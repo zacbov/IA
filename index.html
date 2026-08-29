@@ -1,0 +1,1934 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Routeur IA</title>
+<style>
+  :root{
+    --bg:#0b0f0d; --panel:#111815; --line:#233029;
+    --amber:#e8a33d; --cyan:#5fd0c0; --text:#dfe7e2; --dim:#7c8c84; --danger:#d9654f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{margin:0; background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; display:flex; flex-direction:column; overflow:hidden;}
+  header{padding:14px 16px 12px; border-bottom:1px solid var(--line); background:linear-gradient(180deg,#0e1412,#0b0f0d); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; gap:8px;}
+  header .left{display:flex; align-items:center; gap:10px; overflow:hidden;}
+  #menu-btn{background:none; border:1px solid var(--line); color:var(--dim); width:34px; height:34px; border-radius:6px; font-size:16px; cursor:pointer; flex-shrink:0;}
+  .title{font-family:monospace; font-size:12px; letter-spacing:1px; color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .title b{color:var(--amber); font-weight:600;}
+  #gear{background:none; border:1px solid var(--line); color:var(--dim); width:34px; height:34px; border-radius:6px; font-size:16px; cursor:pointer; flex-shrink:0;}
+  #gear:active, #menu-btn:active{border-color:var(--amber); color:var(--amber);}
+  #status-strip{display:flex; gap:8px; padding:7px 16px; border-bottom:1px solid var(--line); font-family:monospace; font-size:9px; letter-spacing:0.5px; color:var(--dim); flex-shrink:0; overflow-x:auto; white-space:nowrap;}
+  .chip{display:flex; align-items:center; gap:4px; flex-shrink:0;}
+  .dot{width:6px; height:6px; border-radius:50%; background:#3a4a41;}
+  .dot.on{background:var(--cyan); box-shadow:0 0 6px var(--cyan);}
+  #messages{flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:14px;}
+  .msg{max-width:88%; display:flex; flex-direction:column; gap:4px;}
+  .msg.user{align-self:flex-end; align-items:flex-end;}
+  .msg.bot{align-self:flex-start; align-items:flex-start;}
+  .bubble{padding:10px 13px; border-radius:10px; font-size:14.5px; line-height:1.5; white-space:pre-wrap; word-break:break-word;}
+  .msg.user .bubble{background:#1b2b24; border:1px solid #2a3d33;}
+  .msg.bot .bubble{background:var(--panel); border:1px solid var(--line);}
+  .msg img{max-width:100%; border-radius:8px; border:1px solid var(--line); margin-top:6px; display:block; cursor:pointer;}
+  .tag{font-family:monospace; font-size:9.5px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim); padding:0 2px;}
+  .tag.engine-groq{color:var(--amber);} .tag.engine-gemini{color:var(--cyan);}
+  .tag.engine-mistral{color:#f08a5d;} .tag.engine-cerebras{color:#8a9de0;}
+  .tag.engine-openrouter{color:#d0a0e0;} .tag.engine-nvidia{color:#76b900;}
+  .tag.engine-hf{color:#ffcc4d;} .tag.err{color:var(--danger);}
+  .tag.cat{color:#5a6b62; border:1px solid #2a3a32; padding:1px 5px; border-radius:4px; margin-right:4px;}
+  #empty{margin:auto; text-align:center; color:var(--dim); padding:20px; font-family:monospace; font-size:12px; line-height:1.8;}
+  #empty b{color:var(--text); display:block; font-size:15px; margin-bottom:8px; font-family:'Segoe UI',sans-serif;}
+  #preview-bar{display:none; padding:8px 12px 0; flex-shrink:0;}
+  #preview-bar.show{display:flex; gap:8px; align-items:center;}
+  #preview-bar img{width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid var(--line);}
+  #preview-bar button{background:none; border:1px solid var(--line); color:var(--dim); border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer;}
+  #inputbar{display:flex; gap:8px; padding:10px 12px calc(env(safe-area-inset-bottom,0px) + 10px); border-top:1px solid var(--line); background:var(--bg); flex-shrink:0; align-items:flex-end;}
+  #attach{background:none; border:1px solid var(--line); color:var(--dim); width:44px; height:44px; border-radius:10px; font-size:18px; cursor:pointer; flex-shrink:0;}
+  #inputbar textarea{flex:1; resize:none; background:var(--panel); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:15px; font-family:inherit; max-height:110px;}
+  #inputbar textarea:focus{outline:none; border-color:var(--cyan);}
+  #send{background:var(--amber); border:none; color:#1a1208; font-weight:700; width:46px; height:44px; border-radius:10px; font-size:18px; cursor:pointer; flex-shrink:0;}
+  #send:disabled{background:#3a3a34; color:#777;}
+
+  .overlay{position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; z-index:10;}
+  .overlay.show{display:flex;}
+  #overlay-settings{align-items:flex-end;}
+#overlay-news{align-items:flex-end;}
+  #sheet{width:100%; background:var(--panel); border-top:1px solid var(--line); border-radius:16px 16px 0 0; padding:20px 18px calc(env(safe-area-inset-bottom,0px) + 20px); max-height:85vh; overflow-y:auto;}
+  #sheet h2{font-family:monospace; font-size:13px; letter-spacing:2px; text-transform:uppercase; color:var(--amber); margin:0 0 14px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-family:monospace; font-size:10px; letter-spacing:1px; color:var(--dim); margin-bottom:5px; text-transform:uppercase;}
+  .field input{width:100%; background:#0e1512; border:1px solid var(--line); color:var(--text); padding:10px 11px; border-radius:8px; font-size:13px; font-family:monospace;}
+  .field input:focus{outline:none; border-color:var(--cyan);}
+  .field p{font-size:11px; color:var(--dim); margin:5px 2px 0; line-height:1.4;}
+  #save-keys{width:100%; background:var(--cyan); border:none; color:#08211c; font-weight:700; padding:13px; border-radius:8px; font-size:14px; cursor:pointer; margin-top:6px;}
+  #close-sheet, #close-convos{width:100%; background:none; border:1px solid var(--line); color:var(--dim); padding:11px; border-radius:8px; font-size:13px; cursor:pointer; margin-top:10px;}
+  .divider{height:1px; background:var(--line); margin:16px 0;}
+
+  /* Conversations sidebar */
+  #overlay-convos{align-items:stretch; justify-content:flex-start;}
+  #convo-panel{width:82%; max-width:320px; background:var(--panel); border-right:1px solid var(--line); padding:18px 14px calc(env(safe-area-inset-bottom,0px)+14px); display:flex; flex-direction:column; height:100%; overflow-y:auto;}
+  #convo-panel h2{font-family:monospace; font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--amber); margin:0 0 14px;}
+  #new-convo{background:var(--cyan); border:none; color:#08211c; font-weight:700; padding:11px; border-radius:8px; font-size:13px; cursor:pointer; margin-bottom:14px;}
+  .convo-item{display:flex; align-items:center; gap:8px; padding:10px 8px; border-radius:8px; margin-bottom:4px; cursor:pointer; border:1px solid transparent;}
+  .convo-item.active{background:#1b2b24; border-color:#2a3d33;}
+  .convo-item span.name{flex:1; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .convo-item button{background:none; border:none; color:var(--dim); font-size:14px; cursor:pointer; padding:2px 6px;}
+  #preview-modal.show{display:flex !important;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="left">
+    <button id="menu-btn">☰</button>
+    <div class="title mono">Routeur <b>IA</b> · <span id="current-title">Nouvelle conversation</span></div>
+  </div>
+  <div style="display:flex; gap:6px;">
+    <button id="usage-btn" title="Usage du jour" style="background:none; border:1px solid var(--line); color:var(--dim); width:34px; height:34px; border-radius:6px; font-size:15px; cursor:pointer;">📊</button>
+    <button id="news-btn" title="Actualités Claude" style="background:none; border:1px solid var(--line); color:var(--dim); width:34px; height:34px; border-radius:6px; font-size:15px; cursor:pointer;">📰</button>
+    <button id="gear">⚙</button>
+  </div>
+</header>
+
+<div id="offline-banner" style="display:none; background:#3a1414; color:#e0a0a0; text-align:center; font-family:monospace; font-size:11px; letter-spacing:1px; padding:6px; flex-shrink:0;">📡 HORS-LIGNE — pas de connexion réseau</div>
+
+<div id="status-strip">
+  <div class="chip"><span class="dot" id="dot-groq"></span>GROQ</div>
+  <div class="chip"><span class="dot" id="dot-gemini"></span>GEMINI</div>
+  <div class="chip"><span class="dot" id="dot-mistral"></span>MISTRAL</div>
+  <div class="chip"><span class="dot" id="dot-cerebras"></span>CEREBRAS</div>
+  <div class="chip"><span class="dot" id="dot-openrouter"></span>OPENROUTER</div>
+  <div class="chip"><span class="dot" id="dot-nvidia"></span>NVIDIA</div>
+  <div class="chip"><span class="dot" id="dot-hf"></span>HF</div>
+  <div class="chip"><span class="dot" id="dot-github"></span>GITHUB</div>
+  <div class="chip"><span class="dot" id="dot-cloudflare"></span>CLOUDFLARE</div>
+  <div class="chip"><span class="dot" id="dot-zai"></span>Z.AI</div>
+  <div class="chip"><span class="dot on"></span>LLM7</div>
+</div>
+
+<div id="messages">
+  <div id="empty">
+    <b>Prêt</b>
+    Chaque message est classé automatiquement :<br>
+    code → Mistral Codestral / Qwen Coder<br>
+    raisonnement/analyse long → Gemini (1M contexte)<br>
+    discussion rapide → Groq<br>
+    image → Gemini · photo jointe → Gemini Vision<br>
+    fichier .html/.json/.js/... joint → analysé en texte<br>
+    ☰ pour gérer tes conversations.
+  </div>
+</div>
+
+<div id="preview-bar">
+  <img id="preview-img" src="" style="display:none;">
+  <span id="preview-name" style="font-size:11px;color:var(--dim);flex:1;" class="mono">photo jointe</span>
+  <button id="remove-attach">✕</button>
+</div>
+
+<div id="engine-bar" style="display:flex; align-items:center; padding:6px 12px 0; flex-shrink:0;">
+  <button id="engine-picker-btn" style="background:none; border:1px solid var(--line); color:var(--dim); border-radius:14px; padding:4px 12px; font-size:11px; cursor:pointer;" class="mono">🎯 Auto</button>
+  <button id="project-mode-btn" style="background:none; border:1px solid var(--line); color:var(--dim); border-radius:14px; padding:4px 12px; font-size:11px; cursor:pointer; margin-left:8px;" class="mono">🧩 Projet : OFF</button>
+</div>
+
+<div id="inputbar">
+  <button id="attach">📎</button>
+  <button id="scan-code" title="Scanner du code" style="background:none; border:1px solid var(--line); color:var(--dim); width:44px; height:44px; border-radius:10px; font-size:16px; cursor:pointer; flex-shrink:0;">📷</button>
+  <textarea id="input" rows="1" placeholder="Écris ton message…"></textarea>
+  <button id="send">➤</button>
+</div>
+<input type="file" id="file-input" accept="image/*,.html,.json,.js,.jsx,.ts,.css,.txt,.md,.py,.csv,.xml,.yaml,.yml" style="display:none;">
+<input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;">
+<div id="scan-progress" style="display:none; padding:8px 16px; font-size:11px; color:var(--dim); font-family:monospace; flex-shrink:0;"></div>
+
+<!-- Sélecteur de moteur forcé -->
+<div class="overlay" id="overlay-engine" style="align-items:flex-end;">
+  <div id="sheet">
+    <h2>🎯 Forcer un moteur</h2>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:14px;">Contourne le routage automatique — utile pour tester ou éviter un moteur à quota. Reste actif jusqu'à ce que tu repasses en Auto.</div>
+    <div id="engine-list"></div>
+    <button id="close-engine" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:16px;">Fermer</button>
+  </div>
+</div>
+
+<!-- Zoom image plein écran -->
+<div id="image-zoom" style="position:fixed; inset:0; background:rgba(0,0,0,0.92); display:none; z-index:25; align-items:center; justify-content:center;">
+  <img id="image-zoom-img" src="" style="max-width:95%; max-height:95%; object-fit:contain; border-radius:6px;">
+</div>
+
+<!-- Settings -->
+<div class="overlay" id="overlay-settings">
+  <div id="sheet">
+    <h2>Clés API</h2>
+    <div class="field"><label>Groq</label><input type="password" id="key-groq"><p>console.groq.com/keys — discussion rapide.</p></div>
+    <div class="field"><label>Gemini</label><input type="password" id="key-gemini"><p>aistudio.google.com/apikey — doit commencer par AIza. Images, vision, raisonnement long.</p></div>
+    <div class="field"><label>Mistral</label><input type="password" id="key-mistral"><p>console.mistral.ai — code (Codestral) + texte.</p></div>
+    <div class="field"><label>Cerebras</label><input type="password" id="key-cerebras"><p>cloud.cerebras.ai — texte très rapide.</p></div>
+    <div class="field"><label>OpenRouter</label><input type="password" id="key-openrouter"><p>openrouter.ai/keys — code (Qwen Coder) + secours.</p></div>
+    <div class="field"><label>NVIDIA NIM</label><input type="password" id="key-nvidia"><p>build.nvidia.com — gros modèles, secours raisonnement.</p></div>
+    <div class="field"><label>Hugging Face</label><input type="password" id="key-hf"><p>huggingface.co/settings/tokens — secours texte.</p></div>
+    <div class="field"><label>GitHub Models</label><input type="password" id="key-github"><p>github.com/settings/tokens — accès GPT-4o gratuit via ton compte GitHub.</p></div>
+    <div class="field"><label>Cloudflare — API Token</label><input type="password" id="key-cloudflare"><p>⚠ Actuellement inactif : l'API Cloudflare bloque les appels directs depuis un navigateur (CORS). Nécessiterait un Worker-proxy pour fonctionner.</p></div>
+    <div class="field"><label>Cloudflare — Account ID</label><input type="text" id="key-cf_account"><p>Conservé pour plus tard si un proxy est mis en place.</p></div>
+    <div class="field"><label>Z.ai (GLM)</label><input type="password" id="key-zai"><p>z.ai/chat → API Keys — modèle gratuit glm-4.5-flash, rapide, bon en code.</p></div>
+    <div class="field"><label>Brave Search</label><input type="password" id="key-brave"><p>api.search.brave.com → gratuit 2000 requêtes/mois — pour une vraie recherche web.</p></div>
+    <div class="field"><label>Tripo3D</label><input type="password" id="key-tripo"><p>platform.tripo3d.ai → API Keys — génération de modèles 3D (.glb), 300 crédits/mois gratuits.</p></div>
+    <div class="divider"></div>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:6px;" class="mono">PROXY CLOUDFLARE (optionnel — cache tes clés côté serveur)</div>
+    <div class="field"><label>URL du Worker</label><input type="text" id="key-proxy_url" placeholder="https://routeur-ia-proxy.xxx.workers.dev"></div>
+    <div class="field"><label>Mot de passe (APP_SECRET)</label><input type="password" id="key-proxy_secret"></div>
+    <button id="save-keys">Enregistrer</button>
+    <button id="open-shortcuts" style="width:100%;background:none;border:1px solid var(--cyan);color:var(--cyan);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:10px;">🤗 Gérer mes raccourcis de Space</button>
+    <button id="open-connectors" style="width:100%;background:none;border:1px solid var(--cyan);color:var(--cyan);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:8px;">🔌 Mes connecteurs personnalisés</button>
+    <div class="divider"></div>
+    <div class="field"><label>Instructions permanentes</label>
+      <textarea id="custom-instructions" rows="4" style="width:100%;background:#0e1512;border:1px solid var(--line);color:var(--text);padding:10px 11px;border-radius:8px;font-size:13px;font-family:inherit;" placeholder="Ex: réponds toujours en français familier, sois concis."></textarea>
+      <p>S'applique à toutes tes conversations et à tous les moteurs (y compris les agents du mode Projet).</p>
+    </div>
+    <div class="field"><label>Feuilles de style CSS de référence</label>
+      <div id="css-list" style="margin-bottom:8px;"></div>
+      <button id="import-css-btn" style="background:none;border:1px solid var(--cyan);color:var(--cyan);padding:9px 12px;border-radius:8px;font-size:12px;cursor:pointer;">📄 Importer un .css</button>
+      <input type="file" id="css-file-input" accept=".css" style="display:none;">
+      <p>Importe-en plusieurs (polices, couleurs, layout...) — l'agent Design pioche et mixe ce qui est pertinent pour chaque demande, sans obligation de tout reprendre.</p>
+    </div>
+    <button id="save-instructions" style="width:100%;background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-bottom:10px;">Enregistrer les instructions</button>
+    <button id="close-sheet">Fermer</button>
+  </div>
+</div>
+
+<!-- Raccourcis de Spaces HF -->
+<div class="overlay" id="overlay-shortcuts" style="align-items:flex-end;">
+  <div id="sheet">
+    <h2>🤗 Raccourcis de Space</h2>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:14px;">Associe un mot-clé à un Space précis. Ex: "upscale" → un Space d'upscale. Dis simplement "upscale cette image" et l'IA saura quel Space utiliser sans que tu retapes l'ID.</div>
+    <div id="shortcuts-list" style="margin-bottom:16px;"></div>
+    <div class="field"><label>Mot-clé (alias)</label><input type="text" id="sc-alias" placeholder="ex: upscale"></div>
+    <div class="field"><label>ID du Space</label><input type="text" id="sc-spaceid" placeholder="ex: Phips/Upscaler"></div>
+    <div class="field"><label>Nom du endpoint (optionnel)</label><input type="text" id="sc-apiname" placeholder="/predict par défaut"></div>
+    <button id="sc-add" style="width:100%;background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:11px;border-radius:8px;font-size:13px;cursor:pointer;">Ajouter le raccourci</button>
+    <button id="close-shortcuts" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:10px;">Fermer</button>
+  </div>
+</div>
+
+<!-- Connecteurs personnalisés -->
+<div class="overlay" id="overlay-connectors" style="align-items:flex-end;">
+  <div id="sheet">
+    <h2>🔌 Mes connecteurs</h2>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:14px;">Branche n'importe quelle API qui accepte un texte simple en entrée. L'IA choisira d'elle-même quand l'utiliser, à partir de la description que tu donnes.</div>
+    <div id="connectors-list" style="margin-bottom:16px;"></div>
+    <div class="field"><label>Nom</label><input type="text" id="cn-name" placeholder="ex: Mon suivi de stock"></div>
+    <div class="field"><label>Description (pour l'IA — quand l'utiliser)</label><input type="text" id="cn-desc" placeholder="ex: Vérifie le stock d'un produit par son nom"></div>
+    <div class="field"><label>URL</label><input type="text" id="cn-url" placeholder="https://mon-api.com/stock"></div>
+    <div class="field"><label>Méthode</label>
+      <select id="cn-method" style="width:100%;background:#0e1512;border:1px solid var(--line);color:var(--text);padding:10px 11px;border-radius:8px;font-size:13px;">
+        <option value="GET">GET (valeur en paramètre d'URL)</option>
+        <option value="POST">POST (valeur en JSON)</option>
+      </select>
+    </div>
+    <div class="field"><label>Nom du paramètre</label><input type="text" id="cn-param" placeholder="ex: produit (par défaut: query)"></div>
+    <div class="field"><label>Valeur de test</label><input type="text" id="cn-testval" placeholder="ex: une vraie valeur à essayer"></div>
+    <button id="cn-test" style="width:100%;background:none;border:1px solid var(--cyan);color:var(--cyan);font-weight:700;padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-bottom:8px;">🧪 Tester avant d'ajouter</button>
+    <div id="cn-test-result" style="font-size:11.5px;font-family:monospace;padding:8px;border-radius:8px;margin-bottom:8px;display:none;white-space:pre-wrap;word-break:break-word;max-height:150px;overflow-y:auto;"></div>
+    <button id="cn-add" style="width:100%;background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:11px;border-radius:8px;font-size:13px;cursor:pointer;">Ajouter le connecteur</button>
+    <button id="close-connectors" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:10px;">Fermer</button>
+  </div>
+</div>
+
+<!-- Conversations -->
+<div class="overlay" id="overlay-convos">
+  <div id="convo-panel">
+    <h2>Conversations</h2>
+    <button id="new-convo">+ Nouvelle conversation</button>
+    <div id="convo-list"></div>
+    <button id="close-convos">Fermer</button>
+  </div>
+</div>
+
+<!-- Usage du jour -->
+<div class="overlay" id="overlay-usage" style="align-items:flex-end;">
+  <div id="sheet">
+    <h2>📊 Usage du jour</h2>
+    <div id="usage-list"></div>
+    <button id="close-usage" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:16px;">Fermer</button>
+  </div>
+</div>
+
+<!-- Actualités Claude / Anthropic -->
+<div class="overlay" id="overlay-news">
+  <div id="sheet">
+    <h2>📰 Actualités Claude / Anthropic</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div id="news-status" style="font-size:11px;color:var(--dim);" class="mono">Chargement…</div>
+      <button id="refresh-news" style="background:none;border:1px solid var(--line);color:var(--cyan);padding:5px 10px;border-radius:6px;font-size:11px;cursor:pointer;">🔄 Rafraîchir</button>
+    </div>
+    <div id="news-list" style="display:flex;flex-direction:column;gap:14px;"></div>
+    <button id="close-news" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:16px;">Fermer</button>
+  </div>
+</div>
+
+<!-- Aperçu live (HTML/Three.js/design) -->
+<div id="preview-modal" style="position:fixed; inset:0; background:#000; display:none; z-index:20; flex-direction:column;">
+  <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--panel); border-bottom:1px solid var(--line);">
+    <span class="mono" style="font-size:11px; letter-spacing:1px; color:var(--dim); text-transform:uppercase;">Aperçu live</span>
+    <button onclick="closePreview()" style="background:none; border:1px solid var(--line); color:var(--dim); width:32px; height:32px; border-radius:6px; font-size:16px;">✕</button>
+  </div>
+  <iframe id="preview-frame" sandbox="allow-scripts" style="flex:1; border:none; background:#fff;"></iframe>
+</div>
+
+<script>
+// --- Clés intégrées directement (à usage personnel uniquement) ---
+let KEYS = {
+  groq:'',
+  gemini:'',
+  mistral:'',
+  cerebras:'',
+  openrouter:'',
+  nvidia:'',
+  hf:'',
+  github:'',
+  cloudflare:'',
+  cf_account:'',
+  llm7:'unused',
+  zai:'',
+  tripo:'',
+  proxy_url:'https://routeur-ia-proxy.zacharybov.workers.dev',
+  proxy_secret:'',
+  brave:''
+};
+
+async function persistKeys(){
+  try{ if(window.storage) { await window.storage.set('api-keys', JSON.stringify(KEYS), false); return; } }catch(e){}
+  try{ localStorage.setItem('routeur-ia-keys', JSON.stringify(KEYS)); }catch(e){}
+}
+async function loadKeysFromStorage(){
+  try{
+    if(window.storage){ const r = await window.storage.get('api-keys', false); if(r && r.value) KEYS = JSON.parse(r.value); return; }
+  }catch(e){}
+  try{ const raw = localStorage.getItem('routeur-ia-keys'); if(raw) KEYS = JSON.parse(raw); }catch(e){}
+}
+const ALL_KEY_IDS = ['groq','gemini','mistral','cerebras','openrouter','nvidia','hf','github','cloudflare','cf_account','zai','tripo','proxy_url','proxy_secret','brave'];
+function reflectStatus(){
+  ALL_KEY_IDS.forEach(id=>{
+    const dot = document.getElementById('dot-'+id);
+    if(dot) dot.className = 'dot ' + (KEYS[id] ? 'on':'');
+  });
+}
+function openSettings(){
+  ALL_KEY_IDS.forEach(id=>{
+    const el = document.getElementById('key-'+id);
+    if(el) el.value = KEYS[id] || '';
+  });
+  document.getElementById('custom-instructions').value = CUSTOM_INSTRUCTIONS || '';
+  document.getElementById('overlay-settings').classList.add('show');
+}
+function closeSettings(){ document.getElementById('overlay-settings').classList.remove('show'); }
+function saveKeys(){
+  ALL_KEY_IDS.forEach(id=>{
+    const el = document.getElementById('key-'+id);
+    if(el){ const v = el.value.trim(); if(v) KEYS[id] = v; }
+  });
+  persistKeys(); reflectStatus(); closeSettings();
+}
+document.getElementById('gear').onclick = openSettings;
+document.getElementById('close-sheet').onclick = closeSettings;
+document.getElementById('save-keys').onclick = saveKeys;
+
+// --- Conversations ---
+let conversations = [];
+let currentId = null;
+
+function newConversation(){
+  const c = { id: 'c'+Date.now(), title:'Nouvelle conversation', messages:[], history:[] };
+  conversations.unshift(c);
+  currentId = c.id;
+  renderConvoList();
+  renderMessages();
+  persistConvos();
+}
+function getCurrent(){ return conversations.find(c=>c.id===currentId); }
+function switchConvo(id){ currentId = id; renderConvoList(); renderMessages(); closeConvos(); }
+function deleteConvo(id, ev){
+  ev.stopPropagation();
+  conversations = conversations.filter(c=>c.id!==id);
+  if(currentId===id){ if(conversations.length) currentId = conversations[0].id; else newConversation(); }
+  renderConvoList(); renderMessages(); persistConvos();
+}
+function renderConvoList(){
+  const list = document.getElementById('convo-list');
+  list.innerHTML = '';
+  conversations.forEach(c=>{
+    const el = document.createElement('div');
+    el.className = 'convo-item' + (c.id===currentId ? ' active':'');
+    el.innerHTML = `<span class="name">${escapeHtml(c.title)}</span><button class="rename-btn" style="margin-right:2px;">✏️</button><button>✕</button>`;
+    el.onclick = ()=> switchConvo(c.id);
+    el.querySelector('.rename-btn').onclick = (ev)=> renameConvo(c.id, ev);
+    el.querySelectorAll('button')[1].onclick = (ev)=> deleteConvo(c.id, ev);
+    list.appendChild(el);
+  });
+}
+function renameConvo(id, ev){
+  ev.stopPropagation();
+  const c = conversations.find(x=>x.id===id);
+  if(!c) return;
+  const newTitle = prompt('Nouveau nom de la conversation :', c.title);
+  if(newTitle && newTitle.trim()){
+    c.title = newTitle.trim().slice(0, 60);
+    renderConvoList();
+    if(id === currentId) document.getElementById('current-title').textContent = c.title;
+    persistConvos();
+  }
+}
+function renderMessages(){
+  const c = getCurrent();
+  document.getElementById('current-title').textContent = c ? c.title : '';
+  messagesEl.innerHTML = '';
+  if(!c || c.messages.length===0){
+    messagesEl.innerHTML = `<div id="empty"><b>Prêt</b>Chaque message est classé automatiquement :<br>code → Mistral Codestral / Qwen Coder<br>raisonnement/analyse long → Gemini (1M contexte)<br>discussion rapide → Groq<br>image → Gemini · photo jointe → Gemini Vision<br>fichier .html/.json/.js/... joint → analysé en texte<br>☰ pour gérer tes conversations.</div>`;
+    return;
+  }
+  c.messages.forEach((m,i)=> renderMessage(m,i));
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+function openConvos(){ document.getElementById('overlay-convos').classList.add('show'); }
+function closeConvos(){ document.getElementById('overlay-convos').classList.remove('show'); }
+document.getElementById('menu-btn').onclick = openConvos;
+document.getElementById('close-convos').onclick = closeConvos;
+document.getElementById('new-convo').onclick = ()=>{ newConversation(); closeConvos(); };
+document.getElementById('overlay-convos').onclick = (e)=>{ if(e.target.id==='overlay-convos') closeConvos(); };
+
+async function persistConvos(){
+  const trimmed = conversations.map(c => c.messages.length > 80 ? { ...c, messages: c.messages.slice(-80) } : c);
+  let payload = JSON.stringify({ conversations: trimmed, currentId });
+  try{
+    if(window.storage){
+      const ok = await window.storage.set('conversations', payload, false);
+      if(ok) return;
+    }
+  }catch(e){
+    // trop volumineux ou erreur de stockage : on retente avec un historique encore plus réduit
+    try{
+      const reduced = conversations.map(c => ({ ...c, messages: c.messages.slice(-25) }));
+      payload = JSON.stringify({ conversations: reduced, currentId });
+      if(window.storage) await window.storage.set('conversations', payload, false);
+    }catch(e2){ /* on continue quand même, la conversation reste visible en mémoire pour cette session */ }
+  }
+  try{ localStorage.setItem('routeur-ia-convos', payload); }catch(e){}
+}
+async function loadConvos(){
+  let raw = null;
+  try{ if(window.storage){ const r = await window.storage.get('conversations', false); if(r) raw = r.value; } }catch(e){}
+  if(!raw){ try{ raw = localStorage.getItem('routeur-ia-convos'); }catch(e){} }
+  if(raw){
+    try{
+      const d = JSON.parse(raw);
+      conversations = d.conversations || [];
+      currentId = d.currentId;
+    }catch(e){}
+  }
+  if(!conversations.length) newConversation();
+  if(!getCurrent()) currentId = conversations[0].id;
+  renderConvoList();
+  renderMessages();
+}
+
+// --- Attachment (photo ou fichier texte/code) ---
+let attachedImage = null;
+let attachedFile = null; // {name, content}
+document.getElementById('attach').onclick = ()=> document.getElementById('file-input').click();
+document.getElementById('file-input').onchange = (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  attachedImage = null; attachedFile = null;
+  if(f.type.startsWith('image/')){
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const dataUrl = reader.result;
+      attachedImage = { mimeType:f.type, base64:dataUrl.split(',')[1] };
+      document.getElementById('preview-img').style.display = 'block';
+      document.getElementById('preview-img').src = dataUrl;
+      document.getElementById('preview-name').textContent = 'photo jointe';
+      document.getElementById('preview-bar').classList.add('show');
+    };
+    reader.readAsDataURL(f);
+  } else {
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      attachedFile = { name:f.name, content: reader.result };
+      document.getElementById('preview-img').style.display = 'none';
+      document.getElementById('preview-name').textContent = '📄 ' + f.name;
+      document.getElementById('preview-bar').classList.add('show');
+    };
+    reader.readAsText(f);
+  }
+};
+document.getElementById('remove-attach').onclick = ()=>{
+  attachedImage = null; attachedFile = null;
+  document.getElementById('preview-bar').classList.remove('show');
+  document.getElementById('file-input').value = '';
+};
+
+// --- Message rendering ---
+const messagesEl = document.getElementById('messages');
+messagesEl.addEventListener('click', (e)=>{
+  if(e.target.tagName === 'IMG'){
+    document.getElementById('image-zoom-img').src = e.target.src;
+    document.getElementById('image-zoom').style.display = 'flex';
+  }
+});
+document.getElementById('image-zoom').addEventListener('click', ()=>{
+  document.getElementById('image-zoom').style.display = 'none';
+});
+const inputEl = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderMessage(m, index){
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + (m.role==='user' ? 'user' : 'bot');
+  let tagHtml = '';
+  if(m.cat) tagHtml += `<span class="tag cat">${m.cat}</span>`;
+  if(m.tag) tagHtml += `<span class="tag ${m.tagClass||''}">${m.tag}</span>`;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  if(m.role === 'bot' && !m.isError){ renderReplyContent(bubble, m.text || ''); }
+  else { bubble.textContent = m.text || ''; }
+  wrap.innerHTML = tagHtml;
+  wrap.appendChild(bubble);
+  if(m.imgSrc){ const img=document.createElement('img'); img.src=m.imgSrc; bubble.appendChild(img); }
+  if(m.audioSrc){ const audio=document.createElement('audio'); audio.src=m.audioSrc; audio.controls=true; audio.style.cssText='width:100%;margin-top:6px;'; bubble.appendChild(audio); }
+  if(m.role === 'bot'){
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex; gap:6px; margin-top:4px;';
+    const btnStyle = 'background:none;border:1px solid var(--line);color:var(--dim);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;';
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '📋 Copier'; copyBtn.style.cssText = btnStyle;
+    copyBtn.onclick = ()=> copyMessage(m.text || '');
+    const regenBtn = document.createElement('button');
+    regenBtn.textContent = '🔄 Régénérer'; regenBtn.style.cssText = btnStyle;
+    regenBtn.onclick = ()=> regenerate(index);
+    actions.appendChild(copyBtn); actions.appendChild(regenBtn);
+    wrap.appendChild(actions);
+  }
+  messagesEl.appendChild(wrap);
+  return bubble;
+}
+function pushMessage(m){
+  const c = getCurrent();
+  const empty = document.getElementById('empty'); if(empty) empty.remove();
+  c.messages.push(m);
+  const bubble = renderMessage(m, c.messages.length-1);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  if(c.title === 'Nouvelle conversation' && m.role==='user' && m.text){
+    c.title = m.text.slice(0,32) + (m.text.length>32 ? '…':'');
+    renderConvoList();
+  }
+  persistConvos();
+  return bubble;
+}
+
+// --- Task classification & routing ---
+function classifyTask(text, hasAttachment){
+  const imageWords = /\b(image|photo|dessin|illustration|logo|croquis)\b/i;
+  const strongVerbs = /\b(dessine|dessin|illustration|logo|croquis|upscale)\b/i;
+  const ambiguousVerbs = /\b(génère|genere|crée|cree|fais|fait|montre|transforme|édite|edite|modifie|améliore|ameliore|restaure|colorise|colorie|retouche|nettoie|netoie|recolore|stylise|agrandis|agrandir)\b/i;
+  const photoOf = /\b(photo|image)\s+de\b/i;
+  const wantsImageGen = strongVerbs.test(text) || photoOf.test(text) || (ambiguousVerbs.test(text) && imageWords.test(text));
+  const visionOnly = /\b(décris|decris|identifie|analyse|analyses|qu'est-ce|qu est ce|que vois|lis|traduis|explique|résume|resume)\b/i;
+  if(hasAttachment){
+    if(wantsImageGen) return 'image';
+    if(visionOnly.test(text) || !text) return 'vision';
+    return 'image'; // photo jointe + instruction ambiguë -> on suppose une édition plutôt qu'une simple analyse
+  }
+  if(wantsImageGen) return 'image';
+  if(/\b(code|fonction|bug|script|erreur|python|javascript|html|css|json|sql|regex|api|debug|compile|programme)\b/i.test(text)) return 'code';
+  if(text.length > 350 || /\b(analyse|résume|resume|explique en détail|compare|synthétise|synthetise|rédige un rapport|redige un rapport)\b/i.test(text)) return 'reasoning';
+  return 'chat';
+}
+
+const OA_PROVIDERS = {
+  groq: { url:'https://api.groq.com/openai/v1/chat/completions', model:'openai/gpt-oss-120b', tag:'GROQ', cls:'engine-groq' },
+  cerebras: { url:'https://api.cerebras.ai/v1/chat/completions', model:'gpt-oss-120b', tag:'CEREBRAS', cls:'engine-cerebras' },
+  mistral: { url:'https://api.mistral.ai/v1/chat/completions', model:'mistral-small-latest', tag:'MISTRAL', cls:'engine-mistral' },
+  'mistral-code': { key:'mistral', url:'https://api.mistral.ai/v1/chat/completions', model:'codestral-latest', tag:'MISTRAL·CODE', cls:'engine-mistral' },
+  openrouter: { url:'https://openrouter.ai/api/v1/chat/completions', model:'meta-llama/llama-3.3-70b-instruct:free', tag:'OPENROUTER', cls:'engine-openrouter' },
+  'openrouter-code': { key:'openrouter', url:'https://openrouter.ai/api/v1/chat/completions', model:'qwen/qwen3-coder:free', tag:'OPENROUTER·CODE', cls:'engine-openrouter' },
+  nvidia: { url:'https://integrate.api.nvidia.com/v1/chat/completions', model:'meta/llama-3.3-70b-instruct', tag:'NVIDIA', cls:'engine-nvidia' },
+  hf: { url:'https://api-inference.huggingface.co/v1/chat/completions', model:'meta-llama/Llama-3.3-70B-Instruct', tag:'HF', cls:'engine-hf' },
+  github: { url:'https://models.inference.ai.azure.com/chat/completions', model:'gpt-4o', tag:'GITHUB · GPT-4O', cls:'engine-hf' },
+  zai: { url:'https://api.z.ai/api/paas/v4/chat/completions', model:'glm-4.5-flash', tag:'Z.AI · GLM', cls:'engine-cerebras' },
+  llm7: { url:'https://api.llm7.io/v1/chat/completions', model:'default', tag:'LLM7', cls:'engine-hf' },
+};
+
+const ROUTES = {
+  chat:      ['groq','zai','mistral','openrouter','nvidia','github','hf','cerebras','llm7'],
+  code:      ['mistral-code','zai','openrouter-code','github','groq','hf','llm7'],
+  reasoning: ['gemini','github','nvidia','mistral','zai','cerebras'],
+  image:     ['pollinations','gemini'],
+  vision:    ['gemini'],
+};
+const CAT_LABEL = { chat:'CHAT', code:'CODE', reasoning:'ANALYSE', image:'IMAGE', vision:'VISION' };
+
+const SELECTABLE_ENGINES = [
+  { key:'groq', label:'Groq', type:'text', needKey:'groq' },
+  { key:'cerebras', label:'Cerebras', type:'text', needKey:'cerebras' },
+  { key:'mistral', label:'Mistral', type:'text', needKey:'mistral' },
+  { key:'mistral-code', label:'Mistral Codestral', type:'text', needKey:'mistral' },
+  { key:'openrouter', label:'OpenRouter', type:'text', needKey:'openrouter' },
+  { key:'openrouter-code', label:'OpenRouter Qwen Coder', type:'text', needKey:'openrouter' },
+  { key:'nvidia', label:'NVIDIA', type:'text', needKey:'nvidia' },
+  { key:'hf', label:'Hugging Face', type:'text', needKey:'hf' },
+  { key:'github', label:'GitHub GPT-4o', type:'text', needKey:'github' },
+  { key:'gemini', label:'Gemini', type:'text', needKey:'gemini' },
+  { key:'zai', label:'Z.ai GLM', type:'text', needKey:'zai' },
+  { key:'llm7', label:'LLM7 (sans clé)', type:'text', needKey:null },
+  { key:'gemini', label:'Gemini (image)', type:'image', needKey:'gemini' },
+  { key:'pollinations', label:'Pollinations (image)', type:'image', needKey:null },
+];
+let forcedEngine = null; // {key, type, label}
+
+function renderEngineList(){
+  const list = document.getElementById('engine-list');
+  const rows = [{ key:null, label:'🔀 Auto (recommandé)', type:null, needKey:null }, ...SELECTABLE_ENGINES];
+  list.innerHTML = rows.map((e,i) => {
+    const configured = !e.needKey || KEYS[e.needKey];
+    const active = forcedEngine ? (forcedEngine.key===e.key && forcedEngine.type===e.type) : (e.key===null);
+    return `<button data-i="${i}" ${configured?'':'disabled'} style="display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:${active?'#1b2b24':'none'};border:1px solid ${active?'var(--cyan)':'var(--line)'};color:${configured?'var(--text)':'var(--dim)'};padding:10px 12px;border-radius:8px;margin-bottom:6px;font-size:13px;${configured?'cursor:pointer;':'opacity:0.4;'}">
+      <span>${e.label}</span>
+      <span class="mono" style="font-size:10px;color:var(--dim);">${configured ? (e.type ? e.type.toUpperCase() : '') : 'clé manquante'}</span>
+    </button>`;
+  }).join('');
+  list.querySelectorAll('button[data-i]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const e = rows[+btn.dataset.i];
+      forcedEngine = e.key ? { key:e.key, type:e.type, label:e.label } : null;
+      document.getElementById('engine-picker-btn').textContent = forcedEngine ? '🎯 ' + forcedEngine.label : '🎯 Auto';
+      document.getElementById('overlay-engine').classList.remove('show');
+    };
+  });
+}
+document.getElementById('engine-picker-btn').onclick = ()=>{ renderEngineList(); document.getElementById('overlay-engine').classList.add('show'); };
+document.getElementById('close-engine').onclick = ()=> document.getElementById('overlay-engine').classList.remove('show');
+document.getElementById('overlay-engine').onclick = (e)=>{ if(e.target.id==='overlay-engine') document.getElementById('overlay-engine').classList.remove('show'); };
+
+const NEWS_FEEDS = [
+  { id:'anthropic', label:'Anthropic', url:'https://raw.githubusercontent.com/taobojlen/anthropic-rss-feed/main/anthropic_news_rss.xml' },
+  { id:'korben', label:'Korben (filtré Claude/Anthropic)', url:'https://korben.info/feed', filterKeywords:['claude','anthropic'] },
+];
+let newsCache = null; // {items:[...], fetchedAt}
+
+async function fetchNewsFeed(feed){
+  const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`);
+  const data = await res.json();
+  if(data.status !== 'ok') return [];
+  let items = data.items || [];
+  if(feed.filterKeywords){
+    items = items.filter(it => feed.filterKeywords.some(k => (it.title+' '+(it.description||'')).toLowerCase().includes(k)));
+  }
+  return items.map(it => ({
+    date: it.pubDate ? it.pubDate.slice(0,10) : '',
+    title: it.title,
+    text: (it.description||'').replace(/<[^>]+>/g,'').slice(0,220),
+    link: it.link,
+    source: feed.label,
+    ts: it.pubDate ? new Date(it.pubDate).getTime() : 0,
+  }));
+}
+
+async function loadNews(force){
+  const listEl = document.getElementById('news-list');
+  const statusEl = document.getElementById('news-status');
+  if(!force && newsCache){ renderNewsItems(newsCache.items); return; }
+  statusEl.textContent = 'Actualisation…';
+  listEl.innerHTML = '';
+  try{
+    const results = await Promise.all(NEWS_FEEDS.map(f => fetchNewsFeed(f).catch(()=>[])));
+    const merged = results.flat().filter(it=>it.title).sort((a,b)=>b.ts-a.ts).slice(0,20);
+    newsCache = { items: merged, fetchedAt: Date.now() };
+    renderNewsItems(merged);
+    statusEl.textContent = 'Mis à jour à l\'instant · ' + merged.length + ' actualités';
+  }catch(e){
+    statusEl.textContent = "Échec du chargement — vérifie ta connexion.";
+  }
+}
+function renderNewsItems(items){
+  const list = document.getElementById('news-list');
+  if(!items.length){ list.innerHTML = '<div style="color:var(--dim);font-size:12px;">Aucune actualité trouvée.</div>'; return; }
+  list.innerHTML = items.map(n => `
+    <a href="${n.link}" target="_blank" style="text-decoration:none;color:inherit;">
+    <div style="border:1px solid var(--line);border-radius:8px;padding:12px;">
+      <div class="mono" style="font-size:10px;color:var(--amber);letter-spacing:1px;margin-bottom:4px;">${n.date} · ${n.source}</div>
+      <div style="font-weight:600;font-size:14px;margin-bottom:4px;color:var(--text);">${n.title}</div>
+      <div style="font-size:12.5px;color:var(--dim);line-height:1.5;">${n.text}</div>
+    </div>
+    </a>
+  `).join('');
+}
+document.getElementById('news-btn').onclick = ()=>{ document.getElementById('overlay-news').classList.add('show'); loadNews(false); };
+document.getElementById('close-news').onclick = ()=> document.getElementById('overlay-news').classList.remove('show');
+document.getElementById('overlay-news').onclick = (e)=>{ if(e.target.id==='overlay-news') document.getElementById('overlay-news').classList.remove('show'); };
+document.getElementById('refresh-news').onclick = ()=> loadNews(true);
+
+document.getElementById('usage-btn').onclick = ()=>{ renderUsage(); document.getElementById('overlay-usage').classList.add('show'); };
+document.getElementById('close-usage').onclick = ()=> document.getElementById('overlay-usage').classList.remove('show');
+document.getElementById('overlay-usage').onclick = (e)=>{ if(e.target.id==='overlay-usage') document.getElementById('overlay-usage').classList.remove('show'); };
+
+function updateOfflineBanner(){
+  document.getElementById('offline-banner').style.display = navigator.onLine ? 'none' : 'block';
+}
+window.addEventListener('online', updateOfflineBanner);
+window.addEventListener('offline', updateOfflineBanner);
+
+const SKILLS = [
+  { type:'function', function:{ name:'get_weather', description:'Donne la météo actuelle pour une ville', parameters:{ type:'object', properties:{ city:{type:'string', description:'Nom de la ville'} }, required:['city'] } } },
+  { type:'function', function:{ name:'convert_currency', description:'Convertit un montant entre deux devises', parameters:{ type:'object', properties:{ amount:{type:'number'}, from:{type:'string', description:'Code devise ex: EUR'}, to:{type:'string', description:'Code devise ex: USD'} }, required:['amount','from','to'] } } },
+  { type:'function', function:{ name:'wikipedia_lookup', description:'Cherche un résumé encyclopédique sur un sujet précis', parameters:{ type:'object', properties:{ query:{type:'string'} }, required:['query'] } } },
+  { type:'function', function:{ name:'calculate', description:'Évalue une expression mathématique précise', parameters:{ type:'object', properties:{ expression:{type:'string'} }, required:['expression'] } } },
+  { type:'function', function:{ name:'get_timezone', description:"Donne l'heure locale actuelle dans une ville donnée", parameters:{ type:'object', properties:{ city:{type:'string'} }, required:['city'] } } },
+  { type:'function', function:{ name:'jours_feries_fr', description:"Liste les jours fériés en France pour une année donnée", parameters:{ type:'object', properties:{ year:{type:'number', description:'Année, ex: 2026'} }, required:['year'] } } },
+  { type:'function', function:{ name:'make_qrcode', description:"Génère un QR code à partir d'un texte ou d'un lien", parameters:{ type:'object', properties:{ data:{type:'string'} }, required:['data'] } } },
+  { type:'function', function:{ name:'shorten_link', description:"Raccourcit une URL longue", parameters:{ type:'object', properties:{ url:{type:'string'} }, required:['url'] } } },
+  { type:'function', function:{ name:'color_palette', description:"Génère une palette de couleurs harmonieuse à partir d'une couleur de base (hex)", parameters:{ type:'object', properties:{ hex:{type:'string', description:'Couleur de base en hexadécimal, ex: 2E86AB'} }, required:['hex'] } } },
+  { type:'function', function:{ name:'color_info', description:"Donne le nom, le RGB et les infos d'une couleur à partir de son code hexadécimal", parameters:{ type:'object', properties:{ hex:{type:'string'} }, required:['hex'] } } },
+  { type:'function', function:{ name:'icon_search', description:"Cherche des icônes libres de droit sur un thème donné", parameters:{ type:'object', properties:{ query:{type:'string'} }, required:['query'] } } },
+  { type:'function', function:{ name:'texture_search', description:"Cherche des textures PBR ou HDRI libres de droit (utile pour Three.js, rendu 3D, design)", parameters:{ type:'object', properties:{ query:{type:'string'} }, required:['query'] } } },
+  { type:'function', function:{ name:'search_hf_hub', description:"Cherche des modèles, datasets ou Spaces sur Hugging Face Hub", parameters:{ type:'object', properties:{ query:{type:'string'}, kind:{type:'string', description:"'models', 'datasets' ou 'spaces'"} }, required:['query','kind'] } } },
+  { type:'function', function:{ name:'call_hf_space', description:"Appelle un Space Hugging Face précis avec un prompt texte (génération d'image/3D/audio spécialisée, upscale...). Fonctionne surtout avec des Spaces à entrée texte simple ; peut échouer sur des Spaces avec des paramètres complexes ou en file d'attente.", parameters:{ type:'object', properties:{ space_id:{type:'string', description:"Identifiant du Space, format 'auteur/nom-du-space'"}, prompt:{type:'string'}, api_name:{type:'string', description:"Nom du endpoint, souvent '/predict' (par défaut)"} }, required:['space_id','prompt'] } } },
+  { type:'function', function:{ name:'github_list_repos', description:"Liste les dépôts GitHub de l'utilisateur", parameters:{ type:'object', properties:{} } } },
+  { type:'function', function:{ name:'github_latest_commit', description:"Donne le dernier commit d'un dépôt GitHub", parameters:{ type:'object', properties:{ owner:{type:'string'}, repo:{type:'string'} }, required:['owner','repo'] } } },
+  { type:'function', function:{ name:'github_list_issues', description:"Liste les issues ouvertes d'un dépôt GitHub", parameters:{ type:'object', properties:{ owner:{type:'string'}, repo:{type:'string'} }, required:['owner','repo'] } } },
+  { type:'function', function:{ name:'generate_3d_model', description:"Génère un vrai modèle 3D (fichier .glb téléchargeable) à partir d'une description texte, via Tripo3D. Peut prendre 30 à 90 secondes.", parameters:{ type:'object', properties:{ prompt:{type:'string'} }, required:['prompt'] } } },
+  { type:'function', function:{ name:'generate_music', description:"Génère un court morceau de musique instrumentale à partir d'une description texte (via Hugging Face MusicGen). ~10-15 secondes de musique, prend 20-60s à générer.", parameters:{ type:'object', properties:{ prompt:{type:'string', description:"Description du style/ambiance musicale souhaitée"} }, required:['prompt'] } } },
+  { type:'function', function:{ name:'translate_text', description:"Traduit un texte d'une langue vers une autre", parameters:{ type:'object', properties:{ text:{type:'string'}, from:{type:'string', description:"Code langue source, ex: fr"}, to:{type:'string', description:"Code langue cible, ex: en"} }, required:['text','to'] } } },
+  { type:'function', function:{ name:'web_search_real', description:"Fait une vraie recherche web (pas juste Wikipédia) pour de l'actualité générale ou une question précise nécessitant des résultats web à jour", parameters:{ type:'object', properties:{ query:{type:'string'} }, required:['query'] } } },
+  { type:'function', function:{ name:'iss_location', description:"Donne la position actuelle de la Station Spatiale Internationale", parameters:{ type:'object', properties:{} } } },
+  { type:'function', function:{ name:'hackernews_top', description:"Donne les articles tech/dev les plus populaires du moment sur Hacker News", parameters:{ type:'object', properties:{ limit:{type:'number'} } } } },
+  { type:'function', function:{ name:'french_address_lookup', description:"Recherche/valide une adresse officielle française", parameters:{ type:'object', properties:{ query:{type:'string'} }, required:['query'] } } },
+];
+
+let SPACE_SHORTCUTS = {}; // { alias: {spaceId, apiName} }
+
+async function persistShortcuts(){
+  const payload = JSON.stringify(SPACE_SHORTCUTS);
+  try{ if(window.storage){ await window.storage.set('space-shortcuts', payload, false); return; } }catch(e){}
+  try{ localStorage.setItem('routeur-ia-shortcuts', payload); }catch(e){}
+}
+async function loadShortcuts(){
+  try{ if(window.storage){ const r = await window.storage.get('space-shortcuts', false); if(r){ SPACE_SHORTCUTS = JSON.parse(r.value); return; } } }catch(e){}
+  try{ const raw = localStorage.getItem('routeur-ia-shortcuts'); if(raw) SPACE_SHORTCUTS = JSON.parse(raw); }catch(e){}
+}
+function renderShortcuts(){
+  const list = document.getElementById('shortcuts-list');
+  const entries = Object.entries(SPACE_SHORTCUTS);
+  list.innerHTML = entries.length ? entries.map(([alias, s])=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+      <div style="font-size:12px;"><b>${escapeHtml(alias)}</b> <span class="mono" style="color:var(--dim);">→ ${escapeHtml(s.spaceId)}${s.apiName && s.apiName!=='/predict' ? ' ('+escapeHtml(s.apiName)+')' : ''}</span></div>
+      <button data-alias="${escapeHtml(alias)}" class="sc-del" style="background:none;border:none;color:var(--danger);font-size:14px;cursor:pointer;">✕</button>
+    </div>`).join('') : '<div style="color:var(--dim);font-size:12px;">Aucun raccourci pour l\'instant.</div>';
+  list.querySelectorAll('.sc-del').forEach(btn=>{
+    btn.onclick = ()=>{ delete SPACE_SHORTCUTS[btn.dataset.alias]; persistShortcuts(); renderShortcuts(); };
+  });
+}
+document.getElementById('open-shortcuts').onclick = ()=>{ closeSettings(); renderShortcuts(); document.getElementById('overlay-shortcuts').classList.add('show'); };
+document.getElementById('close-shortcuts').onclick = ()=> document.getElementById('overlay-shortcuts').classList.remove('show');
+document.getElementById('overlay-shortcuts').onclick = (e)=>{ if(e.target.id==='overlay-shortcuts') document.getElementById('overlay-shortcuts').classList.remove('show'); };
+document.getElementById('sc-add').onclick = ()=>{
+  const alias = document.getElementById('sc-alias').value.trim().toLowerCase();
+  const spaceId = document.getElementById('sc-spaceid').value.trim();
+  const apiName = document.getElementById('sc-apiname').value.trim() || '/predict';
+  if(!alias || !spaceId) return;
+  SPACE_SHORTCUTS[alias] = { spaceId, apiName };
+  persistShortcuts(); renderShortcuts();
+  document.getElementById('sc-alias').value = ''; document.getElementById('sc-spaceid').value = ''; document.getElementById('sc-apiname').value = '';
+};
+
+// --- Connecteurs personnalisés ---
+let CUSTOM_CONNECTORS = {};
+async function persistConnectors(){
+  const payload = JSON.stringify(CUSTOM_CONNECTORS);
+  try{ if(window.storage){ await window.storage.set('custom-connectors', payload, false); return; } }catch(e){}
+  try{ localStorage.setItem('routeur-ia-connectors', payload); }catch(e){}
+}
+async function loadConnectors(){
+  try{ if(window.storage){ const r = await window.storage.get('custom-connectors', false); if(r){ CUSTOM_CONNECTORS = JSON.parse(r.value); return; } } }catch(e){}
+  try{ const raw = localStorage.getItem('routeur-ia-connectors'); if(raw) CUSTOM_CONNECTORS = JSON.parse(raw); }catch(e){}
+}
+function renderConnectors(){
+  const list = document.getElementById('connectors-list');
+  const entries = Object.entries(CUSTOM_CONNECTORS);
+  list.innerHTML = entries.length ? entries.map(([id, c])=>`
+    <div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <b style="font-size:12px;">${escapeHtml(c.name)}</b>
+        <div>
+          <button data-id="${id}" class="cn-testbtn" style="background:none;border:none;color:var(--cyan);font-size:13px;cursor:pointer;">🧪</button>
+          <button data-id="${id}" class="cn-del" style="background:none;border:none;color:var(--danger);font-size:14px;cursor:pointer;">✕</button>
+        </div>
+      </div>
+      <div class="mono" style="font-size:10px;color:var(--dim);margin-top:2px;">${escapeHtml(c.method)} ${escapeHtml(c.url)}</div>
+      <div style="font-size:11px;color:var(--dim);margin-top:2px;">${escapeHtml(c.description)}</div>
+      <div class="cn-saved-result" data-id="${id}" style="font-size:11px;font-family:monospace;margin-top:6px;padding:6px;border-radius:6px;display:none;white-space:pre-wrap;word-break:break-word;max-height:120px;overflow-y:auto;"></div>
+    </div>`).join('') : '<div style="color:var(--dim);font-size:12px;">Aucun connecteur pour l\'instant.</div>';
+  list.querySelectorAll('.cn-del').forEach(btn=>{
+    btn.onclick = ()=>{ delete CUSTOM_CONNECTORS[btn.dataset.id]; persistConnectors(); renderConnectors(); };
+  });
+  list.querySelectorAll('.cn-testbtn').forEach(btn=>{
+    btn.onclick = async ()=>{
+      const c = CUSTOM_CONNECTORS[btn.dataset.id];
+      const val = prompt('Valeur de test pour "'+c.paramName+'" :', '');
+      if(val === null) return;
+      const resEl = list.querySelector(`.cn-saved-result[data-id="${btn.dataset.id}"]`);
+      resEl.style.display = 'block'; resEl.style.background = '#0e1512'; resEl.style.color = 'var(--dim)';
+      resEl.textContent = 'Test en cours…';
+      const r = await testConnector(c.url, c.method, c.paramName, val);
+      resEl.style.color = r.ok ? 'var(--cyan)' : 'var(--danger)';
+      resEl.textContent = (r.ok ? '✅ HTTP '+r.status+'\n' : '❌ '+r.error+'\n') + (r.preview||'');
+    };
+  });
+}
+
+async function testConnector(url, method, paramName, testValue){
+  try{
+    let res;
+    if(method === 'GET'){
+      const sep = url.includes('?') ? '&' : '?';
+      res = await fetchWithTimeout(`${url}${sep}${encodeURIComponent(paramName)}=${encodeURIComponent(testValue)}`, {}, 12000);
+    } else {
+      res = await fetchWithTimeout(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ [paramName]: testValue }) }, 12000);
+    }
+    const text = await res.text();
+    if(!res.ok) return { ok:false, error:`HTTP ${res.status} — l'URL, la méthode ou le paramètre sont probablement incorrects.`, preview:text.slice(0,300) };
+    return { ok:true, status:res.status, preview:text.slice(0,400) || '(réponse vide mais HTTP 200 — vérifie quand même que c\'est le résultat attendu)' };
+  }catch(e){
+    return { ok:false, error:'Échec réseau — URL invalide, injoignable, ou bloquée par CORS : ' + e.message };
+  }
+}
+document.getElementById('open-connectors').onclick = ()=>{ closeSettings(); renderConnectors(); document.getElementById('overlay-connectors').classList.add('show'); };
+document.getElementById('close-connectors').onclick = ()=> document.getElementById('overlay-connectors').classList.remove('show');
+document.getElementById('overlay-connectors').onclick = (e)=>{ if(e.target.id==='overlay-connectors') document.getElementById('overlay-connectors').classList.remove('show'); };
+document.getElementById('cn-test').onclick = async ()=>{
+  const url = document.getElementById('cn-url').value.trim();
+  const method = document.getElementById('cn-method').value;
+  const paramName = document.getElementById('cn-param').value.trim() || 'query';
+  const testVal = document.getElementById('cn-testval').value.trim();
+  const resultEl = document.getElementById('cn-test-result');
+  if(!url || !testVal){ alert('Renseigne au moins l\'URL et une valeur de test.'); return; }
+  resultEl.style.display = 'block'; resultEl.style.background = '#0e1512'; resultEl.style.color = 'var(--dim)';
+  resultEl.textContent = 'Test en cours…';
+  const r = await testConnector(url, method, paramName, testVal);
+  resultEl.style.color = r.ok ? 'var(--cyan)' : 'var(--danger)';
+  resultEl.textContent = (r.ok ? '✅ HTTP '+r.status+' — ça fonctionne\n' : '❌ '+r.error+'\n') + (r.preview||'');
+};
+document.getElementById('cn-add').onclick = ()=>{
+  const name = document.getElementById('cn-name').value.trim();
+  const description = document.getElementById('cn-desc').value.trim();
+  const url = document.getElementById('cn-url').value.trim();
+  const method = document.getElementById('cn-method').value;
+  const paramName = document.getElementById('cn-param').value.trim() || 'query';
+  if(!name || !url || !description) return;
+  const id = 'c' + Date.now();
+  CUSTOM_CONNECTORS[id] = { name, description, url, method, paramName };
+  persistConnectors(); renderConnectors();
+  document.getElementById('cn-name').value=''; document.getElementById('cn-desc').value=''; document.getElementById('cn-url').value=''; document.getElementById('cn-param').value=''; document.getElementById('cn-testval').value=''; document.getElementById('cn-test-result').style.display='none';
+};
+
+// --- Instructions permanentes ---
+let CUSTOM_INSTRUCTIONS = '';
+async function persistInstructions(){
+  try{ if(window.storage){ await window.storage.set('custom-instructions', CUSTOM_INSTRUCTIONS, false); return; } }catch(e){}
+  try{ localStorage.setItem('routeur-ia-instructions', CUSTOM_INSTRUCTIONS); }catch(e){}
+}
+async function loadInstructions(){
+  try{ if(window.storage){ const r = await window.storage.get('custom-instructions', false); if(r){ CUSTOM_INSTRUCTIONS = r.value; return; } } }catch(e){}
+  try{ const raw = localStorage.getItem('routeur-ia-instructions'); if(raw) CUSTOM_INSTRUCTIONS = raw; }catch(e){}
+}
+document.getElementById('save-instructions').onclick = ()=>{
+  CUSTOM_INSTRUCTIONS = document.getElementById('custom-instructions').value.trim();
+  persistInstructions();
+};
+
+// --- CSS de référence (plusieurs fichiers) ---
+let CUSTOM_CSS_FILES = {}; // { id: {name, content} }
+async function persistCss(){
+  const payload = JSON.stringify(CUSTOM_CSS_FILES);
+  try{ if(window.storage){ await window.storage.set('custom-css', payload, false); return; } }catch(e){}
+  try{ localStorage.setItem('routeur-ia-css', payload); }catch(e){}
+}
+async function loadCss(){
+  let raw = null;
+  try{ if(window.storage){ const r = await window.storage.get('custom-css', false); if(r) raw = r.value; } }catch(e){}
+  if(!raw){ try{ raw = localStorage.getItem('routeur-ia-css'); }catch(e){} }
+  if(raw){
+    try{
+      const d = JSON.parse(raw);
+      // compat avec l'ancien format à un seul fichier
+      CUSTOM_CSS_FILES = (d && d.css !== undefined) ? (d.css ? { legacy:{ name:d.name||'style.css', content:d.css } } : {}) : (d || {});
+    }catch(e){}
+  }
+  renderCssList();
+}
+function renderCssList(){
+  const list = document.getElementById('css-list');
+  const entries = Object.entries(CUSTOM_CSS_FILES);
+  list.innerHTML = entries.length ? entries.map(([id, f])=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:5px;">
+      <span style="font-size:12px;">📄 ${escapeHtml(f.name)} <span class="mono" style="color:var(--dim);font-size:10px;">(${f.content.length.toLocaleString('fr-FR')} car.)</span></span>
+      <button data-id="${id}" class="css-del" style="background:none;border:none;color:var(--danger);font-size:14px;cursor:pointer;">✕</button>
+    </div>`).join('') : '<div style="color:var(--dim);font-size:12px;margin-bottom:6px;">Aucun fichier importé.</div>';
+  list.querySelectorAll('.css-del').forEach(btn=>{
+    btn.onclick = ()=>{ delete CUSTOM_CSS_FILES[btn.dataset.id]; persistCss(); renderCssList(); };
+  });
+}
+document.getElementById('import-css-btn').onclick = ()=> document.getElementById('css-file-input').click();
+document.getElementById('css-file-input').onchange = (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const id = 'css' + Date.now();
+    CUSTOM_CSS_FILES[id] = { name:f.name, content:reader.result };
+    persistCss(); renderCssList();
+  };
+  reader.readAsText(f);
+  document.getElementById('css-file-input').value = '';
+};
+
+function hfSpaceSubdomain(spaceId){
+  return spaceId.trim().toLowerCase().replace(/[_\/]+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+async function callHfSpace(spaceId, prompt, apiName){
+  const base = `https://${hfSpaceSubdomain(spaceId)}.hf.space/gradio_api/call${apiName.startsWith('/') ? apiName : '/'+apiName}`;
+  const headers = { 'Content-Type':'application/json' };
+  if(KEYS.hf) headers['Authorization'] = 'Bearer ' + KEYS.hf;
+  const submitRes = await fetchWithTimeout(base, { method:'POST', headers, body: JSON.stringify({ data:[prompt] }) }, 15000);
+  if(!submitRes.ok){ const t = await submitRes.text().catch(()=>''); throw new Error(`Space "${spaceId}" inaccessible (HTTP ${submitRes.status}) ${t.slice(0,120)}`); }
+  const submitData = await safeJson(submitRes);
+  const eventId = submitData.event_id;
+  if(!eventId) throw new Error(`Réponse inattendue du Space "${spaceId}" (pas d'event_id — l'API de ce Space a peut-être une signature différente).`);
+
+  const resultRes = await fetchWithTimeout(`${base}/${eventId}`, { headers: KEYS.hf ? { 'Authorization':'Bearer '+KEYS.hf } : {} }, 60000);
+  if(!resultRes.ok || !resultRes.body) throw new Error(`Impossible de récupérer le résultat du Space "${spaceId}".`);
+  const reader = resultRes.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let resultData = null;
+  let eventType = '';
+  while(true){
+    let step;
+    try{
+      step = await Promise.race([ reader.read(), new Promise((_,rej)=> setTimeout(()=> rej(new Error(`Le Space "${spaceId}" met trop de temps à répondre (file d'attente pleine ?).`)), 50000)) ]);
+    }catch(e){ try{ reader.cancel(); }catch(e2){} throw e; }
+    const { done, value } = step;
+    if(done) break;
+    buffer += decoder.decode(value, { stream:true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for(const line of lines){
+      if(line.startsWith('event:')) eventType = line.slice(6).trim();
+      if(line.startsWith('data:')){
+        const payload = line.slice(5).trim();
+        if(payload === '[DONE]') continue;
+        try{ resultData = JSON.parse(payload); }catch(e){ continue; }
+        if(eventType === 'complete' || eventType === 'error'){
+          if(eventType === 'error') throw new Error(`Le Space "${spaceId}" a renvoyé une erreur : ${JSON.stringify(resultData).slice(0,150)}`);
+          const first = Array.isArray(resultData) ? resultData[0] : resultData;
+          if(first && typeof first === 'object' && (first.url || first.path)){
+            const fileUrl = first.url || (`https://${hfSpaceSubdomain(spaceId)}.hf.space/file=${first.path}`);
+            return `Résultat du Space "${spaceId}" : ${fileUrl}`;
+          }
+          return `Résultat du Space "${spaceId}" : ${JSON.stringify(resultData).slice(0,300)}`;
+        }
+      }
+    }
+  }
+  throw new Error(`Le Space "${spaceId}" n'a renvoyé aucun résultat exploitable.`);
+}
+
+function hexToRgbArr(hex){
+  const c = hex.replace('#','');
+  return [parseInt(c.substring(0,2),16), parseInt(c.substring(2,4),16), parseInt(c.substring(4,6),16)];
+}
+function rgbToHex(rgb){
+  return '#' + rgb.map(v=>Math.max(0,Math.min(255,v)).toString(16).padStart(2,'0')).join('');
+}
+
+async function fetchJson(url, options, ms){
+  const res = await fetchWithTimeout(url, options, ms || 10000);
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('HTTP ' + res.status + ' ' + t.slice(0,120)); }
+  return await safeJson(res);
+}
+
+async function runSkill(name, args){
+  try{
+    if(name.startsWith('connector_')){
+      const c = CUSTOM_CONNECTORS[name.slice('connector_'.length)];
+      if(!c) return 'Connecteur inconnu.';
+      const value = args[c.paramName] ?? Object.values(args)[0] ?? '';
+      let res;
+      if(c.method === 'GET'){
+        const sep = c.url.includes('?') ? '&' : '?';
+        res = await fetchWithTimeout(`${c.url}${sep}${encodeURIComponent(c.paramName)}=${encodeURIComponent(value)}`, {}, 15000);
+      } else {
+        res = await fetchWithTimeout(c.url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ [c.paramName]: value }) }, 15000);
+      }
+      const text = await res.text();
+      if(!res.ok) return `Erreur du connecteur "${c.name}" (HTTP ${res.status}) : ${text.slice(0,150)}`;
+      return text.slice(0, 1500);
+    }
+    if(name === 'get_weather'){
+      const geo = await fetchJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(args.city)}&count=1&language=fr`);
+      const loc = geo.results && geo.results[0];
+      if(!loc) return `Ville "${args.city}" introuvable.`;
+      const w = await fetchJson(`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current=temperature_2m,weather_code,wind_speed_10m`);
+      if(!w.current) return `Météo indisponible pour ${loc.name} (réponse inattendue du service).`;
+      return `Météo à ${loc.name} : ${w.current.temperature_2m}°C, vent ${w.current.wind_speed_10m} km/h.`;
+    }
+    if(name === 'convert_currency'){
+      const d = await fetchJson(`https://api.frankfurter.app/latest?amount=${args.amount}&from=${args.from}&to=${args.to}`);
+      if(!d.rates || d.rates[args.to] === undefined) return `Conversion impossible : devise "${args.to}" ou "${args.from}" non reconnue.`;
+      return `${args.amount} ${args.from} = ${d.rates[args.to]} ${args.to} (taux du ${d.date}).`;
+    }
+    if(name === 'wikipedia_lookup'){
+      const d = await fetchJson(`https://fr.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(args.query)}`);
+      return d.extract || `Aucun résumé trouvé pour "${args.query}".`;
+    }
+    if(name === 'calculate'){
+      try{ return String(Function('"use strict";return (' + args.expression + ')')()); }
+      catch(e){ return 'Expression invalide.'; }
+    }
+    if(name === 'get_timezone'){
+      const geo = await fetchJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(args.city)}&count=1&language=fr`);
+      const loc = geo.results && geo.results[0];
+      if(!loc) return `Ville "${args.city}" introuvable.`;
+      const f = await fetchJson(`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&timezone=auto&current=temperature_2m`);
+      if(f.utc_offset_seconds === undefined) return `Fuseau horaire indisponible pour ${loc.name}.`;
+      const local = new Date(Date.now() + f.utc_offset_seconds*1000);
+      const hh = String(local.getUTCHours()).padStart(2,'0'), mm = String(local.getUTCMinutes()).padStart(2,'0');
+      return `Il est ${hh}:${mm} à ${loc.name} (${f.timezone}, UTC${f.utc_offset_seconds>=0?'+':''}${f.utc_offset_seconds/3600}).`;
+    }
+    if(name === 'jours_feries_fr'){
+      const d = await fetchJson(`https://calendrier.api.gouv.fr/jours-feries/metropole/${args.year}.json`);
+      const entries = Object.entries(d||{});
+      if(!entries.length) return `Aucun jour férié trouvé pour ${args.year}.`;
+      return `Jours fériés ${args.year} en France :\n${entries.map(([date,label])=>`${date} : ${label}`).join('\n')}`;
+    }
+    if(name === 'make_qrcode'){
+      const url = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(args.data)}`;
+      return `QR code généré : ${url}`;
+    }
+    if(name === 'shorten_link'){
+      const res = await fetchWithTimeout(`https://is.gd/create.php?format=simple&url=${encodeURIComponent(args.url)}`, {}, 10000);
+      const short = await res.text();
+      if(!res.ok || short.startsWith('Error')) return `Impossible de raccourcir ce lien : ${short.slice(0,120)}`;
+      return `Lien raccourci : ${short}`;
+    }
+    if(name === 'color_palette'){
+      const d = await fetchJson('https://colormind.io/api/', { method:'POST', body: JSON.stringify({ model:'default', input:[hexToRgbArr(args.hex),'N','N','N','N'] }) });
+      if(!Array.isArray(d.result)) return `Impossible de générer une palette à partir de #${args.hex}.`;
+      return `Palette à partir de #${args.hex} : ${d.result.map(rgbToHex).join(', ')}`;
+    }
+    if(name === 'color_info'){
+      const clean = args.hex.replace('#','');
+      const d = await fetchJson(`https://www.thecolorapi.com/id?hex=${clean}`);
+      if(!d.name || !d.rgb) return `Couleur #${clean} non reconnue.`;
+      return `Couleur #${clean} : "${d.name.value}", RGB(${d.rgb.r},${d.rgb.g},${d.rgb.b}).`;
+    }
+    if(name === 'icon_search'){
+      const d = await fetchJson(`https://api.iconify.design/search?query=${encodeURIComponent(args.query)}&limit=8`);
+      const list = (d.icons||[]).slice(0,8).join(', ');
+      return list ? `Icônes trouvées pour "${args.query}" : ${list} (utilisables sur https://icon-sets.iconify.design)` : `Aucune icône trouvée pour "${args.query}".`;
+    }
+    if(name === 'texture_search'){
+      const ids = await fetchJson(`https://api.polyhaven.com/assets?t=textures&q=${encodeURIComponent(args.query)}`);
+      const list = Object.keys(ids||{}).slice(0,6);
+      return list.length ? `Textures/HDRI Poly Haven pour "${args.query}" : ${list.map(id=>`https://polyhaven.com/a/${id}`).join(', ')}` : `Aucune texture trouvée pour "${args.query}".`;
+    }
+    if(name === 'search_hf_hub'){
+      const kind = ['models','datasets','spaces'].includes(args.kind) ? args.kind : 'models';
+      const list = await fetchJson(`https://huggingface.co/api/${kind}?search=${encodeURIComponent(args.query)}&limit=6&sort=likes&direction=-1`);
+      if(!Array.isArray(list) || !list.length) return `Aucun résultat sur Hugging Face pour "${args.query}" (${kind}).`;
+      return `${kind} HF pour "${args.query}" :\n` + list.map(x => `- ${x.id || x.modelId} (${x.likes||0} likes) → https://huggingface.co/${kind==='models'?'':kind+'/'}${x.id||x.modelId}`).join('\n');
+    }
+    if(name === 'call_hf_space'){
+      const shortcut = SPACE_SHORTCUTS[(args.space_id||'').trim().toLowerCase()];
+      const spaceId = shortcut ? shortcut.spaceId : args.space_id;
+      const apiName = shortcut ? shortcut.apiName : (args.api_name || '/predict');
+      return await callHfSpace(spaceId, args.prompt, apiName);
+    }
+    if(name === 'github_list_repos'){
+      if(!KEYS.github) return 'Clé GitHub non configurée.';
+      const list = await fetchJson('https://api.github.com/user/repos?sort=updated&per_page=10', { headers:{ 'Authorization':'Bearer '+KEYS.github, 'Accept':'application/vnd.github+json' } });
+      if(!Array.isArray(list) || !list.length) return 'Aucun dépôt trouvé.';
+      return 'Tes dépôts récents :\n' + list.map(r=>`- ${r.full_name}${r.private?' (privé)':''} — mis à jour ${r.updated_at.slice(0,10)}`).join('\n');
+    }
+    if(name === 'github_latest_commit'){
+      if(!KEYS.github) return 'Clé GitHub non configurée.';
+      const list = await fetchJson(`https://api.github.com/repos/${args.owner}/${args.repo}/commits?per_page=1`, { headers:{ 'Authorization':'Bearer '+KEYS.github, 'Accept':'application/vnd.github+json' } });
+      if(!Array.isArray(list) || !list.length) return `Aucun commit trouvé sur ${args.owner}/${args.repo}.`;
+      const c = list[0];
+      return `Dernier commit sur ${args.owner}/${args.repo} : "${c.commit.message.split('\n')[0]}" par ${c.commit.author.name} le ${c.commit.author.date.slice(0,10)}.`;
+    }
+    if(name === 'github_list_issues'){
+      if(!KEYS.github) return 'Clé GitHub non configurée.';
+      const list = await fetchJson(`https://api.github.com/repos/${args.owner}/${args.repo}/issues?state=open&per_page=8`, { headers:{ 'Authorization':'Bearer '+KEYS.github, 'Accept':'application/vnd.github+json' } });
+      if(!Array.isArray(list) || !list.length) return `Aucune issue ouverte sur ${args.owner}/${args.repo}.`;
+      return `Issues ouvertes sur ${args.owner}/${args.repo} :\n` + list.map(i=>`#${i.number} ${i.title}`).join('\n');
+    }
+    if(name === 'generate_3d_model'){
+      const useProxy3d = proxyActive();
+      if(!useProxy3d && !KEYS.tripo) return 'Clé Tripo3D non configurée.';
+      const submit = await fetchJson(
+        useProxy3d ? proxyTarget('tripo-submit') : 'https://api.tripo3d.ai/v2/openapi/task',
+        { method:'POST', headers: useProxy3d ? proxyHeaders() : { 'Content-Type':'application/json', 'Authorization':'Bearer '+KEYS.tripo },
+          body: JSON.stringify({ type:'text_to_model', prompt:args.prompt }) },
+        15000);
+      const taskId = submit.data?.task_id || submit.task_id;
+      if(!taskId) return 'Tripo3D n\'a pas renvoyé de tâche exploitable.';
+      const t0 = Date.now();
+      while(Date.now() - t0 < 90000){
+        await new Promise(r=>setTimeout(r, 4000));
+        const status = await fetchJson(
+          useProxy3d ? proxyTarget('tripo-status/'+taskId) : `https://api.tripo3d.ai/v2/openapi/task/${taskId}`,
+          { headers: useProxy3d ? proxyHeaders() : { 'Authorization':'Bearer '+KEYS.tripo } },
+          10000);
+        const d = status.data || status;
+        if(d.status === 'success' || d.status === 'FINISHED'){
+          const url = d.output?.pbr_model || d.output?.model || d.result?.pbr_model?.url;
+          return url ? `Modèle 3D généré : ${url}` : 'Modèle terminé mais aucun lien de téléchargement trouvé.';
+        }
+        if(d.status === 'failed' || d.status === 'FAILED') return 'La génération 3D a échoué côté Tripo3D.';
+      }
+      return 'Tripo3D met trop de temps à répondre (plus de 90s) — réessaie, le modèle est peut-être encore en file d\'attente.';
+    }
+    if(name === 'generate_music'){
+      const useProxyMusic = proxyActive();
+      if(!useProxyMusic && !KEYS.hf) return 'Clé Hugging Face non configurée.';
+      const res = await fetchWithTimeout(
+        useProxyMusic ? proxyTarget('musicgen') : 'https://api-inference.huggingface.co/models/facebook/musicgen-small',
+        { method:'POST',
+          headers: useProxyMusic ? proxyHeaders() : { 'Authorization':'Bearer '+KEYS.hf, 'Content-Type':'application/json' },
+          body: JSON.stringify({ inputs: args.prompt }) },
+        60000);
+      if(!res.ok){
+        const t = await res.text().catch(()=>'');
+        if(res.status === 503) return 'Le modèle MusicGen se réveille (à froid) — réessaie dans 20-30 secondes.';
+        return `Échec de la génération musicale (HTTP ${res.status}) ${t.slice(0,120)}`;
+      }
+      const blob = await res.blob();
+      const audioUrl = URL.createObjectURL(blob);
+      pushMessage({ role:'bot', cat:'MUSIQUE', tag:'HF · MUSICGEN', tagClass:'engine-hf', text:'🎵 "'+args.prompt+'"', audioSrc:audioUrl });
+      return 'Musique générée avec succès — le lecteur audio est apparu juste au-dessus dans le chat.';
+    }
+    if(name === 'translate_text'){
+      const langpair = (args.from || 'auto') + '|' + args.to;
+      const d = await fetchJson(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(args.text)}&langpair=${langpair}`);
+      const translated = d.responseData?.translatedText;
+      if(!translated) return 'Traduction impossible.';
+      return `Traduction (${args.to}) : ${translated}`;
+    }
+    if(name === 'web_search_real'){
+      if(!KEYS.brave) return 'Clé Brave Search non configurée — recherche web réelle indisponible (repli possible sur Wikipédia).';
+      const d = await fetchJson(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(args.query)}&count=5`, { headers:{ 'Accept':'application/json', 'X-Subscription-Token':KEYS.brave } });
+      const results = d.web?.results || [];
+      if(!results.length) return `Aucun résultat web pour "${args.query}".`;
+      return `Résultats web pour "${args.query}" :\n` + results.slice(0,5).map(r=>`- ${r.title} — ${r.description||''} (${r.url})`).join('\n');
+    }
+    if(name === 'iss_location'){
+      const d = await fetchJson('https://api.open-notify.org/iss-now.json');
+      return `La Station Spatiale Internationale est actuellement à la latitude ${d.iss_position.latitude}, longitude ${d.iss_position.longitude}.`;
+    }
+    if(name === 'hackernews_top'){
+      const ids = await fetchJson('https://hacker-news.firebaseio.com/v0/topstories.json');
+      const top = ids.slice(0, args.limit || 5);
+      const items = await Promise.all(top.map(id => fetchJson(`https://hacker-news.firebaseio.com/v0/item/${id}.json`)));
+      return 'Top Hacker News :\n' + items.map(it => `- ${it.title} (${it.score} points) — ${it.url||''}`).join('\n');
+    }
+    if(name === 'french_address_lookup'){
+      const d = await fetchJson(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(args.query)}&limit=3`);
+      const feats = d.features || [];
+      if(!feats.length) return `Aucune adresse trouvée pour "${args.query}".`;
+      return 'Adresses trouvées :\n' + feats.map(f=>`- ${f.properties.label}`).join('\n');
+    }
+    return 'Compétence inconnue.';
+  }catch(e){ return 'Erreur pendant l\'exécution de la compétence : ' + e.message; }
+}
+
+async function fetchWithTimeout(url, options, ms){
+  const controller = new AbortController();
+  const t = setTimeout(()=>controller.abort(), ms || 30000);
+  try{
+    return await fetch(url, { ...options, signal: controller.signal });
+  }catch(e){
+    if(e.name === 'AbortError') throw new Error("Délai dépassé — ce moteur n'a pas répondu à temps.");
+    throw e;
+  }finally{ clearTimeout(t); }
+}
+async function safeJson(res){
+  const raw = await res.text();
+  try{ return JSON.parse(raw); }
+  catch(e){ throw new Error('Réponse invalide (pas du JSON) — ' + raw.slice(0,100)); }
+}
+
+function getSkills(){
+  const shortcuts = Object.entries(SPACE_SHORTCUTS);
+  let base = SKILLS;
+  if(shortcuts.length){
+    const note = " Raccourcis connus (utilise directement ce mot comme space_id) : " + shortcuts.map(([alias,s])=>`"${alias}" → ${s.spaceId}`).join(', ') + '.';
+    base = SKILLS.map(s => s.function.name === 'call_hf_space'
+      ? { ...s, function:{ ...s.function, description: s.function.description + note } }
+      : s
+    );
+  }
+  const customTools = Object.entries(CUSTOM_CONNECTORS).map(([id, c]) => ({
+    type:'function',
+    function:{
+      name: 'connector_' + id,
+      description: c.description,
+      parameters:{ type:'object', properties:{ [c.paramName]:{ type:'string' } }, required:[c.paramName] }
+    }
+  }));
+  return [...base, ...customTools];
+}
+
+function proxyActive(){ return !!(KEYS.proxy_url && KEYS.proxy_secret); }
+function proxyTarget(providerKey){ return KEYS.proxy_url.replace(/\/$/,'') + '/proxy/' + providerKey; }
+function proxyHeaders(extra){ return { 'Content-Type':'application/json', 'X-App-Secret':KEYS.proxy_secret, ...(extra||{}) }; }
+
+async function callOpenAICompatible(cfg, userText, history, onSkillUse, onChunk){
+  const keyName = cfg.key || Object.keys(OA_PROVIDERS).find(k=>OA_PROVIDERS[k]===cfg);
+  const providerKey = cfg.key || keyName.split('-')[0];
+  const useProxy = proxyActive();
+  const apiKey = useProxy ? null : KEYS[providerKey];
+  const targetUrl = useProxy ? proxyTarget(providerKey) : cfg.url;
+  const headers = useProxy ? proxyHeaders() : { 'Content-Type':'application/json', 'Authorization':'Bearer ' + apiKey };
+  let messages = CUSTOM_INSTRUCTIONS ? [{role:'system', content:CUSTOM_INSTRUCTIONS}, ...history, {role:'user', content:userText}] : [...history, {role:'user', content:userText}];
+  for(let round=0; round<3; round++){
+    const res = await fetchWithTimeout(targetUrl, {
+      method:'POST',
+      headers,
+      body: JSON.stringify({ model:cfg.model, messages, tools:getSkills(), tool_choice:'auto', stream:true })
+    }, 30000);
+    if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('HTTP ' + res.status + ' ' + t.slice(0,180)); }
+    if(!res.body){ // fournisseur sans support de streaming : repli non-streamé
+      const data = await safeJson(res);
+      if(data.error) throw new Error(typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error)).slice(0,180));
+      const msg = data.choices?.[0]?.message;
+      if(!msg) throw new Error('Réponse vide reçue du modèle.');
+      if(msg.tool_calls && msg.tool_calls.length){
+        messages.push(msg);
+        for(const call of msg.tool_calls){
+          let args = {}; try{ args = JSON.parse(call.function.arguments||'{}'); }catch(e){}
+          if(onSkillUse) onSkillUse(call.function.name, args);
+          messages.push({ role:'tool', tool_call_id:call.id, content:String(await runSkill(call.function.name, args)) });
+        }
+        continue;
+      }
+      if(!msg.content || !msg.content.trim()) throw new Error('Réponse vide reçue du modèle.');
+      return msg.content;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let contentAccum = '';
+    let toolCalls = []; // {id, name, arguments}
+    let sawToolCalls = false;
+    let streamStarted = false;
+    while(true){
+      let step;
+      try{
+        step = await Promise.race([
+          reader.read(),
+          new Promise((_,rej)=> setTimeout(()=> rej(new Error("Délai dépassé — le flux s'est arrêté de répondre.")), 30000))
+        ]);
+      }catch(e){ try{ reader.cancel(); }catch(e2){} throw e; }
+      const { done, value } = step;
+      if(done) break;
+      buffer += decoder.decode(value, { stream:true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for(const line of lines){
+        const t = line.trim();
+        if(!t.startsWith('data:')) continue;
+        const payload = t.slice(5).trim();
+        if(payload === '[DONE]') continue;
+        let chunk; try{ chunk = JSON.parse(payload); }catch(e){ continue; }
+        const delta = chunk.choices?.[0]?.delta;
+        if(!delta) continue;
+        if(delta.content){
+          contentAccum += delta.content;
+          if(!streamStarted){ streamStarted = true; }
+          if(onChunk) onChunk(contentAccum);
+        }
+        if(delta.tool_calls){
+          sawToolCalls = true;
+          for(const tc of delta.tool_calls){
+            const i = tc.index || 0;
+            if(!toolCalls[i]) toolCalls[i] = { id:tc.id||'', name:'', arguments:'' };
+            if(tc.id) toolCalls[i].id = tc.id;
+            if(tc.function?.name) toolCalls[i].name += tc.function.name;
+            if(tc.function?.arguments) toolCalls[i].arguments += tc.function.arguments;
+          }
+        }
+      }
+    }
+    if(sawToolCalls && toolCalls.length){
+      messages.push({ role:'assistant', content:contentAccum||null, tool_calls: toolCalls.map(tc=>({ id:tc.id, type:'function', function:{ name:tc.name, arguments:tc.arguments } })) });
+      for(const tc of toolCalls){
+        let args = {}; try{ args = JSON.parse(tc.arguments||'{}'); }catch(e){}
+        if(onSkillUse) onSkillUse(tc.name, args);
+        const result = await runSkill(tc.name, args);
+        messages.push({ role:'tool', tool_call_id:tc.id, content:String(result) });
+      }
+      continue;
+    }
+    if(!contentAccum || !contentAccum.trim()) throw new Error('Réponse vide reçue du modèle.');
+    return contentAccum;
+  }
+  return '(trop d\'appels d\'outils, réponse interrompue)';
+}
+async function callGeminiText(userText, imagePart, history){
+  const parts = [];
+  if(imagePart) parts.push({ inline_data:{ mime_type:imagePart.mimeType, data:imagePart.base64 } });
+  parts.push({ text:userText });
+  const contents = history.map(h=>({ role: h.role==='assistant'?'model':'user', parts:[{text:h.content}] }));
+  contents.push({ role:'user', parts });
+  const useProxy = proxyActive();
+  const res = await fetchWithTimeout(
+    useProxy ? proxyTarget('gemini-text') : 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',
+    {
+      method:'POST',
+      headers: useProxy ? proxyHeaders() : { 'Content-Type':'application/json', 'x-goog-api-key': KEYS.gemini },
+      body: JSON.stringify(CUSTOM_INSTRUCTIONS ? { contents, systemInstruction:{ parts:[{text:CUSTOM_INSTRUCTIONS}] } } : { contents })
+    }, 45000);
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('HTTP ' + res.status + ' ' + t.slice(0,180)); }
+  const data = await safeJson(res);
+  if(data.promptFeedback?.blockReason) throw new Error('Contenu bloqué par les filtres Gemini (' + data.promptFeedback.blockReason + ').');
+  const cand = data.candidates?.[0];
+  if(cand?.finishReason === 'SAFETY' || cand?.finishReason === 'RECITATION') throw new Error('Réponse bloquée par Gemini (' + cand.finishReason + ').');
+  const text = cand?.content?.parts?.[0]?.text;
+  if(!text || !text.trim()) throw new Error('Réponse vide reçue de Gemini.');
+  return text;
+}
+async function callGeminiImage(userText, imagePart){
+  const parts = [];
+  if(imagePart) parts.push({ inline_data:{ mime_type:imagePart.mimeType, data:imagePart.base64 } });
+  parts.push({ text:userText });
+  const useProxyImg = proxyActive();
+  const res = await fetchWithTimeout(
+    useProxyImg ? proxyTarget('gemini-image') : 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent',
+    {
+      method:'POST',
+      headers: useProxyImg ? proxyHeaders() : { 'Content-Type':'application/json', 'x-goog-api-key': KEYS.gemini },
+      body: JSON.stringify({ contents:[{ parts }], generationConfig:{ responseModalities:['TEXT','IMAGE'] } })
+    }, 60000);
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('HTTP ' + res.status + ' ' + t.slice(0,180)); }
+  const data = await safeJson(res);
+  if(data.promptFeedback?.blockReason) throw new Error('Image bloquée par les filtres Gemini (' + data.promptFeedback.blockReason + ').');
+  const cand = data.candidates?.[0];
+  if(cand?.finishReason === 'SAFETY' || cand?.finishReason === 'RECITATION') throw new Error('Image bloquée par Gemini (' + cand.finishReason + ').');
+  const respParts = cand?.content?.parts || [];
+  const imgPart = respParts.find(p => p.inlineData || p.inline_data);
+  const textPart = respParts.find(p => p.text);
+  const inline = imgPart ? (imgPart.inlineData || imgPart.inline_data) : null;
+  if(!inline) throw new Error(textPart ? ('Gemini a répondu sans image : ' + textPart.text.slice(0,150)) : 'Gemini n\'a produit aucune image.');
+  return { text: textPart?textPart.text:'', imgSrc: `data:${inline.mimeType||inline.mime_type};base64,${inline.data}` };
+}
+
+function friendlyError(err){
+  const msg = String(err && err.message || err || '');
+  if(msg.includes('429')) return "Plus de crédit gratuit disponible pour ce moteur aujourd'hui (quota atteint). Réessaie plus tard ou utilise-en un autre.";
+  if(msg.includes('401') || msg.includes('403')) return "Clé refusée par ce moteur — vérifie qu'elle est correcte dans ⚙.";
+  if(msg.includes('404')) return "Ce modèle n'existe plus chez ce fournisseur.";
+  if(/reduce the length|maximum context|tokens_limit_reached|too large|context_length_exceeded/i.test(msg)) return "Message trop volumineux pour ce moteur (dépasse sa limite de contexte).";
+  return msg.slice(0,160);
+}
+
+async function callCloudflareText(userText, history){
+  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${KEYS.cf_account}/ai/run/@cf/meta/llama-3.1-8b-instruct`, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + KEYS.cloudflare },
+    body: JSON.stringify({ messages:[...history, {role:'user', content:userText}] })
+  });
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('HTTP ' + res.status + ' ' + t.slice(0,180)); }
+  const data = await res.json();
+  if(!data.success) throw new Error(JSON.stringify(data.errors||data).slice(0,180));
+  return data.result?.response || '(réponse vide)';
+}
+async function callCloudflareImage(prompt){
+  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${KEYS.cf_account}/ai/run/@cf/black-forest-labs/flux-1-schnell`, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + KEYS.cloudflare },
+    body: JSON.stringify({ prompt })
+  });
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('HTTP ' + res.status + ' ' + t.slice(0,180)); }
+  const data = await res.json();
+  if(!data.success || !data.result?.image) throw new Error(JSON.stringify(data.errors||data).slice(0,180));
+  return { text:'', imgSrc:`data:image/jpeg;base64,${data.result.image}` };
+}
+
+async function callPollinationsImage(prompt){
+  const seed = Math.floor(Math.random()*1000000);
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}&nologo=true`;
+  // on vérifie que l'image charge réellement avant de la considérer comme un succès
+  await new Promise((resolve, reject)=>{
+    const test = new Image();
+    test.onload = resolve;
+    test.onerror = ()=> reject(new Error('Pollinations indisponible'));
+    test.src = url;
+  });
+  return { text:'', imgSrc:url };
+}
+
+function chatHistoryFor(c){
+  return c.messages.filter(m=>m.text && !m.isError).slice(-20).map(m=>({ role: m.role==='user'?'user':'assistant', content:m.text }));
+}
+
+const EXT_MAP = { html:'html', htm:'html', javascript:'js', js:'js', jsx:'jsx', json:'json', css:'css', python:'py', py:'py', xml:'xml', yaml:'yml', yml:'yml', markdown:'md', md:'md', txt:'txt', sql:'sql', bash:'sh', sh:'sh', c:'c', cpp:'cpp', java:'java' };
+function extractCodeBlock(text){
+  const m = text && text.match(/```(\w+)?\n?([\s\S]*?)```/);
+  if(!m) return null;
+  return { lang:(m[1]||'txt').toLowerCase(), code:m[2], before:text.slice(0,m.index).trim(), after:text.slice(m.index+m[0].length).trim() };
+}
+function downloadBlob(filename, content){
+  try{
+    const blob = new Blob([content], {type:'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  }catch(e){ shareOrCopy(filename, content); }
+}
+async function shareOrCopy(filename, content){
+  try{
+    const file = new File([content], filename, { type:'text/plain' });
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
+      await navigator.share({ files:[file], title:filename });
+      return;
+    }
+  }catch(e){ /* partage annulé ou indisponible, on continue */ }
+  copyMessage(content);
+  alert('Le partage direct n\'est pas disponible ici — le contenu a été copié dans le presse-papier à la place.');
+}
+function renderMarkdown(text){
+  let s = escapeHtml(text || '');
+  s = s.replace(/`([^`]+)`/g, '<code style="background:#1b2b24;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:13px;">$1</code>');
+  s = s.replace(/^### (.*)$/gm, '<div style="font-weight:700;font-size:14.5px;margin:8px 0 2px;">$1</div>');
+  s = s.replace(/^## (.*)$/gm, '<div style="font-weight:700;font-size:15.5px;margin:10px 0 3px;">$1</div>');
+  s = s.replace(/^# (.*)$/gm, '<div style="font-weight:700;font-size:16.5px;margin:10px 0 4px;">$1</div>');
+  s = s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>');
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" style="color:var(--cyan);">$1</a>');
+  // listes
+  s = s.replace(/(^|\n)([-*] .+(\n[-*] .+)*)/g, (m, pre, block) => {
+    const items = block.split('\n').map(l => '<li style="margin-left:18px;">' + l.replace(/^[-*] /, '') + '</li>').join('');
+    return pre + '<ul style="margin:4px 0;padding:0;">' + items + '</ul>';
+  });
+  s = s.replace(/(^|\n)(\d+\. .+(\n\d+\. .+)*)/g, (m, pre, block) => {
+    const items = block.split('\n').map(l => '<li style="margin-left:18px;">' + l.replace(/^\d+\. /, '') + '</li>').join('');
+    return pre + '<ol style="margin:4px 0;padding:0;">' + items + '</ol>';
+  });
+  s = s.split('\n\n').map(p => p.includes('<ul') || p.includes('<ol') || p.includes('<div') ? p : '<div style="margin:4px 0;">' + p.replace(/\n/g,'<br>') + '</div>').join('');
+  return s;
+}
+
+function renderReplyContent(bubble, text){
+  bubble.textContent = '';
+  const imgMatch = text && text.match(/https:\/\/[^\s)]+\.(png|jpe?g|webp|gif)(\?[^\s)]*)?/i);
+  const qrMatch = text && text.match(/https:\/\/api\.qrserver\.com\/v1\/create-qr-code\/\?[^\s)]+/);
+  const foundImg = qrMatch ? qrMatch[0] : (imgMatch ? imgMatch[0] : null);
+  if(foundImg && !extractCodeBlock(text)){
+    const p = document.createElement('div'); p.innerHTML = renderMarkdown(text); bubble.appendChild(p);
+    const img = document.createElement('img'); img.src = foundImg; img.style.maxWidth = qrMatch ? '200px' : '100%';
+    bubble.appendChild(img);
+    return;
+  }
+  const block = extractCodeBlock(text);
+  if(!block || block.code.trim().length < 40){ bubble.innerHTML = renderMarkdown(text || ''); return; }
+  if(block.before){ const p=document.createElement('div'); p.innerHTML=renderMarkdown(block.before); p.style.marginBottom='8px'; bubble.appendChild(p); }
+  const card = document.createElement('div');
+  card.style.cssText = 'border:1px solid var(--line); border-radius:8px; padding:10px; margin:6px 0; background:#0e1512;';
+  const ext = EXT_MAP[block.lang] || 'txt';
+  const fname = 'reponse-' + Date.now() + '.' + ext;
+  const info = document.createElement('div');
+  info.style.cssText = 'font-family:monospace;font-size:11px;color:var(--dim);margin-bottom:6px;';
+  info.textContent = '📄 ' + fname + ' · ' + block.code.length + ' caractères';
+  card.appendChild(info);
+  const btn = document.createElement('button');
+  btn.textContent = '⬇ Télécharger';
+  btn.style.cssText = 'background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;margin-right:6px;margin-bottom:6px;';
+  btn.onclick = ()=> downloadBlob(fname, block.code);
+  card.appendChild(btn);
+  const shareBtn = document.createElement('button');
+  shareBtn.textContent = '📤 Partager';
+  shareBtn.style.cssText = 'background:none;border:1px solid var(--line);color:var(--text);font-weight:700;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;margin-right:6px;margin-bottom:6px;';
+  shareBtn.onclick = ()=> shareOrCopy(fname, block.code);
+  card.appendChild(shareBtn);
+  const copyBtn = document.createElement('button');
+  copyBtn.textContent = '📋 Copier le code';
+  copyBtn.style.cssText = 'background:none;border:1px solid var(--line);color:var(--text);font-weight:700;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;margin-right:6px;margin-bottom:6px;';
+  copyBtn.onclick = ()=> copyMessage(block.code);
+  card.appendChild(copyBtn);
+  if(block.code.length < 1200){
+    const qrBtn = document.createElement('button');
+    qrBtn.textContent = '📱→💻 QR';
+    qrBtn.style.cssText = 'background:none;border:1px solid var(--cyan);color:var(--cyan);font-weight:700;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;margin-bottom:6px;';
+    qrBtn.onclick = ()=>{
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(block.code)}`;
+      const img = document.createElement('img');
+      img.src = qrUrl; img.style.cssText = 'max-width:220px;display:block;margin-top:8px;border-radius:6px;';
+      card.appendChild(img);
+      qrBtn.disabled = true;
+    };
+    card.appendChild(qrBtn);
+  }
+  if(block.lang === 'html' || block.code.includes('<html') || block.code.includes('<!DOCTYPE')){
+    const previewBtn = document.createElement('button');
+    previewBtn.textContent = '👁 Aperçu';
+    previewBtn.style.cssText = 'background:none;border:1px solid var(--cyan);color:var(--cyan);font-weight:700;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;margin-bottom:6px;';
+    previewBtn.onclick = ()=> openPreview(block.code);
+    card.appendChild(previewBtn);
+  }
+  bubble.appendChild(card);
+  if(block.after){ const p=document.createElement('div'); p.innerHTML=renderMarkdown(block.after); p.style.marginTop='8px'; bubble.appendChild(p); }
+}
+
+const SKILL_LABELS = { get_weather:'météo', convert_currency:'conversion devise', wikipedia_lookup:'recherche Wikipédia', calculate:'calcul', get_timezone:'fuseau horaire', jours_feries_fr:'jours fériés', make_qrcode:'QR code', shorten_link:'raccourcissement de lien', color_palette:'palette de couleurs', color_info:'infos couleur', icon_search:'recherche d\'icônes', texture_search:'recherche de textures/HDRI', search_hf_hub:'recherche Hugging Face Hub', call_hf_space:'appel d\'un Space Hugging Face', github_list_repos:'liste des dépôts GitHub', github_latest_commit:'dernier commit GitHub', github_list_issues:'issues GitHub', generate_3d_model:'génération de modèle 3D (Tripo3D)', generate_music:'génération musicale (MusicGen)', translate_text:'traduction', web_search_real:'recherche web', iss_location:'position ISS', hackernews_top:'Hacker News', french_address_lookup:'recherche d\'adresse' };
+function skillLabel(name){
+  if(name.startsWith('connector_')){ const c = CUSTOM_CONNECTORS[name.slice('connector_'.length)]; return c ? c.name : name; }
+  return SKILL_LABELS[name] || name;
+}
+
+function injectThreeIfNeeded(code){
+  const usesThree = /THREE\./.test(code);
+  const alreadyImports = /three(\.min)?\.js/i.test(code) || /"three"|'three'/.test(code);
+  if(!usesThree || alreadyImports) return code;
+  const tag = '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>\n';
+  if(/<head[^>]*>/i.test(code)) return code.replace(/<head[^>]*>/i, m => m + '\n' + tag);
+  if(/<html[^>]*>/i.test(code)) return code.replace(/<html[^>]*>/i, m => m + '\n' + tag);
+  return tag + code;
+}
+function openPreview(code){
+  const modal = document.getElementById('preview-modal');
+  const frame = document.getElementById('preview-frame');
+  frame.srcdoc = injectThreeIfNeeded(code);
+  modal.classList.add('show');
+}
+function closePreview(){
+  document.getElementById('preview-modal').classList.remove('show');
+  document.getElementById('preview-frame').srcdoc = '';
+}
+
+function startThinking(b, label){
+  const t0 = Date.now();
+  let currentLabel = label;
+  const iv = setInterval(()=>{
+    const s = ((Date.now()-t0)/1000).toFixed(0);
+    b.textContent = currentLabel + ' ' + s + 's';
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }, 400);
+  return { stop: ()=> clearInterval(iv), setLabel: (l)=>{ currentLabel = l; } };
+}
+
+function bumpUsage(key){
+  const day = new Date().toISOString().slice(0,10);
+  if(!USAGE[day]) USAGE[day] = {};
+  USAGE[day][key] = (USAGE[day][key]||0) + 1;
+  persistUsage();
+}
+async function persistUsage(){
+  try{ if(window.storage){ await window.storage.set('usage', JSON.stringify(USAGE), false); return; } }catch(e){}
+  try{ localStorage.setItem('routeur-ia-usage', JSON.stringify(USAGE)); }catch(e){}
+}
+async function loadUsage(){
+  try{ if(window.storage){ const r = await window.storage.get('usage', false); if(r) USAGE = JSON.parse(r.value); return; } }catch(e){}
+  try{ const raw = localStorage.getItem('routeur-ia-usage'); if(raw) USAGE = JSON.parse(raw); }catch(e){}
+}
+let USAGE = {};
+function renderUsage(){
+  const day = new Date().toISOString().slice(0,10);
+  const today = USAGE[day] || {};
+  const list = document.getElementById('usage-list');
+  const entries = Object.entries(today).sort((a,b)=>b[1]-a[1]);
+  list.innerHTML = entries.length ? entries.map(([k,n])=>`
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);">
+      <span class="mono" style="font-size:12px;">${k}</span>
+      <span class="mono" style="font-size:12px;color:var(--amber);">${n} appel${n>1?'s':''}</span>
+    </div>`).join('') : '<div style="color:var(--dim);font-size:12px;">Aucun appel aujourd\'hui.</div>';
+}
+
+async function tryWithRetry(fn){
+  try{ return await fn(); }
+  catch(err){
+    const m = String(err && err.message || err || '');
+    if(m.includes('429') || m.includes('401') || m.includes('403') || m.includes('404')) throw err;
+    if(/reduce the length|maximum context|tokens_limit_reached|too large|context_length_exceeded/i.test(m)) throw err;
+    await new Promise(r=>setTimeout(r, 600));
+    return await fn();
+  }
+}
+
+async function classifySmart(userText, hasAttachment){
+  if(!KEYS.groq) return classifyTask(userText, hasAttachment);
+  try{
+    const sys = `Tu classes une demande utilisateur dans une seule catégorie parmi : chat, code, reasoning, image, vision.
+- image = générer une nouvelle image, ou modifier/éditer/améliorer/upscaler une image/photo existante.
+- vision = décrire, identifier ou analyser une photo jointe SANS la modifier.
+- code = écrire, corriger, améliorer, expliquer du code ou un fichier technique (html, js, python...).
+- reasoning = analyse longue, résumé, comparaison, question complexe nécessitant beaucoup de contexte.
+- chat = discussion générale, question simple, recherche d'info rapide (météo, calcul, définition...).
+Réponds uniquement par un seul mot parmi ces 5, rien d'autre.`;
+    const pj = hasAttachment ? 'Une photo est jointe.' : 'Aucune photo jointe (un fichier texte/code peut être collé dans le message, ignore son contenu pour classer, ne regarde que la demande).';
+    const res = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + KEYS.groq },
+      body: JSON.stringify({
+        model:'openai/gpt-oss-120b',
+        messages:[ {role:'system', content:sys}, {role:'user', content: pj + '\nDemande : ' + userText.slice(0,500)} ],
+        max_tokens:6, temperature:0
+      })
+    }, 8000);
+    if(!res.ok) throw new Error('classif http ' + res.status);
+    const data = await res.json();
+    const word = (data.choices?.[0]?.message?.content||'').trim().toLowerCase().replace(/[^a-z]/g,'');
+    if(['chat','code','reasoning','image','vision'].includes(word)) return word;
+    throw new Error('réponse de classification invalide');
+  }catch(e){
+    return classifyTask(userText, hasAttachment); // repli mots-clés si l'appel échoue
+  }
+}
+
+async function runRequest(text, pendingImage, targetC, classifyHint, forceCategory){
+  const c = targetC || getCurrent();
+  const hasAttachment = !!pendingImage;
+  const category = forceCategory || await classifySmart(classifyHint || text, hasAttachment);
+  let route = ROUTES[category];
+  if(forcedEngine){
+    if(forcedEngine.type === 'image' && category === 'image') route = [forcedEngine.key];
+    else if(forcedEngine.type === 'text' && ['chat','code','reasoning'].includes(category)) route = [forcedEngine.key];
+  }
+  const history = chatHistoryFor(c);
+
+  try{
+    if(category === 'image'){
+      let done = false;
+      for(const key of route){
+        if(key === 'gemini' && !KEYS.gemini) continue;
+        if(key === 'cloudflare' && (pendingImage || !KEYS.cloudflare || !KEYS.cf_account)) continue;
+        if(key === 'pollinations' && pendingImage) continue; // pas d'édition d'image existante possible
+        const tag = key==='gemini' ? 'GEMINI · IMAGE' : key==='pollinations' ? 'POLLINATIONS · FLUX' : 'CLOUDFLARE · FLUX';
+        const cls = key==='gemini' ? 'engine-gemini' : key==='pollinations' ? 'engine-cerebras' : 'engine-nvidia';
+        const b = pushMessage({ role:'bot', cat:CAT_LABEL[category], tag, tagClass:cls, text:'…' });
+        const think = startThinking(b, 'Génération…');
+        try{
+          const r = await tryWithRetry(()=> key==='gemini' ? callGeminiImage(text, pendingImage) : key==='pollinations' ? callPollinationsImage(text) : callCloudflareImage(text));
+          think.stop();
+          bumpUsage(key);
+          b.textContent = r.text || '';
+          if(r.imgSrc){ const img=document.createElement('img'); img.src=r.imgSrc; b.appendChild(img); }
+          c.messages[c.messages.length-1].text = r.text || ''; c.messages[c.messages.length-1].imgSrc = r.imgSrc;
+          done = true; break;
+        }catch(err){
+          think.stop();
+          const msg = '⚠ indisponible — ' + friendlyError(err);
+          b.textContent = msg; c.messages[c.messages.length-1].text = msg; c.messages[c.messages.length-1].tagClass = 'err'; c.messages[c.messages.length-1].isError = true;
+        }
+      }
+      if(!done) throw new Error(route.some(k=>k==='gemini'?KEYS.gemini:(KEYS.cloudflare&&KEYS.cf_account)) ? "Tous les moteurs d'image ont échoué (quota atteint partout)." : "Aucune clé d'image configurée (Gemini ou Cloudflare).");
+    } else if(category === 'vision'){
+      if(!KEYS.gemini) throw new Error('Clé Gemini requise pour analyser une photo.');
+      const b = pushMessage({ role:'bot', cat:CAT_LABEL[category], tag:'GEMINI · VISION', tagClass:'engine-gemini', text:'…' });
+      const think = startThinking(b, 'Analyse…');
+      try{
+        const reply = await tryWithRetry(()=> callGeminiText(text || 'Décris cette image.', pendingImage, history));
+        think.stop(); bumpUsage('gemini'); renderReplyContent(b, reply); c.messages[c.messages.length-1].text = reply;
+      }catch(err){ think.stop(); c.messages.pop(); if(b.parentElement) b.parentElement.remove(); throw new Error(friendlyError(err)); }
+    } else {
+      let done = false;
+      for(const key of route){
+        let tag, cls, needKey, call;
+        if(key === 'gemini'){
+          needKey = 'gemini'; tag = 'GEMINI'; cls = 'engine-gemini';
+          call = ()=> callGeminiText(text, null, history);
+        } else if(key === 'cloudflare'){
+          needKey = null; tag = 'CLOUDFLARE'; cls = 'engine-nvidia';
+          if(!KEYS.cloudflare || !KEYS.cf_account) continue;
+          call = ()=> callCloudflareText(text, history);
+        } else {
+          const cfg = OA_PROVIDERS[key];
+          needKey = cfg.key || key; tag = cfg.tag; cls = cfg.cls;
+          call = ()=> callOpenAICompatible(cfg, text, history,
+            (skillName)=>{ think.setLabel('🔧 ' + skillLabel(skillName) + '…'); streaming = false; },
+            (partial)=>{
+              if(!streaming){ streaming = true; think.stop(); }
+              if(partial.includes('```')){
+                b.textContent = '✍️ Rédaction du fichier… ' + partial.length.toLocaleString('fr-FR') + ' caractères';
+              } else {
+                b.textContent = partial;
+              }
+              messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+          );
+        }
+        if(needKey && !KEYS[needKey]) continue;
+        let streaming = false;
+        const b = pushMessage({ role:'bot', cat:CAT_LABEL[category], tag, tagClass:cls, text:'…' });
+        const think = startThinking(b, 'Réflexion…');
+        try{
+          const reply = await tryWithRetry(call);
+          if(!streaming) think.stop();
+          bumpUsage(key);
+          renderReplyContent(b, reply); c.messages[c.messages.length-1].text = reply;
+          done = true; break;
+        }catch(err){
+          think.stop();
+          const msg = '⚠ indisponible — ' + friendlyError(err);
+          b.textContent = msg; c.messages[c.messages.length-1].text = msg; c.messages[c.messages.length-1].tagClass = 'err'; c.messages[c.messages.length-1].isError = true;
+        }
+      }
+      if(!done) throw new Error('Tous les moteurs de la catégorie "'+category+'" ont échoué (quota atteint) ou aucun n\'est configuré.');
+    }
+  } catch(err){
+    pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:friendlyError(err), isError:true });
+  }
+  persistConvos();
+}
+
+document.getElementById('scan-code').onclick = ()=> document.getElementById('camera-input').click();
+document.getElementById('camera-input').onchange = async (e)=>{
+  const f = e.target.files[0];
+  document.getElementById('camera-input').value = '';
+  if(!f) return;
+  if(!KEYS.gemini){ pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:'Clé Gemini requise pour la transcription OCR du code.', isError:true }); return; }
+  if(!navigator.onLine){ pushMessage({ role:'bot', tag:'HORS-LIGNE', tagClass:'err', text:'Pas de connexion réseau.', isError:true }); return; }
+  if(sendBtn.disabled) return;
+
+  const reader = new FileReader();
+  const dataUrl = await new Promise((res)=>{ reader.onload = ()=> res(reader.result); reader.readAsDataURL(f); });
+  const imagePart = { mimeType:f.type, base64:dataUrl.split(',')[1] };
+
+  pushMessage({ role:'user', text:'📷 Scan de code (photo)', fullText:'📷 Scan de code (photo)', imgSrc:dataUrl });
+  sendBtn.disabled = true;
+  const c = getCurrent();
+  const progress = document.getElementById('scan-progress');
+  progress.style.display = 'block';
+  progress.textContent = '📷 Transcription du code en cours (Gemini Vision)…';
+
+  try{
+    const ocrPrompt = "Transcris fidèlement et intégralement le code visible sur cette photo, caractère pour caractère, en respectant l'indentation exacte. N'ajoute aucun commentaire, aucune explication, aucune reformulation. Si le code est du PowerShell, fais particulièrement attention aux caractères spéciaux ($, {}, |, `, \"). Réponds uniquement avec le code dans un bloc de code, rien d'autre.";
+    const ocrText = await tryWithRetry(()=> callGeminiText(ocrPrompt, imagePart, []));
+    const ocrBlock = extractCodeBlock(ocrText);
+    const code = ocrBlock ? ocrBlock.code.trim() : ocrText.trim();
+    if(!code){ throw new Error('Aucun code détecté sur la photo.'); }
+
+    pushMessage({ role:'bot', cat:'OCR', tag:'GEMINI · TRANSCRIPTION', tagClass:'engine-gemini', text:'```\n' + code + '\n```' });
+
+    progress.textContent = '🔎 Analyse du code par Mistral Codestral…';
+    const analysisText = `Voici du code PowerShell transcrit depuis une photo (vérifie qu'il n'y a pas d'erreur de transcription évidente, puis analyse-le) :\n\`\`\`powershell\n${code}\n\`\`\`\n\nAnalyse ce code, signale les problèmes éventuels et propose des améliorations.`;
+    await runRequest(analysisText, null, c, 'analyse ce code', 'code');
+  }catch(err){
+    pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:friendlyError(err), isError:true });
+  }
+  progress.style.display = 'none';
+  sendBtn.disabled = false;
+};
+
+let projectMode = false;
+document.getElementById('project-mode-btn').onclick = ()=>{
+  projectMode = !projectMode;
+  document.getElementById('project-mode-btn').textContent = '🧩 Projet : ' + (projectMode ? 'ON' : 'OFF');
+  document.getElementById('project-mode-btn').style.borderColor = projectMode ? 'var(--amber)' : 'var(--line)';
+  document.getElementById('project-mode-btn').style.color = projectMode ? 'var(--amber)' : 'var(--dim)';
+};
+
+// Un rôle = un appel à un moteur précis (texte simple, pas de streaming/outils pour rester robuste au JSON)
+const PROJECT_ROLES = {
+  content: [ { p:'groq', label:'GROQ' }, { p:'mistral', label:'MISTRAL' }, { p:'openrouter', label:'OPENROUTER' }, { p:'gemini', label:'GEMINI' } ],
+  design:  [ { p:'zai', label:'Z.AI GLM' }, { p:'openrouter', label:'OPENROUTER' }, { p:'groq', label:'GROQ' }, { p:'cerebras', label:'CEREBRAS' }, { p:'mistral', label:'MISTRAL' } ],
+  code:    [ { p:'mistral-code', label:'MISTRAL CODESTRAL' }, { p:'zai', label:'Z.AI GLM' }, { p:'openrouter-code', label:'OPENROUTER QWEN CODER' }, { p:'github', label:'GITHUB GPT-4O' }, { p:'gemini', label:'GEMINI' } ],
+};
+
+async function callAgent(providerKey, systemPrompt, userPrompt){
+  const fullSystem = CUSTOM_INSTRUCTIONS ? systemPrompt + '\n\nInstructions permanentes de l\'utilisateur à respecter aussi : ' + CUSTOM_INSTRUCTIONS : systemPrompt;
+  if(providerKey === 'gemini') return await callGeminiText(fullSystem + '\n\n' + userPrompt, null, []);
+  const cfg = OA_PROVIDERS[providerKey];
+  const needKey = cfg.key || providerKey;
+  if(!KEYS[needKey]) throw new Error(`Clé manquante pour l'agent ${providerKey}.`);
+  const res = await fetchWithTimeout(cfg.url, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+KEYS[needKey] },
+    body: JSON.stringify({ model:cfg.model, messages:[ {role:'system',content:fullSystem}, {role:'user',content:userPrompt} ], temperature:0.4 })
+  }, 45000);
+  if(!res.ok){ const t = await res.text().catch(()=>''); throw new Error('HTTP '+res.status+' '+t.slice(0,150)); }
+  const data = await safeJson(res);
+  const content = data.choices?.[0]?.message?.content;
+  if(!content || !content.trim()) throw new Error('Réponse vide de l\'agent '+providerKey+'.');
+  return content;
+}
+
+// Essaie chaque moteur du rôle dans l'ordre jusqu'à ce qu'un réussisse ; met à jour le statut en direct
+async function callAgentCascade(roleKey, systemPrompt, userPrompt, step, card, steps){
+  const candidates = PROJECT_ROLES[roleKey];
+  let lastErr = null;
+  for(const cand of candidates){
+    const needKey = cand.p === 'gemini' ? 'gemini' : (OA_PROVIDERS[cand.p].key || cand.p);
+    if(!KEYS[needKey]) continue;
+    step.engine = cand.label; step.status = 'running'; renderProjectStatus(card, steps);
+    try{
+      const result = await callAgent(cand.p, systemPrompt, userPrompt);
+      step.status = 'done'; renderProjectStatus(card, steps);
+      return result;
+    }catch(err){
+      lastErr = err;
+      step.status = 'retry'; step.error = cand.label + ' indisponible ('+friendlyError(err)+'), essai suivant…'; renderProjectStatus(card, steps);
+    }
+  }
+  step.status = 'error'; step.error = lastErr ? friendlyError(lastErr) : 'Aucun moteur disponible pour ce rôle.'; renderProjectStatus(card, steps);
+  throw new Error(`Rôle "${roleKey}" : tous les moteurs ont échoué.`);
+}
+
+function renderProjectStatus(card, steps){
+  card.innerHTML = steps.map(s => {
+    const icon = s.status==='done' ? '✅' : s.status==='error' ? '❌' : (s.status==='running'||s.status==='retry') ? '⏳' : '⬜';
+    return `<div style="padding:4px 0;font-size:12.5px;">${icon} <b>${s.label}</b> <span class="mono" style="color:var(--dim);font-size:10.5px;">${s.engine}</span>${(s.status==='error'||s.status==='retry') ? ' — '+escapeHtml(s.error||'') : ''}</div>`;
+  }).join('');
+}
+
+async function runProjectPipeline(prompt, c){
+  const statusBubble = pushMessage({ role:'bot', cat:'PROJET', tag:'PIPELINE MULTI-AGENTS', tagClass:'engine-mistral', text:'' });
+  const card = document.createElement('div');
+  card.style.cssText = 'border:1px solid var(--line);border-radius:8px;padding:10px 12px;';
+  statusBubble.appendChild(card);
+
+  const steps = [
+    { id:'content', label:'Agent Contenu (parallèle)', engine:'…', status:'pending' },
+    { id:'design',  label:'Agent Design (parallèle)',  engine:'…', status:'pending' },
+    { id:'code',    label:'Agent Code — assemblage final', engine:'…', status:'pending' },
+  ];
+  renderProjectStatus(card, steps);
+
+  try{
+    // Contenu et Design ne dépendent que de la demande initiale -> exécution en parallèle réelle
+    const [contentResult, designResult] = await Promise.allSettled([
+      callAgentCascade('content',
+        "Tu es un rédacteur/architecte de contenu. À partir de la demande, décris précisément le contenu nécessaire (textes, données, sections, fonctionnalités attendues) en points clairs. Ne code rien, décris seulement le contenu et la structure fonctionnelle attendue.",
+        prompt, steps[0], card, steps),
+      callAgentCascade('design',
+        Object.keys(CUSTOM_CSS_FILES).length
+          ? "Tu es un designer UI/CSS. Voici plusieurs feuilles de style de référence (polices, couleurs, mises en page...). Pioche et mixe librement ce qui est pertinent pour CETTE demande précise — tu n'es pas obligé de tout reprendre, choisis juste les éléments (couleurs, polices, composants) qui conviennent, et complète le reste toi-même si besoin :\n\n" +
+            Object.values(CUSTOM_CSS_FILES).map(f => `--- ${f.name} ---\n\`\`\`css\n${f.content}\n\`\`\``).join('\n\n') +
+            "\n\nFournis le bloc CSS final (le mix choisi + tes compléments) dans un bloc de code ```css."
+          : "Tu es un designer UI/CSS. À partir de la demande, propose une direction visuelle (palette de couleurs, ambiance) puis fournis un bloc CSS complet et prêt à l'emploi (dans un bloc de code ```css). Sois créatif mais garde un rendu propre et lisible sur mobile.",
+        prompt, steps[1], card, steps),
+    ]);
+
+    if(contentResult.status === 'rejected' && designResult.status === 'rejected'){
+      throw new Error('Les agents Contenu et Design ont tous les deux échoué.');
+    }
+    const contentBrief = contentResult.status === 'fulfilled' ? contentResult.value : '(non disponible — improvise un contenu cohérent avec la demande)';
+    const cssBlock = designResult.status === 'fulfilled' ? designResult.value : '(non disponible — choisis toi-même une palette et un style propres)';
+
+    const finalCode = await callAgentCascade('code',
+      "Tu es un développeur front-end. Assemble un fichier HTML autonome (HTML+CSS+JS dans un seul fichier) complet et fonctionnel, en respectant fidèlement le brief de contenu et en intégrant le CSS fourni (adapte-le si nécessaire mais garde son esprit). Réponds uniquement avec le fichier complet dans un seul bloc de code ```html.",
+      `Demande initiale : ${prompt}\n\nBrief de contenu (agent 1) :\n${contentBrief}\n\nCSS proposé (agent 2) :\n${cssBlock}`,
+      steps[2], card, steps);
+
+    pushMessage({ role:'bot', cat:'PROJET', tag:'RÉSULTAT FINAL', tagClass:'engine-mistral', text: finalCode });
+  }catch(err){
+    pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:'Le pipeline a échoué : '+friendlyError(err), isError:true });
+  }
+  persistConvos();
+}
+
+async function handleSend(){
+  if(sendBtn.disabled) return; // requête déjà en cours
+  const rawText = inputEl.value.trim();
+  if(!rawText && !attachedImage && !attachedFile) return;
+  if(!Object.values(KEYS).some(v=>v)){ openSettings(); return; }
+  if(!navigator.onLine){ pushMessage({ role:'bot', tag:'HORS-LIGNE', tagClass:'err', text:'Pas de connexion réseau — réessaie une fois reconnecté.', isError:true }); return; }
+
+  inputEl.value=''; inputEl.style.height='auto';
+  const userImgSrc = attachedImage ? `data:${attachedImage.mimeType};base64,${attachedImage.base64}` : null;
+
+  let text = rawText;
+  let displayText = rawText;
+  let forceCategory = null;
+  if(attachedFile){
+    text = `Fichier joint "${attachedFile.name}":\n\`\`\`\n${attachedFile.content}\n\`\`\`\n\n${rawText || 'Analyse ce fichier.'}`;
+    displayText = (rawText ? rawText + '\n' : '') + '📄 ' + attachedFile.name;
+    const approxTokens = Math.ceil(attachedFile.content.length / 4);
+    if(approxTokens > 15000){
+      forceCategory = 'reasoning';
+      pushMessage({ role:'bot', tag:'INFO', tagClass:'', text:`📄 Fichier volumineux (~${approxTokens.toLocaleString('fr-FR')} tokens estimés) — seul Gemini (contexte 1M) peut le traiter, les autres moteurs seront ignorés pour cette demande.`, isError:true });
+    }
+  }
+  pushMessage({ role:'user', text:displayText, fullText:text, imgSrc:userImgSrc });
+  sendBtn.disabled = true;
+
+  const pendingImage = attachedImage;
+  attachedImage = null; attachedFile = null;
+  document.getElementById('preview-bar').classList.remove('show');
+
+  if(projectMode){
+    await runProjectPipeline(rawText, getCurrent());
+  } else {
+    await runRequest(text, pendingImage, undefined, rawText, forceCategory);
+  }
+  sendBtn.disabled = false;
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function regenerate(botIndex){
+  if(sendBtn.disabled) return; // requête déjà en cours
+  if(!Object.values(KEYS).some(v=>v)){ openSettings(); return; }
+  if(!navigator.onLine){ pushMessage({ role:'bot', tag:'HORS-LIGNE', tagClass:'err', text:'Pas de connexion réseau — réessaie une fois reconnecté.', isError:true }); return; }
+  const c = getCurrent();
+  let userIdx = botIndex - 1;
+  while(userIdx >= 0 && c.messages[userIdx].role !== 'user') userIdx--;
+  if(userIdx < 0) return;
+  const userMsg = c.messages[userIdx];
+  const text = userMsg.fullText || userMsg.text;
+  let pendingImage = null;
+  if(userMsg.imgSrc){
+    const m = userMsg.imgSrc.match(/^data:([^;]+);base64,(.*)$/);
+    if(m) pendingImage = { mimeType:m[1], base64:m[2] };
+  }
+  // retire les messages bot qui suivent ce tour (jusqu'au prochain message user)
+  let cut = botIndex;
+  while(cut < c.messages.length && c.messages[cut].role === 'bot') cut++;
+  c.messages.splice(botIndex, cut - botIndex);
+  renderMessages();
+  sendBtn.disabled = true;
+  await runRequest(text, pendingImage, c, userMsg.text);
+  sendBtn.disabled = false;
+}
+
+function copyMessage(txt){
+  const doIt = async ()=>{
+    try{ await navigator.clipboard.writeText(txt); }
+    catch(e){
+      const ta = document.createElement('textarea');
+      ta.value = txt; document.body.appendChild(ta); ta.select();
+      try{ document.execCommand('copy'); }catch(e2){}
+      document.body.removeChild(ta);
+    }
+  };
+  doIt();
+}
+
+sendBtn.onclick = handleSend;
+inputEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); handleSend(); } });
+inputEl.addEventListener('input', ()=>{ inputEl.style.height='auto'; inputEl.style.height=Math.min(inputEl.scrollHeight,110)+'px'; });
+
+(async function init(){
+  await loadKeysFromStorage();
+  if(!KEYS.groq) { /* garde les clés intégrées par défaut si rien en storage */ }
+  reflectStatus();
+  await loadConvos();
+  await loadUsage();
+  await loadShortcuts();
+  await loadConnectors();
+  await loadInstructions();
+  await loadCss();
+  updateOfflineBanner();
+})();
+</script>
+</body>
+</html>
