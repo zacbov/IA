@@ -307,10 +307,11 @@ async function loadKeysFromStorage(){
   try{ const raw = localStorage.getItem('routeur-ia-keys'); if(raw) KEYS = JSON.parse(raw); }catch(e){}
 }
 const ALL_KEY_IDS = ['groq','gemini','mistral','cerebras','openrouter','nvidia','hf','github','cloudflare','cf_account','zai','tripo','proxy_url','proxy_secret','brave'];
+const PROXIED_IDS = ['groq','mistral','cerebras','openrouter','nvidia','hf','github','zai','gemini','tripo'];
 function reflectStatus(){
   ALL_KEY_IDS.forEach(id=>{
     const dot = document.getElementById('dot-'+id);
-    if(dot) dot.className = 'dot ' + (KEYS[id] ? 'on':'');
+    if(dot) dot.className = 'dot ' + ((KEYS[id] || (proxyActive() && PROXIED_IDS.includes(id))) ? 'on':'');
   });
 }
 function openSettings(){
@@ -589,7 +590,7 @@ function renderEngineList(){
   const list = document.getElementById('engine-list');
   const rows = [{ key:null, label:'🔀 Auto (recommandé)', type:null, needKey:null }, ...SELECTABLE_ENGINES];
   list.innerHTML = rows.map((e,i) => {
-    const configured = !e.needKey || KEYS[e.needKey];
+    const configured = !e.needKey || hasKey(e.needKey);
     const active = forcedEngine ? (forcedEngine.key===e.key && forcedEngine.type===e.type) : (e.key===null);
     return `<button data-i="${i}" ${configured?'':'disabled'} style="display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:${active?'#1b2b24':'none'};border:1px solid ${active?'var(--cyan)':'var(--line)'};color:${configured?'var(--text)':'var(--dim)'};padding:10px 12px;border-radius:8px;margin-bottom:6px;font-size:13px;${configured?'cursor:pointer;':'opacity:0.4;'}">
       <span>${e.label}</span>
@@ -1188,6 +1189,7 @@ function getSkills(){
 }
 
 function proxyActive(){ return !!(KEYS.proxy_url && KEYS.proxy_secret); }
+function hasKey(id){ return !!KEYS[id] || proxyActive(); }
 function proxyTarget(providerKey){ return KEYS.proxy_url.replace(/\/$/,'') + '/proxy/' + providerKey; }
 function proxyHeaders(extra){ return { 'Content-Type':'application/json', 'X-App-Secret':KEYS.proxy_secret, ...(extra||{}) }; }
 
@@ -1610,8 +1612,8 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
     if(category === 'image'){
       let done = false;
       for(const key of route){
-        if(key === 'gemini' && !KEYS.gemini) continue;
-        if(key === 'cloudflare' && (pendingImage || !KEYS.cloudflare || !KEYS.cf_account)) continue;
+        if(key === 'gemini' && !hasKey('gemini')) continue;
+        if(key === 'cloudflare' && (pendingImage || (!proxyActive() && (!KEYS.cloudflare || !KEYS.cf_account)))) continue;
         if(key === 'pollinations' && pendingImage) continue; // pas d'édition d'image existante possible
         const tag = key==='gemini' ? 'GEMINI · IMAGE' : key==='pollinations' ? 'POLLINATIONS · FLUX' : 'CLOUDFLARE · FLUX';
         const cls = key==='gemini' ? 'engine-gemini' : key==='pollinations' ? 'engine-cerebras' : 'engine-nvidia';
@@ -1631,9 +1633,9 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
           b.textContent = msg; c.messages[c.messages.length-1].text = msg; c.messages[c.messages.length-1].tagClass = 'err'; c.messages[c.messages.length-1].isError = true;
         }
       }
-      if(!done) throw new Error(route.some(k=>k==='gemini'?KEYS.gemini:(KEYS.cloudflare&&KEYS.cf_account)) ? "Tous les moteurs d'image ont échoué (quota atteint partout)." : "Aucune clé d'image configurée (Gemini ou Cloudflare).");
+      if(!done) throw new Error(route.some(k=>k==='gemini'?hasKey('gemini'):(hasKey('cloudflare')&&KEYS.cf_account)) ? "Tous les moteurs d'image ont échoué (quota atteint partout)." : "Aucune clé d'image configurée (Gemini ou Cloudflare).");
     } else if(category === 'vision'){
-      if(!KEYS.gemini) throw new Error('Clé Gemini requise pour analyser une photo.');
+      if(!hasKey('gemini')) throw new Error('Clé Gemini requise pour analyser une photo.');
       const b = pushMessage({ role:'bot', cat:CAT_LABEL[category], tag:'GEMINI · VISION', tagClass:'engine-gemini', text:'…' });
       const think = startThinking(b, 'Analyse…');
       try{
@@ -1649,7 +1651,7 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
           call = ()=> callGeminiText(text, null, history);
         } else if(key === 'cloudflare'){
           needKey = null; tag = 'CLOUDFLARE'; cls = 'engine-nvidia';
-          if(!KEYS.cloudflare || !KEYS.cf_account) continue;
+          if(!proxyActive() && (!KEYS.cloudflare || !KEYS.cf_account)) continue;
           call = ()=> callCloudflareText(text, history);
         } else {
           const cfg = OA_PROVIDERS[key];
@@ -1667,7 +1669,7 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
             }
           );
         }
-        if(needKey && !KEYS[needKey]) continue;
+        if(needKey && !hasKey(needKey)) continue;
         let streaming = false;
         const b = pushMessage({ role:'bot', cat:CAT_LABEL[category], tag, tagClass:cls, text:'…' });
         const think = startThinking(b, 'Réflexion…');
@@ -1696,7 +1698,7 @@ document.getElementById('camera-input').onchange = async (e)=>{
   const f = e.target.files[0];
   document.getElementById('camera-input').value = '';
   if(!f) return;
-  if(!KEYS.gemini){ pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:'Clé Gemini requise pour la transcription OCR du code.', isError:true }); return; }
+  if(!hasKey('gemini')){ pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:'Clé Gemini requise pour la transcription OCR du code.', isError:true }); return; }
   if(!navigator.onLine){ pushMessage({ role:'bot', tag:'HORS-LIGNE', tagClass:'err', text:'Pas de connexion réseau.', isError:true }); return; }
   if(sendBtn.disabled) return;
 
@@ -1750,10 +1752,11 @@ async function callAgent(providerKey, systemPrompt, userPrompt){
   if(providerKey === 'gemini') return await callGeminiText(fullSystem + '\n\n' + userPrompt, null, []);
   const cfg = OA_PROVIDERS[providerKey];
   const needKey = cfg.key || providerKey;
-  if(!KEYS[needKey]) throw new Error(`Clé manquante pour l'agent ${providerKey}.`);
-  const res = await fetchWithTimeout(cfg.url, {
+  if(!hasKey(needKey)) throw new Error(`Clé manquante pour l'agent ${providerKey}.`);
+  const useProxyAgent = proxyActive();
+  const res = await fetchWithTimeout(useProxyAgent ? proxyTarget(needKey) : cfg.url, {
     method:'POST',
-    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+KEYS[needKey] },
+    headers: useProxyAgent ? proxyHeaders() : { 'Content-Type':'application/json', 'Authorization':'Bearer '+KEYS[needKey] },
     body: JSON.stringify({ model:cfg.model, messages:[ {role:'system',content:fullSystem}, {role:'user',content:userPrompt} ], temperature:0.4 })
   }, 45000);
   if(!res.ok){ const t = await res.text().catch(()=>''); throw new Error('HTTP '+res.status+' '+t.slice(0,150)); }
@@ -1769,7 +1772,7 @@ async function callAgentCascade(roleKey, systemPrompt, userPrompt, step, card, s
   let lastErr = null;
   for(const cand of candidates){
     const needKey = cand.p === 'gemini' ? 'gemini' : (OA_PROVIDERS[cand.p].key || cand.p);
-    if(!KEYS[needKey]) continue;
+    if(!hasKey(needKey)) continue;
     step.engine = cand.label; step.status = 'running'; renderProjectStatus(card, steps);
     try{
       const result = await callAgent(cand.p, systemPrompt, userPrompt);
@@ -1841,7 +1844,7 @@ async function handleSend(){
   if(sendBtn.disabled) return; // requête déjà en cours
   const rawText = inputEl.value.trim();
   if(!rawText && !attachedImage && !attachedFile) return;
-  if(!Object.values(KEYS).some(v=>v)){ openSettings(); return; }
+  if(!proxyActive() && !Object.values(KEYS).some(v=>v)){ openSettings(); return; }
   if(!navigator.onLine){ pushMessage({ role:'bot', tag:'HORS-LIGNE', tagClass:'err', text:'Pas de connexion réseau — réessaie une fois reconnecté.', isError:true }); return; }
 
   inputEl.value=''; inputEl.style.height='auto';
@@ -1877,7 +1880,7 @@ async function handleSend(){
 
 async function regenerate(botIndex){
   if(sendBtn.disabled) return; // requête déjà en cours
-  if(!Object.values(KEYS).some(v=>v)){ openSettings(); return; }
+  if(!proxyActive() && !Object.values(KEYS).some(v=>v)){ openSettings(); return; }
   if(!navigator.onLine){ pushMessage({ role:'bot', tag:'HORS-LIGNE', tagClass:'err', text:'Pas de connexion réseau — réessaie une fois reconnecté.', isError:true }); return; }
   const c = getCurrent();
   let userIdx = botIndex - 1;
