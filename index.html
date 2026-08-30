@@ -85,6 +85,7 @@
     <div class="title mono">Routeur <b>IA</b> · <span id="current-title">Nouvelle conversation</span></div>
   </div>
   <div style="display:flex; gap:6px;">
+    <button id="knowledge-btn" title="Zone de dépôt du projet" style="background:none; border:1px solid var(--line); color:var(--dim); width:34px; height:34px; border-radius:6px; font-size:15px; cursor:pointer;">📚</button>
     <button id="usage-btn" title="Usage du jour" style="background:none; border:1px solid var(--line); color:var(--dim); width:34px; height:34px; border-radius:6px; font-size:15px; cursor:pointer;">📊</button>
     <button id="news-btn" title="Actualités Claude" style="background:none; border:1px solid var(--line); color:var(--dim); width:34px; height:34px; border-radius:6px; font-size:15px; cursor:pointer;">📰</button>
     <button id="gear">⚙</button>
@@ -187,9 +188,15 @@
     </div>
     <div class="field"><label>Feuilles de style CSS de référence</label>
       <div id="css-list" style="margin-bottom:8px;"></div>
-      <button id="import-css-btn" style="background:none;border:1px solid var(--cyan);color:var(--cyan);padding:9px 12px;border-radius:8px;font-size:12px;cursor:pointer;">📄 Importer un .css</button>
+      <button id="sync-css-github-btn" style="width:100%;background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:10px;border-radius:8px;font-size:12.5px;cursor:pointer;margin-bottom:8px;">🔄 Synchroniser depuis mon dépôt GitHub (zacbov/IA/css)</button>
+      <div id="css-sync-status" style="font-size:11px;color:var(--dim);margin-bottom:8px;display:none;"></div>
+      <button id="import-css-btn" style="background:none;border:1px solid var(--cyan);color:var(--cyan);padding:9px 12px;border-radius:8px;font-size:12px;cursor:pointer;margin-bottom:8px;">📄 Importer un .css (fichier local)</button>
       <input type="file" id="css-file-input" accept=".css" style="display:none;">
-      <p>Importe-en plusieurs (polices, couleurs, layout...) — l'agent Design pioche et mixe ce qui est pertinent pour chaque demande, sans obligation de tout reprendre.</p>
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="css-url-input" placeholder="https://raw.githubusercontent.com/.../style.css" style="flex:1;background:#0e1512;border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:8px;font-size:12px;">
+        <button id="import-css-url-btn" style="background:none;border:1px solid var(--cyan);color:var(--cyan);padding:9px 12px;border-radius:8px;font-size:12px;cursor:pointer;white-space:nowrap;">🔗 Importer</button>
+      </div>
+      <p>Le bouton de synchro va chercher automatiquement tous les .css de ton dossier GitHub — retape juste dessus après avoir ajouté/modifié un fichier là-bas.</p>
     </div>
     <button id="save-instructions" style="width:100%;background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-bottom:10px;">Enregistrer les instructions</button>
     <button id="close-sheet">Fermer</button>
@@ -207,6 +214,18 @@
     <div class="field"><label>Nom du endpoint (optionnel)</label><input type="text" id="sc-apiname" placeholder="/predict par défaut"></div>
     <button id="sc-add" style="width:100%;background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:11px;border-radius:8px;font-size:13px;cursor:pointer;">Ajouter le raccourci</button>
     <button id="close-shortcuts" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:10px;">Fermer</button>
+  </div>
+</div>
+
+<!-- Zone de dépôt du projet (propre à chaque conversation) -->
+<div class="overlay" id="overlay-knowledge" style="align-items:flex-end;">
+  <div id="sheet">
+    <h2>📚 Zone de dépôt — <span id="knowledge-convo-name" class="mono" style="color:var(--dim);font-size:12px;"></span></h2>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:14px;">Propre à CETTE conversation. L'IA ne reçoit pas ces fichiers en entier à chaque message — elle va les consulter elle-même, seulement quand elle en a besoin.</div>
+    <div id="knowledge-list" style="margin-bottom:14px;"></div>
+    <button id="import-knowledge-btn" style="width:100%;background:none;border:1px solid var(--cyan);color:var(--cyan);padding:10px;border-radius:8px;font-size:12.5px;cursor:pointer;">📄 Ajouter un fichier</button>
+    <input type="file" id="knowledge-file-input" accept=".txt,.md,.js,.py,.html,.css,.json,.csv,.xml,.yaml,.yml" style="display:none;">
+    <button id="close-knowledge" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:10px;">Fermer</button>
   </div>
 </div>
 
@@ -339,7 +358,7 @@ let conversations = [];
 let currentId = null;
 
 function newConversation(){
-  const c = { id: 'c'+Date.now(), title:'Nouvelle conversation', messages:[], history:[] };
+  const c = { id: 'c'+Date.now(), title:'Nouvelle conversation', messages:[], history:[], knowledgeFiles:{} };
   conversations.unshift(c);
   currentId = c.id;
   renderConvoList();
@@ -890,6 +909,52 @@ document.getElementById('css-file-input').onchange = (e)=>{
   reader.readAsText(f);
   document.getElementById('css-file-input').value = '';
 };
+const DEFAULT_CSS_REPO_API = 'https://api.github.com/repos/zacbov/IA/contents/css';
+
+document.getElementById('sync-css-github-btn').onclick = async ()=>{
+  const btn = document.getElementById('sync-css-github-btn');
+  const statusEl = document.getElementById('css-sync-status');
+  btn.disabled = true; btn.textContent = '🔄 Synchronisation…';
+  statusEl.style.display = 'block'; statusEl.textContent = 'Récupération de la liste des fichiers…';
+  try{
+    const listing = await fetchJson(DEFAULT_CSS_REPO_API);
+    const cssFiles = (Array.isArray(listing) ? listing : []).filter(f => f.type === 'file' && f.name.endsWith('.css'));
+    if(!cssFiles.length){ statusEl.textContent = 'Aucun fichier .css trouvé dans ce dossier.'; }
+    let count = 0;
+    for(const f of cssFiles){
+      const content = await (await fetchWithTimeout(f.download_url, {}, 12000)).text();
+      // clé stable basée sur le nom pour que la resynchro mette à jour au lieu de dupliquer
+      const id = 'gh-' + f.name.replace(/[^a-z0-9.-]/gi, '_');
+      CUSTOM_CSS_FILES[id] = { name: f.name, content, source:'github' };
+      count++;
+    }
+    await persistCss(); renderCssList();
+    statusEl.textContent = `✅ ${count} fichier(s) synchronisé(s) depuis GitHub.`;
+  }catch(e){
+    statusEl.textContent = '❌ Échec de la synchronisation : ' + e.message;
+  }
+  btn.disabled = false; btn.textContent = '🔄 Synchroniser depuis mon dépôt GitHub (zacbov/IA/css)';
+};
+
+document.getElementById('import-css-url-btn').onclick = async ()=>{
+  const url = document.getElementById('css-url-input').value.trim();
+  if(!url) return;
+  const btn = document.getElementById('import-css-url-btn');
+  btn.textContent = '…'; btn.disabled = true;
+  try{
+    const res = await fetchWithTimeout(url, {}, 12000);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const content = await res.text();
+    const name = url.split('/').pop() || 'style.css';
+    const id = 'css' + Date.now();
+    CUSTOM_CSS_FILES[id] = { name, content };
+    persistCss(); renderCssList();
+    document.getElementById('css-url-input').value = '';
+  }catch(e){
+    alert('Import impossible : ' + e.message + '\n(vérifie que l\'URL pointe vers le fichier "raw" et pas la page GitHub normale)');
+  }
+  btn.textContent = '🔗 Importer'; btn.disabled = false;
+};
 
 function hfSpaceSubdomain(spaceId){
   return spaceId.trim().toLowerCase().replace(/[_\/]+/g, '-').replace(/[^a-z0-9-]/g, '');
@@ -1201,13 +1266,22 @@ async function callOpenAICompatible(cfg, userText, history, onSkillUse, onChunk)
   const targetUrl = useProxy ? proxyTarget(providerKey) : cfg.url;
   const headers = useProxy ? proxyHeaders() : { 'Content-Type':'application/json', 'Authorization':'Bearer ' + apiKey };
   let messages = CUSTOM_INSTRUCTIONS ? [{role:'system', content:CUSTOM_INSTRUCTIONS}, ...history, {role:'user', content:userText}] : [...history, {role:'user', content:userText}];
+  let toolsEnabled = true;
   for(let round=0; round<3; round++){
     const res = await fetchWithTimeout(targetUrl, {
       method:'POST',
       headers,
-      body: JSON.stringify({ model:cfg.model, messages, tools:getSkills(), tool_choice:'auto', stream:true })
+      body: JSON.stringify(toolsEnabled ? { model:cfg.model, messages, tools:getSkills(), tool_choice:'auto', stream:true } : { model:cfg.model, messages, stream:true })
     }, 30000);
-    if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('HTTP ' + res.status + ' ' + t.slice(0,180)); }
+    if(!res.ok){
+      const t = await res.text().catch(()=> '');
+      if(res.status === 400 && toolsEnabled){
+        // certains moteurs (ex: Z.ai sur modèle gratuit) refusent le function calling -> on retente sans
+        toolsEnabled = false;
+        round--; continue;
+      }
+      throw new Error('HTTP ' + res.status + ' ' + t.slice(0,180));
+    }
     if(!res.body){ // fournisseur sans support de streaming : repli non-streamé
       const data = await safeJson(res);
       if(data.error) throw new Error(typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error)).slice(0,180));
@@ -1807,6 +1881,13 @@ async function runProjectPipeline(prompt, c){
   ];
   renderProjectStatus(card, steps);
 
+  const DESIGN_PRINCIPLES = `Règles impératives de design :
+- ÉVITE ABSOLUMENT les 3 clichés du "look généré par IA" : (1) fond crème/beige + accent terracotta/orange, (2) fond noir/sombre + accent vert fluo ou vermillon, (3) mise en page façon journal avec règles fines et coins carrés partout. Si aucune direction n'est imposée par la demande, choisis une palette et une ambiance spécifiques au sujet réel, pas un de ces trois défauts.
+- Palette : donne 4 à 6 couleurs nommées en hexadécimal, cohérentes avec le sujet précis (pas une palette générique).
+- Typographie : importe une VRAIE police via Google Fonts (@import ou <link>), jamais la police système par défaut. Associe une police d'affichage (titres, avec du caractère) et une police de texte courant, différentes l'une de l'autre.
+- Un seul élément signature : choisis UNE chose mémorable et originale liée au sujet précis, garde le reste sobre et discipliné autour.
+- Pas de markers numérotés (01/02/03) sauf si le contenu est vraiment une séquence/un process réel.`;
+
   try{
     // Contenu et Design ne dépendent que de la demande initiale -> exécution en parallèle réelle
     const [contentResult, designResult] = await Promise.allSettled([
@@ -1814,11 +1895,12 @@ async function runProjectPipeline(prompt, c){
         "Tu es un rédacteur/architecte de contenu. À partir de la demande, décris précisément le contenu nécessaire (textes, données, sections, fonctionnalités attendues) en points clairs. Ne code rien, décris seulement le contenu et la structure fonctionnelle attendue.",
         prompt, steps[0], card, steps),
       callAgentCascade('design',
-        Object.keys(CUSTOM_CSS_FILES).length
-          ? "Tu es un designer UI/CSS. Voici plusieurs feuilles de style de référence (polices, couleurs, mises en page...). Pioche et mixe librement ce qui est pertinent pour CETTE demande précise — tu n'es pas obligé de tout reprendre, choisis juste les éléments (couleurs, polices, composants) qui conviennent, et complète le reste toi-même si besoin :\n\n" +
+        (Object.keys(CUSTOM_CSS_FILES).length
+          ? "Tu es un designer UI/CSS. Voici plusieurs feuilles de style de référence (polices, couleurs, mises en page...). Pioche et mixe librement ce qui est pertinent pour CETTE demande précise — tu n'es pas obligé de tout reprendre, choisis juste les éléments qui conviennent, et complète le reste toi-même si besoin :\n\n" +
             Object.values(CUSTOM_CSS_FILES).map(f => `--- ${f.name} ---\n\`\`\`css\n${f.content}\n\`\`\``).join('\n\n') +
             "\n\nFournis le bloc CSS final (le mix choisi + tes compléments) dans un bloc de code ```css."
-          : "Tu es un designer UI/CSS. À partir de la demande, propose une direction visuelle (palette de couleurs, ambiance) puis fournis un bloc CSS complet et prêt à l'emploi (dans un bloc de code ```css). Sois créatif mais garde un rendu propre et lisible sur mobile.",
+          : "Tu es un designer UI/CSS. À partir de la demande, propose une direction visuelle spécifique au sujet puis fournis un bloc CSS complet et prêt à l'emploi (dans un bloc de code ```css).")
+        + '\n\n' + DESIGN_PRINCIPLES,
         prompt, steps[1], card, steps),
     ]);
 
@@ -1828,10 +1910,27 @@ async function runProjectPipeline(prompt, c){
     const contentBrief = contentResult.status === 'fulfilled' ? contentResult.value : '(non disponible — improvise un contenu cohérent avec la demande)';
     const cssBlock = designResult.status === 'fulfilled' ? designResult.value : '(non disponible — choisis toi-même une palette et un style propres)';
 
-    const finalCode = await callAgentCascade('code',
-      "Tu es un développeur front-end. Assemble un fichier HTML autonome (HTML+CSS+JS dans un seul fichier) complet et fonctionnel, en respectant fidèlement le brief de contenu et en intégrant le CSS fourni (adapte-le si nécessaire mais garde son esprit). Réponds uniquement avec le fichier complet dans un seul bloc de code ```html.",
-      `Demande initiale : ${prompt}\n\nBrief de contenu (agent 1) :\n${contentBrief}\n\nCSS proposé (agent 2) :\n${cssBlock}`,
+    const draftCode = await callAgentCascade('code',
+      "Tu es un développeur front-end. La DEMANDE INITIALE ci-dessous est ta priorité absolue — le brief de contenu et le CSS ne sont que des propositions d'agents précédents, adapte-les ou écarte-les s'ils s'éloignent de la demande. Assemble un fichier HTML autonome (HTML+CSS+JS dans un seul fichier) complet et fonctionnel. Réponds uniquement avec le fichier complet dans un seul bloc de code ```html.\n\n" + DESIGN_PRINCIPLES,
+      `Demande initiale (priorité absolue) : ${prompt}\n\nBrief de contenu proposé :\n${contentBrief}\n\nCSS proposé :\n${cssBlock}`,
       steps[2], card, steps);
+
+    steps.push({ id:'critique', label:'Relecture critique & polish', engine:'…', status:'running' });
+    renderProjectStatus(card, steps);
+    let finalCode = draftCode;
+    try{
+      const extracted = extractCodeBlock(draftCode);
+      const draftHtml = extracted ? extracted.code : draftCode;
+      const critique = await callAgentCascade('code',
+        `Tu es un directeur artistique exigeant qui relit un travail avant livraison. Voici les pièges à vérifier : le résultat ressemble-t-il à un des 3 clichés IA (crème+terracotta, noir+néon, journal à règles fines) ? La typographie est-elle une vraie police importée ou juste la police système ? Y a-t-il un vrai élément signature original lié au sujet "${prompt}" ? Si tout est déjà bon, renvoie le fichier EXACTEMENT tel quel. Sinon, corrige uniquement les points problématiques et renvoie le fichier HTML complet corrigé. Réponds uniquement avec le fichier complet dans un bloc de code \`\`\`html, rien d'autre.`,
+        draftHtml,
+        steps[3], card, steps);
+      const critExtracted = extractCodeBlock(critique);
+      if(critExtracted && critExtracted.code.trim().length > 100) finalCode = critique;
+      steps[3].status = 'done'; renderProjectStatus(card, steps);
+    }catch(err){
+      steps[3].status = 'error'; steps[3].error = 'Relecture ignorée (' + friendlyError(err) + '), fichier initial conservé.'; renderProjectStatus(card, steps);
+    }
 
     pushMessage({ role:'bot', cat:'PROJET', tag:'RÉSULTAT FINAL', tagClass:'engine-mistral', text: finalCode });
   }catch(err){
