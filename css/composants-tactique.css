@@ -1,0 +1,62 @@
+/* ============================================================
+   MODULE : Composants "Tactique" — cartes, boutons, HUD
+   À combiner avec palette-grimdark.css et typographie-tactique.css
+   ============================================================ */
+
+.tactique-card {
+  background: var(--grim-panel, #111815);
+  border: 1px solid var(--grim-line, #233029);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.tactique-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--grim-line, #233029);
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.tactique-button {
+  font-family: var(--font-tactique-body, sans-serif);
+  font-weight: 600;
+  background: var(--grim-amber, #e8a33d);
+  color: #1a1208;
+  border: none;
+  border-radius: 8px;
+  padding: 0.7em 1.3em;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.tactique-button.tactique-button-ghost {
+  background: none;
+  color: var(--grim-cyan, #5fd0c0);
+  border: 1px solid var(--grim-cyan, #5fd0c0);
+}
+
+/* Étiquette de statut façon équipement — élément signature */
+.tactique-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-tactique-mono, monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--grim-dim, #7c8c84);
+  border: 1px solid var(--grim-line, #233029);
+  border-radius: 14px;
+  padding: 3px 10px;
+}
+
+/* Grille façon scanner/diagnostic — fond quadrillé très subtil */
+.tactique-grid-bg {
+  background-image:
+    linear-gradient(var(--grim-line, #233029) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grim-line, #233029) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-color: var(--grim-bg, #0b0f0d);
+  background-position: -1px -1px;
+}

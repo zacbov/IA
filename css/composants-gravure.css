@@ -1,0 +1,61 @@
+/* ============================================================
+   MODULE : Composants "Gravure" — cartes, boutons, encarts
+   À combiner avec palette-pharmatlas.css et typographie-gravure.css
+   ============================================================ */
+
+.gravure-card {
+  background: var(--pharmatlas-panel, #F5F0E4);
+  border: 1px solid var(--pharmatlas-line, #C9BFA3);
+  border-radius: 2px; /* presque droit — évite le "tout arrondi" générique */
+  padding: 1.5rem 1.75rem;
+  position: relative;
+}
+
+/* Coin "corné" — évoque une page de grimoire, élément signature discret */
+.gravure-card::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 18px; height: 18px;
+  background: linear-gradient(135deg, transparent 50%, var(--pharmatlas-line, #C9BFA3) 50%);
+  opacity: 0.5;
+}
+
+.gravure-button {
+  font-family: var(--font-gravure-display, serif);
+  background: transparent;
+  color: var(--pharmatlas-ink, #2B2A25);
+  border: 1.5px solid var(--pharmatlas-ink, #2B2A25);
+  border-radius: 2px;
+  padding: 0.65em 1.4em;
+  font-size: 0.95rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.gravure-button:hover {
+  background: var(--pharmatlas-ink, #2B2A25);
+  color: var(--pharmatlas-parchment, #EDE6D6);
+}
+.gravure-button.gravure-button-accent {
+  border-color: var(--pharmatlas-rust, #A6592E);
+  color: var(--pharmatlas-rust, #A6592E);
+}
+.gravure-button.gravure-button-accent:hover {
+  background: var(--pharmatlas-rust, #A6592E);
+  color: var(--pharmatlas-parchment, #EDE6D6);
+}
+
+/* Encart "planche botanique" — pour isoler une info/illustration */
+.gravure-plate {
+  border: 1px solid var(--pharmatlas-line, #C9BFA3);
+  padding: 1rem;
+  text-align: center;
+}
+.gravure-plate figcaption {
+  font-family: var(--font-gravure-body, serif);
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--pharmatlas-ink-soft, #55524A);
+  margin-top: 0.6rem;
+}

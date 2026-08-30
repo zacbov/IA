@@ -1,0 +1,55 @@
+/* ============================================================
+   MODULE : Typographie "Gravure" — display à fort contraste + texte lisible
+   Usage : Mandragore, pharmacognosie, tout ce qui évoque la gravure/l'imprimé
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+
+:root {
+  /* Fraunces : serif à fort contraste, optical sizing — texture d'encre gravée
+     dans ses graisses hautes, idéal pour de gros titres avec du caractère. */
+  --font-gravure-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+
+  /* Spectral : serif de lecture, discret, ne rentre pas en compétition
+     avec le display mais reste dans la même famille d'esprit (livre ancien). */
+  --font-gravure-body: 'Spectral', Georgia, serif;
+
+  /* Échelle typographique (rapport ~1.333, "fourth majeur") */
+  --gravure-size-xs: 0.75rem;
+  --gravure-size-sm: 0.9rem;
+  --gravure-size-base: 1.05rem;
+  --gravure-size-lg: 1.4rem;
+  --gravure-size-xl: 1.9rem;
+  --gravure-size-2xl: 2.8rem;
+  --gravure-size-3xl: 4rem;
+}
+
+.gravure-display {
+  font-family: var(--font-gravure-display);
+  font-optical-sizing: auto;
+  font-weight: 600;
+  font-variation-settings: "SOFT" 0, "WONK" 1; /* légère excentricité, moins "générée" */
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+}
+.gravure-display.gravure-italic {
+  font-style: italic;
+  font-weight: 500;
+}
+
+body.gravure-body, .gravure-body {
+  font-family: var(--font-gravure-body);
+  font-weight: 400;
+  line-height: 1.65;
+  letter-spacing: 0.005em;
+}
+
+/* Petite majuscule d'ouverture façon lettrine légère — élément signature */
+.gravure-lettrine::first-letter {
+  font-family: var(--font-gravure-display);
+  font-size: 3.2em;
+  font-weight: 600;
+  float: left;
+  line-height: 0.8;
+  margin: 0.05em 0.08em 0 0;
+}

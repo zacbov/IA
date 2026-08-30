@@ -1,0 +1,48 @@
+/* ============================================================
+   MODULE : Palette "Grimdark" — tactique, sombre, signal
+   Usage : Warhammer, gamebook, ambiance extraction/survie
+   ============================================================ */
+
+:root {
+  /* Fond et surfaces */
+  --grim-bg: #0b0f0d;          /* fond principal, quasi-noir légèrement vert */
+  --grim-panel: #111815;       /* cartes, panneaux */
+  --grim-panel-raised: #161f1a; /* surfaces encore plus surélevées */
+
+  /* Texte et lignes */
+  --grim-text: #dfe7e2;        /* texte principal */
+  --grim-dim: #7c8c84;         /* texte secondaire, métadonnées */
+  --grim-line: #233029;        /* bordures, séparateurs */
+
+  /* Accents (un seul dominant + un froid en contrepoint) */
+  --grim-amber: #e8a33d;       /* accent chaud dominant — alerte, action, feu */
+  --grim-cyan: #5fd0c0;        /* accent froid — information, validation, signal */
+  --grim-blood: #7a2e2e;       /* rouge sourd — danger, dégâts, échec critique */
+
+  /* États */
+  --grim-success: var(--grim-cyan);
+  --grim-danger: #d9654f;
+  --grim-focus: var(--grim-amber);
+}
+
+/* Élément signature : "voyant" de statut façon équipement militaire —
+   un point qui pulse doucement quand actif, pas une simple pastille plate. */
+.grim-status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--grim-line);
+  display: inline-block;
+}
+.grim-status-dot.active {
+  background: var(--grim-cyan);
+  box-shadow: 0 0 6px var(--grim-cyan);
+  animation: grim-pulse 2.4s ease-in-out infinite;
+}
+@keyframes grim-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Fond avec vignette légère — évite le noir plat uniforme */
+.grim-surface {
+  background: radial-gradient(ellipse at top, var(--grim-panel) 0%, var(--grim-bg) 70%);
+}
