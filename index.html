@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Routeur IA</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="theme-color" content="#0b0f0d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Routeur IA">
 <style>
   :root{
     --bg:#0b0f0d; --panel:#111815; --line:#233029;
@@ -87,6 +94,7 @@
   <div style="display:flex; gap:6px;">
     <button id="knowledge-btn" title="Zone de dépôt du projet" style="background:none; border:1px solid var(--line); color:var(--dim); width:34px; height:34px; border-radius:6px; font-size:15px; cursor:pointer;">📚</button>
     <button id="usage-btn" title="Usage du jour" style="background:none; border:1px solid var(--line); color:var(--dim); width:34px; height:34px; border-radius:6px; font-size:15px; cursor:pointer;">📊</button>
+    <button id="diag-btn" title="Diagnostic des modèles" style="background:none; border:1px solid var(--line); color:var(--dim); width:34px; height:34px; border-radius:6px; font-size:15px; cursor:pointer;">🩺</button>
     <button id="news-btn" title="Actualités Claude" style="background:none; border:1px solid var(--line); color:var(--dim); width:34px; height:34px; border-radius:6px; font-size:15px; cursor:pointer;">📰</button>
     <button id="gear">⚙</button>
   </div>
@@ -161,19 +169,11 @@
 <div class="overlay" id="overlay-settings">
   <div id="sheet">
     <h2>Clés API</h2>
-    <div class="field"><label>Groq</label><input type="password" id="key-groq"><p>console.groq.com/keys — discussion rapide.</p></div>
-    <div class="field"><label>Gemini</label><input type="password" id="key-gemini"><p>aistudio.google.com/apikey — doit commencer par AIza. Images, vision, raisonnement long.</p></div>
-    <div class="field"><label>Mistral</label><input type="password" id="key-mistral"><p>console.mistral.ai — code (Codestral) + texte.</p></div>
-    <div class="field"><label>Cerebras</label><input type="password" id="key-cerebras"><p>cloud.cerebras.ai — texte très rapide.</p></div>
-    <div class="field"><label>OpenRouter</label><input type="password" id="key-openrouter"><p>openrouter.ai/keys — code (Qwen Coder) + secours.</p></div>
-    <div class="field"><label>NVIDIA NIM</label><input type="password" id="key-nvidia"><p>build.nvidia.com — gros modèles, secours raisonnement.</p></div>
-    <div class="field"><label>Hugging Face</label><input type="password" id="key-hf"><p>huggingface.co/settings/tokens — secours texte.</p></div>
-    <div class="field"><label>GitHub Models</label><input type="password" id="key-github"><p>github.com/settings/tokens — accès GPT-4o gratuit via ton compte GitHub.</p></div>
-    <div class="field"><label>Cloudflare — API Token</label><input type="password" id="key-cloudflare"><p>⚠ Actuellement inactif : l'API Cloudflare bloque les appels directs depuis un navigateur (CORS). Nécessiterait un Worker-proxy pour fonctionner.</p></div>
-    <div class="field"><label>Cloudflare — Account ID</label><input type="text" id="key-cf_account"><p>Conservé pour plus tard si un proxy est mis en place.</p></div>
-    <div class="field"><label>Z.ai (GLM)</label><input type="password" id="key-zai"><p>z.ai/chat → API Keys — modèle gratuit glm-4.5-flash, rapide, bon en code.</p></div>
+    <div style="font-size:11px;color:var(--dim);background:#0e1512;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.5;">
+      ℹ️ Groq, Gemini, Mistral, Cerebras, OpenRouter, NVIDIA, Hugging Face, Cloudflare, Z.ai, Tripo3D et Hume sont désormais gérés par ton Worker Cloudflare — plus besoin de coller ces clés ici. Seuls les deux champs ci-dessous restent nécessaires (compétences qui n'utilisent pas encore le proxy).
+    </div>
+    <div class="field"><label>GitHub Models</label><input type="password" id="key-github"><p>github.com/settings/tokens — utilisée aussi par les compétences GitHub (dépôts, commits, issues), pas encore proxyfiées.</p></div>
     <div class="field"><label>Brave Search</label><input type="password" id="key-brave"><p>api.search.brave.com → gratuit 2000 requêtes/mois — pour une vraie recherche web.</p></div>
-    <div class="field"><label>Tripo3D</label><input type="password" id="key-tripo"><p>platform.tripo3d.ai → API Keys — génération de modèles 3D (.glb), 300 crédits/mois gratuits.</p></div>
     <div class="divider"></div>
     <div style="font-size:11px;color:var(--dim);margin-bottom:6px;" class="mono">PROXY CLOUDFLARE (optionnel — cache tes clés côté serveur)</div>
     <div class="field"><label>URL du Worker</label><input type="text" id="key-proxy_url" placeholder="https://routeur-ia-proxy.xxx.workers.dev"></div>
@@ -272,6 +272,17 @@
   </div>
 </div>
 
+<!-- Diagnostic des modèles -->
+<div class="overlay" id="overlay-diag" style="align-items:flex-end;">
+  <div id="sheet">
+    <h2>🩺 Diagnostic des modèles</h2>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:14px;">Envoie un petit message test à chaque moteur configuré pour vérifier lesquels répondent vraiment aujourd'hui.</div>
+    <button id="run-diag-btn" style="width:100%;background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-bottom:14px;">▶ Lancer le diagnostic</button>
+    <div id="diag-results"></div>
+    <button id="close-diag" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:16px;">Fermer</button>
+  </div>
+</div>
+
 <!-- Actualités Claude / Anthropic -->
 <div class="overlay" id="overlay-news">
   <div id="sheet">
@@ -312,7 +323,8 @@ let KEYS = {
   tripo:'',
   proxy_url:'https://routeur-ia-proxy.zacharybov.workers.dev',
   proxy_secret:'',
-  brave:''
+  brave:'',
+  hume:''
 };
 
 async function persistKeys(){
@@ -325,7 +337,7 @@ async function loadKeysFromStorage(){
   }catch(e){}
   try{ const raw = localStorage.getItem('routeur-ia-keys'); if(raw) KEYS = JSON.parse(raw); }catch(e){}
 }
-const ALL_KEY_IDS = ['groq','gemini','mistral','cerebras','openrouter','nvidia','hf','github','cloudflare','cf_account','zai','tripo','proxy_url','proxy_secret','brave'];
+const ALL_KEY_IDS = ['groq','gemini','mistral','cerebras','openrouter','nvidia','hf','github','cloudflare','cf_account','zai','tripo','proxy_url','proxy_secret','brave','hume'];
 const PROXIED_IDS = ['groq','mistral','cerebras','openrouter','nvidia','hf','github','zai','gemini','tripo'];
 function reflectStatus(){
   ALL_KEY_IDS.forEach(id=>{
@@ -442,6 +454,7 @@ async function loadConvos(){
     try{
       const d = JSON.parse(raw);
       conversations = d.conversations || [];
+      conversations.forEach(c => { if(!c.knowledgeFiles) c.knowledgeFiles = {}; });
       currentId = d.currentId;
     }catch(e){}
   }
@@ -454,10 +467,11 @@ async function loadConvos(){
 // --- Attachment (photo ou fichier texte/code) ---
 let attachedImage = null;
 let attachedFile = null; // {name, content}
+let pendingCodeScan = false;
 document.getElementById('attach').onclick = ()=> document.getElementById('file-input').click();
 document.getElementById('file-input').onchange = (e)=>{
   const f = e.target.files[0]; if(!f) return;
-  attachedImage = null; attachedFile = null;
+  attachedImage = null; attachedFile = null; pendingCodeScan = false;
   if(f.type.startsWith('image/')){
     const reader = new FileReader();
     reader.onload = ()=>{
@@ -481,7 +495,7 @@ document.getElementById('file-input').onchange = (e)=>{
   }
 };
 document.getElementById('remove-attach').onclick = ()=>{
-  attachedImage = null; attachedFile = null;
+  attachedImage = null; attachedFile = null; pendingCodeScan = false;
   document.getElementById('preview-bar').classList.remove('show');
   document.getElementById('file-input').value = '';
 };
@@ -528,8 +542,30 @@ function renderMessage(m, index){
     actions.appendChild(copyBtn); actions.appendChild(regenBtn);
     wrap.appendChild(actions);
   }
+  if(m.role === 'user'){
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex; justify-content:flex-end; margin-top:4px;';
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '✏️ Modifier'; editBtn.style.cssText = 'background:none;border:1px solid var(--line);color:var(--dim);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;';
+    editBtn.onclick = ()=> editMessage(index);
+    actions.appendChild(editBtn);
+    wrap.appendChild(actions);
+  }
   messagesEl.appendChild(wrap);
   return bubble;
+}
+function editMessage(index){
+  if(isBusy) return;
+  const c = getCurrent();
+  const msg = c.messages[index];
+  if(!msg || msg.role !== 'user') return;
+  // retire ce message et tout ce qui suit (nouvelle branche de conversation à partir d'ici)
+  c.messages.splice(index);
+  renderMessages();
+  persistConvos();
+  inputEl.value = (msg.text || '').replace(/\n?📄[^\n]*$/,''); // enlève la mention de fichier joint, non ré-attachable
+  inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight,110)+'px';
+  inputEl.focus();
 }
 function pushMessage(m){
   const c = getCurrent();
@@ -688,6 +724,81 @@ document.getElementById('overlay-news').onclick = (e)=>{ if(e.target.id==='overl
 document.getElementById('refresh-news').onclick = ()=> loadNews(true);
 
 document.getElementById('usage-btn').onclick = ()=>{ renderUsage(); document.getElementById('overlay-usage').classList.add('show'); };
+
+// --- Diagnostic des modèles ---
+document.getElementById('diag-btn').onclick = ()=>{ document.getElementById('overlay-diag').classList.add('show'); };
+document.getElementById('close-diag').onclick = ()=> document.getElementById('overlay-diag').classList.remove('show');
+document.getElementById('overlay-diag').onclick = (e)=>{ if(e.target.id==='overlay-diag') document.getElementById('overlay-diag').classList.remove('show'); };
+
+const DIAG_TARGETS = [
+  { id:'groq', label:'Groq' }, { id:'cerebras', label:'Cerebras' }, { id:'mistral', label:'Mistral' },
+  { id:'mistral-code', label:'Mistral Codestral' }, { id:'openrouter', label:'OpenRouter' },
+  { id:'openrouter-code', label:'OpenRouter Qwen Coder' }, { id:'nvidia', label:'NVIDIA' },
+  { id:'hf', label:'Hugging Face' }, { id:'github', label:'GitHub GPT-4o' }, { id:'zai', label:'Z.ai' },
+  { id:'gemini-text', label:'Gemini (texte)' }, { id:'llm7', label:'LLM7' },
+];
+
+document.getElementById('run-diag-btn').onclick = async ()=>{
+  const btn = document.getElementById('run-diag-btn');
+  const resultsEl = document.getElementById('diag-results');
+  btn.disabled = true; btn.textContent = 'Test en cours…';
+  resultsEl.innerHTML = DIAG_TARGETS.map(t=>`<div id="diag-row-${t.id}" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px;"><span>${t.label}</span><span class="mono" style="color:var(--dim);">⏳</span></div>`).join('');
+
+  for(const t of DIAG_TARGETS){
+    const row = document.getElementById('diag-row-'+t.id);
+    const statusSpan = row.querySelector('span:last-child');
+    try{
+      if(t.id === 'gemini-text'){
+        if(!hasKey('gemini')) throw new Error('non configuré');
+        await callGeminiText('Réponds juste "ok".', null, []);
+      } else if(t.id === 'llm7'){
+        await callOpenAICompatible(OA_PROVIDERS.llm7, 'Réponds juste "ok".', []);
+      } else {
+        if(!hasKey(OA_PROVIDERS[t.id].key || t.id)) throw new Error('non configuré');
+        await callOpenAICompatible(OA_PROVIDERS[t.id], 'Réponds juste "ok".', []);
+      }
+      statusSpan.textContent = '✅ OK'; statusSpan.style.color = 'var(--cyan)';
+    }catch(e){
+      const msg = friendlyError(e);
+      statusSpan.textContent = msg.includes('configuré') ? '⚪ non configuré' : '❌ ' + msg.slice(0,60);
+      statusSpan.style.color = msg.includes('configuré') ? 'var(--dim)' : 'var(--danger)';
+    }
+  }
+  btn.disabled = false; btn.textContent = '▶ Relancer le diagnostic';
+};
+
+// --- Zone de dépôt du projet (propre à chaque conversation) ---
+function renderKnowledgeList(){
+  const c = getCurrent();
+  document.getElementById('knowledge-convo-name').textContent = c.title;
+  const list = document.getElementById('knowledge-list');
+  const entries = Object.entries(c.knowledgeFiles || {});
+  list.innerHTML = entries.length ? entries.map(([id, f])=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+      <span style="font-size:12px;">📄 ${escapeHtml(f.name)} <span class="mono" style="color:var(--dim);font-size:10px;">(${f.content.length.toLocaleString('fr-FR')} car.)</span></span>
+      <button data-id="${id}" class="kn-del" style="background:none;border:none;color:var(--danger);font-size:14px;cursor:pointer;">✕</button>
+    </div>`).join('') : '<div style="color:var(--dim);font-size:12px;">Zone de dépôt vide pour cette conversation.</div>';
+  list.querySelectorAll('.kn-del').forEach(btn=>{
+    btn.onclick = ()=>{ delete c.knowledgeFiles[btn.dataset.id]; persistConvos(); renderKnowledgeList(); };
+  });
+}
+document.getElementById('knowledge-btn').onclick = ()=>{ renderKnowledgeList(); document.getElementById('overlay-knowledge').classList.add('show'); };
+document.getElementById('close-knowledge').onclick = ()=> document.getElementById('overlay-knowledge').classList.remove('show');
+document.getElementById('overlay-knowledge').onclick = (e)=>{ if(e.target.id==='overlay-knowledge') document.getElementById('overlay-knowledge').classList.remove('show'); };
+document.getElementById('import-knowledge-btn').onclick = ()=> document.getElementById('knowledge-file-input').click();
+document.getElementById('knowledge-file-input').onchange = (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const c = getCurrent();
+    if(!c.knowledgeFiles) c.knowledgeFiles = {};
+    const id = 'kn' + Date.now();
+    c.knowledgeFiles[id] = { name:f.name, content:reader.result };
+    persistConvos(); renderKnowledgeList();
+  };
+  reader.readAsText(f);
+  document.getElementById('knowledge-file-input').value = '';
+};
 document.getElementById('close-usage').onclick = ()=> document.getElementById('overlay-usage').classList.remove('show');
 document.getElementById('overlay-usage').onclick = (e)=>{ if(e.target.id==='overlay-usage') document.getElementById('overlay-usage').classList.remove('show'); };
 
@@ -717,6 +828,7 @@ const SKILLS = [
   { type:'function', function:{ name:'github_list_issues', description:"Liste les issues ouvertes d'un dépôt GitHub", parameters:{ type:'object', properties:{ owner:{type:'string'}, repo:{type:'string'} }, required:['owner','repo'] } } },
   { type:'function', function:{ name:'generate_3d_model', description:"Génère un vrai modèle 3D (fichier .glb téléchargeable) à partir d'une description texte, via Tripo3D. Peut prendre 30 à 90 secondes.", parameters:{ type:'object', properties:{ prompt:{type:'string'} }, required:['prompt'] } } },
   { type:'function', function:{ name:'generate_music', description:"Génère un court morceau de musique instrumentale à partir d'une description texte (via Hugging Face MusicGen). ~10-15 secondes de musique, prend 20-60s à générer.", parameters:{ type:'object', properties:{ prompt:{type:'string', description:"Description du style/ambiance musicale souhaitée"} }, required:['prompt'] } } },
+  { type:'function', function:{ name:'text_to_speech', description:"Lit un texte à voix haute avec une vraie voix expressive (via Hume AI). Utilise seulement quand on demande explicitement d'entendre/écouter un texte.", parameters:{ type:'object', properties:{ text:{type:'string'}, description:{type:'string', description:"Description optionnelle du style vocal souhaité, ex: 'voix calme et posée'"} }, required:['text'] } } },
   { type:'function', function:{ name:'translate_text', description:"Traduit un texte d'une langue vers une autre", parameters:{ type:'object', properties:{ text:{type:'string'}, from:{type:'string', description:"Code langue source, ex: fr"}, to:{type:'string', description:"Code langue cible, ex: en"} }, required:['text','to'] } } },
   { type:'function', function:{ name:'web_search_real', description:"Fait une vraie recherche web (pas juste Wikipédia) pour de l'actualité générale ou une question précise nécessitant des résultats web à jour", parameters:{ type:'object', properties:{ query:{type:'string'} }, required:['query'] } } },
   { type:'function', function:{ name:'iss_location', description:"Donne la position actuelle de la Station Spatiale Internationale", parameters:{ type:'object', properties:{} } } },
@@ -864,6 +976,37 @@ document.getElementById('save-instructions').onclick = ()=>{
   CUSTOM_INSTRUCTIONS = document.getElementById('custom-instructions').value.trim();
   persistInstructions();
 };
+
+// --- Mémoire inter-conversations ---
+let LONG_TERM_MEMORY = []; // liste de faits (strings)
+async function persistMemory(){
+  const payload = JSON.stringify(LONG_TERM_MEMORY);
+  try{ if(window.storage){ await window.storage.set('long-term-memory', payload, false); return; } }catch(e){}
+  try{ localStorage.setItem('routeur-ia-memory', payload); }catch(e){}
+}
+async function loadMemory(){
+  let raw = null;
+  try{ if(window.storage){ const r = await window.storage.get('long-term-memory', false); if(r) raw = r.value; } }catch(e){}
+  if(!raw){ try{ raw = localStorage.getItem('routeur-ia-memory'); }catch(e){} }
+  if(raw){ try{ LONG_TERM_MEMORY = JSON.parse(raw); }catch(e){} }
+}
+function renderMemoryList(){
+  const list = document.getElementById('memory-list');
+  list.innerHTML = LONG_TERM_MEMORY.length ? LONG_TERM_MEMORY.map((fact, i) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+      <span style="font-size:12px;">${escapeHtml(fact)}</span>
+      <button data-i="${i}" class="mem-del" style="background:none;border:none;color:var(--danger);font-size:14px;cursor:pointer;">✕</button>
+    </div>`).join('') : '<div style="color:var(--dim);font-size:12px;">Rien de mémorisé pour l\'instant.</div>';
+  list.querySelectorAll('.mem-del').forEach(btn=>{
+    btn.onclick = ()=>{ LONG_TERM_MEMORY.splice(+btn.dataset.i, 1); persistMemory(); renderMemoryList(); };
+  });
+}
+function getSystemContext(){
+  const parts = [];
+  if(CUSTOM_INSTRUCTIONS) parts.push(CUSTOM_INSTRUCTIONS);
+  if(LONG_TERM_MEMORY.length) parts.push('Ce que tu sais déjà sur l\'utilisateur (mémorisé lors de conversations précédentes) :\n- ' + LONG_TERM_MEMORY.join('\n- '));
+  return parts.join('\n\n');
+}
 
 // --- CSS de référence (plusieurs fichiers) ---
 let CUSTOM_CSS_FILES = {}; // { id: {name, content} }
@@ -1023,6 +1166,13 @@ async function fetchJson(url, options, ms){
 
 async function runSkill(name, args){
   try{
+    if(name === 'read_project_file'){
+      const files = getCurrent()?.knowledgeFiles || {};
+      const match = Object.values(files).find(f => f.name === args.filename);
+      if(!match) return `Fichier "${args.filename}" introuvable dans la zone de dépôt de ce projet.`;
+      const capped = match.content.length > 6000 ? match.content.slice(0, 6000) + '\n\n[... tronqué, fichier plus long ...]' : match.content;
+      return `Contenu de "${match.name}" :\n\`\`\`\n${capped}\n\`\`\``;
+    }
     if(name.startsWith('connector_')){
       const c = CUSTOM_CONNECTORS[name.slice('connector_'.length)];
       if(!c) return 'Connecteur inconnu.';
@@ -1182,6 +1332,22 @@ async function runSkill(name, args){
       pushMessage({ role:'bot', cat:'MUSIQUE', tag:'HF · MUSICGEN', tagClass:'engine-hf', text:'🎵 "'+args.prompt+'"', audioSrc:audioUrl });
       return 'Musique générée avec succès — le lecteur audio est apparu juste au-dessus dans le chat.';
     }
+    if(name === 'text_to_speech'){
+      const useProxyTts = proxyActive();
+      if(!useProxyTts && !KEYS.hume) return 'Clé Hume AI non configurée.';
+      const body = JSON.stringify({ utterances: [{ text: args.text, description: args.description || undefined }] });
+      const res = await fetchWithTimeout(
+        useProxyTts ? proxyTarget('hume-tts') : 'https://api.hume.ai/v0/tts/file',
+        { method:'POST',
+          headers: useProxyTts ? proxyHeaders() : { 'Content-Type':'application/json', 'X-Hume-Api-Key':KEYS.hume },
+          body },
+        30000);
+      if(!res.ok){ const t = await res.text().catch(()=>''); return `Échec de la synthèse vocale (HTTP ${res.status}) ${t.slice(0,120)}`; }
+      const blob = await res.blob();
+      const audioUrl = URL.createObjectURL(blob);
+      pushMessage({ role:'bot', cat:'VOIX', tag:'HUME · TTS', tagClass:'engine-cerebras', text:'🔊 "'+args.text.slice(0,80)+(args.text.length>80?'…':'')+'"', audioSrc:audioUrl });
+      return 'Texte lu à voix haute avec succès — le lecteur audio est apparu juste au-dessus dans le chat.';
+    }
     if(name === 'translate_text'){
       const langpair = (args.from || 'auto') + '|' + args.to;
       const d = await fetchJson(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(args.text)}&langpair=${langpair}`);
@@ -1216,13 +1382,20 @@ async function runSkill(name, args){
   }catch(e){ return 'Erreur pendant l\'exécution de la compétence : ' + e.message; }
 }
 
+let currentTurnController = null;
 async function fetchWithTimeout(url, options, ms){
-  const controller = new AbortController();
-  const t = setTimeout(()=>controller.abort(), ms || 30000);
+  const timeoutController = new AbortController();
+  const t = setTimeout(()=>timeoutController.abort(), ms || 30000);
+  const signals = [timeoutController.signal];
+  if(currentTurnController) signals.push(currentTurnController.signal);
+  const signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
   try{
-    return await fetch(url, { ...options, signal: controller.signal });
+    return await fetch(url, { ...options, signal });
   }catch(e){
-    if(e.name === 'AbortError') throw new Error("Délai dépassé — ce moteur n'a pas répondu à temps.");
+    if(e.name === 'AbortError'){
+      if(currentTurnController && currentTurnController.signal.aborted) throw new Error('Génération arrêtée.');
+      throw new Error("Délai dépassé — ce moteur n'a pas répondu à temps.");
+    }
     throw e;
   }finally{ clearTimeout(t); }
 }
@@ -1250,7 +1423,16 @@ function getSkills(){
       parameters:{ type:'object', properties:{ [c.paramName]:{ type:'string' } }, required:[c.paramName] }
     }
   }));
-  return [...base, ...customTools];
+  const knowledgeEntries = Object.values(getCurrent()?.knowledgeFiles || {});
+  const knowledgeTool = knowledgeEntries.length ? [{
+    type:'function',
+    function:{
+      name:'read_project_file',
+      description:`Consulte un fichier de la zone de dépôt de CE projet, seulement quand tu as besoin d'une info précise dedans (ne le fais pas systématiquement). Fichiers disponibles : ${knowledgeEntries.map(f=>f.name).join(', ')}.`,
+      parameters:{ type:'object', properties:{ filename:{type:'string', description:'Nom exact du fichier à consulter'} }, required:['filename'] }
+    }
+  }] : [];
+  return [...base, ...customTools, ...knowledgeTool];
 }
 
 function proxyActive(){ return !!(KEYS.proxy_url && KEYS.proxy_secret); }
@@ -1265,7 +1447,8 @@ async function callOpenAICompatible(cfg, userText, history, onSkillUse, onChunk)
   const apiKey = useProxy ? null : KEYS[providerKey];
   const targetUrl = useProxy ? proxyTarget(providerKey) : cfg.url;
   const headers = useProxy ? proxyHeaders() : { 'Content-Type':'application/json', 'Authorization':'Bearer ' + apiKey };
-  let messages = CUSTOM_INSTRUCTIONS ? [{role:'system', content:CUSTOM_INSTRUCTIONS}, ...history, {role:'user', content:userText}] : [...history, {role:'user', content:userText}];
+  const sysCtx = getSystemContext();
+  let messages = sysCtx ? [{role:'system', content:sysCtx}, ...history, {role:'user', content:userText}] : [...history, {role:'user', content:userText}];
   let toolsEnabled = true;
   for(let round=0; round<3; round++){
     const res = await fetchWithTimeout(targetUrl, {
@@ -1359,6 +1542,8 @@ async function callOpenAICompatible(cfg, userText, history, onSkillUse, onChunk)
   }
   return '(trop d\'appels d\'outils, réponse interrompue)';
 }
+const GEMINI_TEXT_CASCADE = ['gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemma-4-27b-it'];
+
 async function callGeminiText(userText, imagePart, history){
   const parts = [];
   if(imagePart) parts.push({ inline_data:{ mime_type:imagePart.mimeType, data:imagePart.base64 } });
@@ -1366,21 +1551,38 @@ async function callGeminiText(userText, imagePart, history){
   const contents = history.map(h=>({ role: h.role==='assistant'?'model':'user', parts:[{text:h.content}] }));
   contents.push({ role:'user', parts });
   const useProxy = proxyActive();
-  const res = await fetchWithTimeout(
-    useProxy ? proxyTarget('gemini-text') : 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',
-    {
-      method:'POST',
-      headers: useProxy ? proxyHeaders() : { 'Content-Type':'application/json', 'x-goog-api-key': KEYS.gemini },
-      body: JSON.stringify(CUSTOM_INSTRUCTIONS ? { contents, systemInstruction:{ parts:[{text:CUSTOM_INSTRUCTIONS}] } } : { contents })
-    }, 45000);
-  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('HTTP ' + res.status + ' ' + t.slice(0,180)); }
-  const data = await safeJson(res);
-  if(data.promptFeedback?.blockReason) throw new Error('Contenu bloqué par les filtres Gemini (' + data.promptFeedback.blockReason + ').');
-  const cand = data.candidates?.[0];
-  if(cand?.finishReason === 'SAFETY' || cand?.finishReason === 'RECITATION') throw new Error('Réponse bloquée par Gemini (' + cand.finishReason + ').');
-  const text = cand?.content?.parts?.[0]?.text;
-  if(!text || !text.trim()) throw new Error('Réponse vide reçue de Gemini.');
-  return text;
+  const baseBody = getSystemContext() ? { contents, systemInstruction:{ parts:[{text:getSystemContext()}] } } : { contents };
+
+  let lastErr = null;
+  for(const model of GEMINI_TEXT_CASCADE){
+    try{
+      const res = await fetchWithTimeout(
+        useProxy ? proxyTarget('gemini-text') : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method:'POST',
+          headers: useProxy ? proxyHeaders() : { 'Content-Type':'application/json', 'x-goog-api-key': KEYS.gemini },
+          body: JSON.stringify(useProxy ? { ...baseBody, __model:model } : baseBody)
+        }, 45000);
+      if(!res.ok){
+        const t = await res.text().catch(()=> '');
+        const err = new Error('HTTP ' + res.status + ' ' + t.slice(0,180));
+        // 429 = rafale sur CE modèle précis -> on tente le suivant, plus de marge
+        if(res.status === 429){ lastErr = err; continue; }
+        throw err;
+      }
+      const data = await safeJson(res);
+      if(data.promptFeedback?.blockReason) throw new Error('Contenu bloqué par les filtres Gemini (' + data.promptFeedback.blockReason + ').');
+      const cand = data.candidates?.[0];
+      if(cand?.finishReason === 'SAFETY' || cand?.finishReason === 'RECITATION') throw new Error('Réponse bloquée par Gemini (' + cand.finishReason + ').');
+      const text = cand?.content?.parts?.[0]?.text;
+      if(!text || !text.trim()) throw new Error('Réponse vide reçue de Gemini.');
+      return text;
+    }catch(e){
+      if(e.message && e.message.includes('429')){ lastErr = e; continue; }
+      throw e;
+    }
+  }
+  throw lastErr || new Error('Tous les modèles Gemini sont saturés (rafale).');
 }
 async function callGeminiImage(userText, imagePart){
   const parts = [];
@@ -1501,8 +1703,36 @@ function renderMarkdown(text){
     const items = block.split('\n').map(l => '<li style="margin-left:18px;">' + l.replace(/^\d+\. /, '') + '</li>').join('');
     return pre + '<ol style="margin:4px 0;padding:0;">' + items + '</ol>';
   });
-  s = s.split('\n\n').map(p => p.includes('<ul') || p.includes('<ol') || p.includes('<div') ? p : '<div style="margin:4px 0;">' + p.replace(/\n/g,'<br>') + '</div>').join('');
+  // tableaux
+  const parseMdRow = (line) => line.trim().replace(/^\||\|$/g,'').split('|').map(c=>c.trim());
+  s = s.replace(/^(\|.+\|)\n(\|[\s:-]+\|)\n((?:\|.+\|\n?)+)/gm, (m, headerLine, sepLine, bodyLines) => {
+    const headers = parseMdRow(headerLine);
+    const rows = bodyLines.trim().split('\n').map(parseMdRow);
+    let html = '<table style="border-collapse:collapse;width:100%;margin:8px 0;font-size:12.5px;"><thead><tr>';
+    headers.forEach(h => html += `<th style="border:1px solid var(--line);padding:6px 8px;text-align:left;background:#161f1a;">${h}</th>`);
+    html += '</tr></thead><tbody>';
+    rows.forEach(r => {
+      html += '<tr>';
+      r.forEach(c => html += `<td style="border:1px solid var(--line);padding:6px 8px;">${c}</td>`);
+      html += '</tr>';
+    });
+    return html + '</tbody></table>';
+  });
+  s = s.split('\n\n').map(p => p.includes('<ul') || p.includes('<ol') || p.includes('<div') || p.includes('<table') ? p : '<div style="margin:4px 0;">' + p.replace(/\n/g,'<br>') + '</div>').join('');
   return s;
+}
+
+function highlightCode(code, lang){
+  const KEYWORDS = new Set(['function','const','let','var','if','else','elif','for','foreach','while','return','class','import','from','export','async','await','new','this','try','catch','except','finally','throw','typeof','def','with','as','lambda','none','true','false','self','param','begin','process','end','switch','case','break','continue','do','in','of','null','undefined','public','private','static','void','int','string','bool']);
+  const pattern = /(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\$[A-Za-z_][A-Za-z0-9_]*)|(\b\d+\.?\d*\b)|(\b[A-Za-z_][A-Za-z0-9_]*\b)/g;
+  return escapeHtml(code).replace(pattern, (m, comment, str, psvar, num, word) => {
+    if(comment) return '<span style="color:#6a9955;">'+comment+'</span>';
+    if(str) return '<span style="color:#ce9178;">'+str+'</span>';
+    if(psvar) return '<span style="color:#9cdcfe;">'+psvar+'</span>';
+    if(num) return '<span style="color:#b5cea8;">'+num+'</span>';
+    if(word && KEYWORDS.has(word.toLowerCase())) return '<span style="color:#c586c0;">'+word+'</span>';
+    return m;
+  });
 }
 
 function renderReplyContent(bubble, text){
@@ -1517,7 +1747,18 @@ function renderReplyContent(bubble, text){
     return;
   }
   const block = extractCodeBlock(text);
-  if(!block || block.code.trim().length < 40){ bubble.innerHTML = renderMarkdown(text || ''); return; }
+  if(!block){ bubble.innerHTML = renderMarkdown(text || ''); return; }
+  if(block.code.trim().length < 40){
+    if(block.before){ const p=document.createElement('div'); p.innerHTML=renderMarkdown(block.before); p.style.marginBottom='6px'; bubble.appendChild(p); }
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'background:#0e1512;border:1px solid var(--line);border-radius:8px;padding:10px;overflow-x:auto;font-size:12.5px;margin:4px 0;';
+    const codeEl = document.createElement('code');
+    codeEl.style.fontFamily = 'monospace';
+    codeEl.innerHTML = highlightCode(block.code, block.lang);
+    pre.appendChild(codeEl); bubble.appendChild(pre);
+    if(block.after){ const p=document.createElement('div'); p.innerHTML=renderMarkdown(block.after); p.style.marginTop='6px'; bubble.appendChild(p); }
+    return;
+  }
   if(block.before){ const p=document.createElement('div'); p.innerHTML=renderMarkdown(block.before); p.style.marginBottom='8px'; bubble.appendChild(p); }
   const card = document.createElement('div');
   card.style.cssText = 'border:1px solid var(--line); border-radius:8px; padding:10px; margin:6px 0; background:#0e1512;';
@@ -1527,6 +1768,12 @@ function renderReplyContent(bubble, text){
   info.style.cssText = 'font-family:monospace;font-size:11px;color:var(--dim);margin-bottom:6px;';
   info.textContent = '📄 ' + fname + ' · ' + block.code.length + ' caractères';
   card.appendChild(info);
+  const preview = document.createElement('pre');
+  preview.style.cssText = 'max-height:260px;overflow:auto;background:#08110d;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:11.5px;margin-bottom:8px;';
+  const previewCode = document.createElement('code');
+  previewCode.style.fontFamily = 'monospace';
+  previewCode.innerHTML = highlightCode(block.code, block.lang);
+  preview.appendChild(previewCode); card.appendChild(preview);
   const btn = document.createElement('button');
   btn.textContent = '⬇ Télécharger';
   btn.style.cssText = 'background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;margin-right:6px;margin-bottom:6px;';
@@ -1566,7 +1813,7 @@ function renderReplyContent(bubble, text){
   if(block.after){ const p=document.createElement('div'); p.innerHTML=renderMarkdown(block.after); p.style.marginTop='8px'; bubble.appendChild(p); }
 }
 
-const SKILL_LABELS = { get_weather:'météo', convert_currency:'conversion devise', wikipedia_lookup:'recherche Wikipédia', calculate:'calcul', get_timezone:'fuseau horaire', jours_feries_fr:'jours fériés', make_qrcode:'QR code', shorten_link:'raccourcissement de lien', color_palette:'palette de couleurs', color_info:'infos couleur', icon_search:'recherche d\'icônes', texture_search:'recherche de textures/HDRI', search_hf_hub:'recherche Hugging Face Hub', call_hf_space:'appel d\'un Space Hugging Face', github_list_repos:'liste des dépôts GitHub', github_latest_commit:'dernier commit GitHub', github_list_issues:'issues GitHub', generate_3d_model:'génération de modèle 3D (Tripo3D)', generate_music:'génération musicale (MusicGen)', translate_text:'traduction', web_search_real:'recherche web', iss_location:'position ISS', hackernews_top:'Hacker News', french_address_lookup:'recherche d\'adresse' };
+const SKILL_LABELS = { get_weather:'météo', convert_currency:'conversion devise', wikipedia_lookup:'recherche Wikipédia', calculate:'calcul', get_timezone:'fuseau horaire', jours_feries_fr:'jours fériés', make_qrcode:'QR code', shorten_link:'raccourcissement de lien', color_palette:'palette de couleurs', color_info:'infos couleur', icon_search:'recherche d\'icônes', texture_search:'recherche de textures/HDRI', search_hf_hub:'recherche Hugging Face Hub', call_hf_space:'appel d\'un Space Hugging Face', github_list_repos:'liste des dépôts GitHub', github_latest_commit:'dernier commit GitHub', github_list_issues:'issues GitHub', generate_3d_model:'génération de modèle 3D (Tripo3D)', generate_music:'génération musicale (MusicGen)', translate_text:'traduction', web_search_real:'recherche web', iss_location:'position ISS', hackernews_top:'Hacker News', french_address_lookup:'recherche d\'adresse', text_to_speech:'synthèse vocale (Hume)', read_project_file:'consultation de la zone de dépôt' };
 function skillLabel(name){
   if(name.startsWith('connector_')){ const c = CUSTOM_CONNECTORS[name.slice('connector_'.length)]; return c ? c.name : name; }
   return SKILL_LABELS[name] || name;
@@ -1675,6 +1922,9 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
   const c = targetC || getCurrent();
   const hasAttachment = !!pendingImage;
   const category = forceCategory || await classifySmart(classifyHint || text, hasAttachment);
+  if(category === 'code' && c.lastArtifact && !extractCodeBlock(text)){
+    text = `Fichier actuel à modifier (ta dernière version produite dans cette conversation) :\n\`\`\`${c.lastArtifact.lang||''}\n${c.lastArtifact.code}\n\`\`\`\n\nDemande : ${text}\n\n(Modifie ce fichier existant selon la demande — ne repars pas de zéro sauf si c'est explicitement demandé.)`;
+  }
   let route = ROUTES[category];
   if(forcedEngine){
     if(forcedEngine.type === 'image' && category === 'image') route = [forcedEngine.key];
@@ -1752,6 +2002,10 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
           if(!streaming) think.stop();
           bumpUsage(key);
           renderReplyContent(b, reply); c.messages[c.messages.length-1].text = reply;
+          if(category === 'code'){
+            const extracted = extractCodeBlock(reply);
+            if(extracted && extracted.code.trim().length >= 40) c.lastArtifact = { code: extracted.code, lang: extracted.lang };
+          }
           done = true; break;
         }catch(err){
           think.stop();
@@ -1772,23 +2026,26 @@ document.getElementById('camera-input').onchange = async (e)=>{
   const f = e.target.files[0];
   document.getElementById('camera-input').value = '';
   if(!f) return;
-  if(!hasKey('gemini')){ pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:'Clé Gemini requise pour la transcription OCR du code.', isError:true }); return; }
-  if(!navigator.onLine){ pushMessage({ role:'bot', tag:'HORS-LIGNE', tagClass:'err', text:'Pas de connexion réseau.', isError:true }); return; }
-  if(sendBtn.disabled) return;
-
   const reader = new FileReader();
   const dataUrl = await new Promise((res)=>{ reader.onload = ()=> res(reader.result); reader.readAsDataURL(f); });
-  const imagePart = { mimeType:f.type, base64:dataUrl.split(',')[1] };
+  attachedImage = { mimeType:f.type, base64:dataUrl.split(',')[1] };
+  attachedFile = null;
+  pendingCodeScan = true;
+  document.getElementById('preview-img').style.display = 'block';
+  document.getElementById('preview-img').src = dataUrl;
+  document.getElementById('preview-name').textContent = '📷 Code à transcrire — ajoute des précisions (langage, ce que fait le script...) puis envoie';
+  document.getElementById('preview-bar').classList.add('show');
+  inputEl.focus();
+};
 
-  pushMessage({ role:'user', text:'📷 Scan de code (photo)', fullText:'📷 Scan de code (photo)', imgSrc:dataUrl });
-  sendBtn.disabled = true;
-  const c = getCurrent();
+async function runCodeScan(rawText, imagePart, c){
+  if(!hasKey('gemini')){ pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:'Clé Gemini requise pour la transcription OCR du code.', isError:true }); return; }
   const progress = document.getElementById('scan-progress');
   progress.style.display = 'block';
   progress.textContent = '📷 Transcription du code en cours (Gemini Vision)…';
-
   try{
-    const ocrPrompt = "Transcris fidèlement et intégralement le code visible sur cette photo, caractère pour caractère, en respectant l'indentation exacte. N'ajoute aucun commentaire, aucune explication, aucune reformulation. Si le code est du PowerShell, fais particulièrement attention aux caractères spéciaux ($, {}, |, `, \"). Réponds uniquement avec le code dans un bloc de code, rien d'autre.";
+    const contextNote = rawText ? `Contexte donné par l'utilisateur (utilise-le pour mieux interpréter les caractères ambigus et le langage) : "${rawText}"\n\n` : '';
+    const ocrPrompt = contextNote + "Transcris fidèlement et intégralement le code visible sur cette photo, caractère pour caractère, en respectant l'indentation exacte. N'ajoute aucun commentaire, aucune explication, aucune reformulation. Fais particulièrement attention aux caractères ambigus (1/l/I, 0/O, accolades, guillemets) et aux caractères spéciaux du langage concerné ($ {} | \` \" pour PowerShell notamment). Si un mot ne peut pas être déchiffré avec certitude, laisse un commentaire [ILLISIBLE] à cet endroit plutôt que d'inventer. Réponds uniquement avec le code dans un bloc de code, rien d'autre.";
     const ocrText = await tryWithRetry(()=> callGeminiText(ocrPrompt, imagePart, []));
     const ocrBlock = extractCodeBlock(ocrText);
     const code = ocrBlock ? ocrBlock.code.trim() : ocrText.trim();
@@ -1797,14 +2054,14 @@ document.getElementById('camera-input').onchange = async (e)=>{
     pushMessage({ role:'bot', cat:'OCR', tag:'GEMINI · TRANSCRIPTION', tagClass:'engine-gemini', text:'```\n' + code + '\n```' });
 
     progress.textContent = '🔎 Analyse du code par Mistral Codestral…';
-    const analysisText = `Voici du code PowerShell transcrit depuis une photo (vérifie qu'il n'y a pas d'erreur de transcription évidente, puis analyse-le) :\n\`\`\`powershell\n${code}\n\`\`\`\n\nAnalyse ce code, signale les problèmes éventuels et propose des améliorations.`;
-    await runRequest(analysisText, null, c, 'analyse ce code', 'code');
+    const userIntent = rawText ? `Demande précise de l'utilisateur : "${rawText}".` : "Aucune demande précise donnée — fais une relecture générale et signale les problèmes éventuels.";
+    const analysisText = `Voici du code transcrit depuis une photo (vérifie qu'il n'y a pas d'erreur de transcription évidente, en particulier autour de tout marqueur [ILLISIBLE]) :\n\`\`\`\n${code}\n\`\`\`\n\n${userIntent}`;
+    await runRequest(analysisText, null, c, rawText || 'analyse ce code', 'code');
   }catch(err){
     pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:friendlyError(err), isError:true });
   }
   progress.style.display = 'none';
-  sendBtn.disabled = false;
-};
+}
 
 let projectMode = false;
 document.getElementById('project-mode-btn').onclick = ()=>{
@@ -1822,7 +2079,8 @@ const PROJECT_ROLES = {
 };
 
 async function callAgent(providerKey, systemPrompt, userPrompt){
-  const fullSystem = CUSTOM_INSTRUCTIONS ? systemPrompt + '\n\nInstructions permanentes de l\'utilisateur à respecter aussi : ' + CUSTOM_INSTRUCTIONS : systemPrompt;
+  const sysCtx = getSystemContext();
+  const fullSystem = sysCtx ? systemPrompt + '\n\nÀ respecter aussi : ' + sysCtx : systemPrompt;
   if(providerKey === 'gemini') return await callGeminiText(fullSystem + '\n\n' + userPrompt, null, []);
   const cfg = OA_PROVIDERS[providerKey];
   const needKey = cfg.key || providerKey;
@@ -1940,7 +2198,7 @@ async function runProjectPipeline(prompt, c){
 }
 
 async function handleSend(){
-  if(sendBtn.disabled) return; // requête déjà en cours
+  if(isBusy) return; // requête déjà en cours
   const rawText = inputEl.value.trim();
   if(!rawText && !attachedImage && !attachedFile) return;
   if(!proxyActive() && !Object.values(KEYS).some(v=>v)){ openSettings(); return; }
@@ -1961,24 +2219,27 @@ async function handleSend(){
       pushMessage({ role:'bot', tag:'INFO', tagClass:'', text:`📄 Fichier volumineux (~${approxTokens.toLocaleString('fr-FR')} tokens estimés) — seul Gemini (contexte 1M) peut le traiter, les autres moteurs seront ignorés pour cette demande.`, isError:true });
     }
   }
-  pushMessage({ role:'user', text:displayText, fullText:text, imgSrc:userImgSrc });
-  sendBtn.disabled = true;
+  pushMessage({ role:'user', text:(displayText||'') + (pendingCodeScan ? (displayText?'\n':'')+'📷 Code à transcrire' : ''), fullText:text, imgSrc:userImgSrc });
+  setBusy(true); currentTurnController = new AbortController();
 
   const pendingImage = attachedImage;
-  attachedImage = null; attachedFile = null;
+  const isCodeScan = pendingCodeScan;
+  attachedImage = null; attachedFile = null; pendingCodeScan = false;
   document.getElementById('preview-bar').classList.remove('show');
 
-  if(projectMode){
+  if(isCodeScan){
+    await runCodeScan(rawText, pendingImage, getCurrent());
+  } else if(projectMode){
     await runProjectPipeline(rawText, getCurrent());
   } else {
     await runRequest(text, pendingImage, undefined, rawText, forceCategory);
   }
-  sendBtn.disabled = false;
+  setBusy(false);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
 async function regenerate(botIndex){
-  if(sendBtn.disabled) return; // requête déjà en cours
+  if(isBusy) return; // requête déjà en cours
   if(!proxyActive() && !Object.values(KEYS).some(v=>v)){ openSettings(); return; }
   if(!navigator.onLine){ pushMessage({ role:'bot', tag:'HORS-LIGNE', tagClass:'err', text:'Pas de connexion réseau — réessaie une fois reconnecté.', isError:true }); return; }
   const c = getCurrent();
@@ -1997,9 +2258,9 @@ async function regenerate(botIndex){
   while(cut < c.messages.length && c.messages[cut].role === 'bot') cut++;
   c.messages.splice(botIndex, cut - botIndex);
   renderMessages();
-  sendBtn.disabled = true;
+  setBusy(true); currentTurnController = new AbortController();
   await runRequest(text, pendingImage, c, userMsg.text);
-  sendBtn.disabled = false;
+  setBusy(false);
 }
 
 function copyMessage(txt){
@@ -2015,9 +2276,27 @@ function copyMessage(txt){
   doIt();
 }
 
-sendBtn.onclick = handleSend;
+let isBusy = false;
+function setBusy(busy){
+  isBusy = busy;
+  if(busy){
+    sendBtn.textContent = '⏹';
+    sendBtn.style.background = 'var(--danger)';
+    sendBtn.onclick = ()=>{ if(currentTurnController) currentTurnController.abort(); };
+  } else {
+    sendBtn.textContent = '➤';
+    sendBtn.style.background = 'var(--amber)';
+    sendBtn.onclick = handleSend;
+    currentTurnController = null;
+  }
+}
+setBusy(false);
 inputEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); handleSend(); } });
 inputEl.addEventListener('input', ()=>{ inputEl.style.height='auto'; inputEl.style.height=Math.min(inputEl.scrollHeight,110)+'px'; });
+
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{ /* pas grave, ex: ouvert en fichier local */ });
+}
 
 (async function init(){
   await loadKeysFromStorage();
