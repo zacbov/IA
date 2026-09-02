@@ -1,0 +1,19 @@
+/* ============================================
+   Paire de polices : Arcade / pixel-art
+   Press Start 2P (titres, très gros corps uniquement) + VT323 (texte, HUD)
+   Pourquoi ça marche : Press Start 2P est illisible en petit corps par
+   design — on le réserve donc aux logos/titres courts ; VT323 imite un
+   terminal CRT tout en restant lisible en paragraphe. Registre : jeu
+   vidéo rétro, borne d'arcade, culture geek, site événementiel gaming.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+:root{
+  --font-display:'Press Start 2P', monospace;
+  --font-body:'VT323', monospace;
+}
+
+h1, .logo{ font-family:var(--font-display); font-size:1.4em; line-height:1.6; letter-spacing:.02em; }
+h2, h3{ font-family:var(--font-body); font-size:1.6em; letter-spacing:.03em; }
+body, p, .hud{ font-family:var(--font-body); font-size:1.25em; line-height:1.4; }

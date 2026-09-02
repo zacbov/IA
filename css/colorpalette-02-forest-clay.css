@@ -1,0 +1,36 @@
+/* ============================================
+   Palette : Forest & Clay (vert profond + terracotta)
+   Règle 60-30-10 : 60% ivoire chaud (dominante), 30% vert forêt
+   (structure/nature), 10% terracotta (accent chaleureux).
+   Harmonie : analogue chaud (crème/terracotta) rehaussé par un
+   complémentaire froid désaturé (vert). Ambiance organique, bio, éditorial.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  /* Dominante (~60%) */
+  --bg:#FAF6EE;
+  --surface:#FFFFFF;
+  --surface-alt:#F1EADA;
+
+  /* Secondaire / structure (~30%) */
+  --primary:#22423A;
+  --primary-dark:#152D27;
+  --primary-light:#3D6B5D;
+
+  /* Accent (~10%) */
+  --accent:#C1613F;
+  --accent-dark:#9C4A2E;
+  --accent-light:#E0956F;
+
+  /* Texte */
+  --text:#1E1B15;
+  --text-muted:#6E6656;
+  --text-on-primary:#FAF6EE;
+  --text-on-accent:#FFF8F3;
+
+  /* États */
+  --success:#4C8B5C;
+  --warning:#C99A3C;
+  --danger:#B9503B;
+  --border:#E4DAC4;
+}

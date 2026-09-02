@@ -1,0 +1,17 @@
+/* ============================================
+   Police : Poppins (police par défaut / titres & corps de texte)
+   Extrait de ZACBOV — Projets (index.html)
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+:root{
+  --font-head:'Poppins', sans-serif;
+  --font-display:'Poppins', sans-serif;
+}
+
+body{ font:400 16px/1.6 var(--font-head); }
+.logo{ font:700 20px var(--font-display); }
+.card h2{ font:700 21px var(--font-display); letter-spacing:-.01em; }
+.chip{ font:500 13px var(--font-head); }

@@ -1,0 +1,15 @@
+/* ============================================
+   Design theme: darkglass
+   Extrait de ZACBOV — Projets (index.html)
+   A importer comme fichier d'inspiration design/couleurs
+   ============================================ */
+
+html[data-theme="darkglass"]{
+  --bg:#0f1220; --card:rgba(255,255,255,.06); --ink:#eef0ff; --mut:#9aa0c4;
+  --jeux:#ff6b6b; --pedago:#4ecdc4; --fac:#5b8cff; --perso:#ffd166; --sites:#c77dff;
+  --shadow-out:0 8px 32px rgba(0,0,0,.35); --shadow-in:inset 0 0 0 1px rgba(255,255,255,.12);
+  --radius-card:20px; --radius-chip:24px;
+  --card-border:1px solid rgba(255,255,255,.14);
+}
+html[data-theme="darkglass"] body{background:radial-gradient(circle at 20% 0%,#1c2340,#0f1220 60%)}
+html[data-theme="darkglass"] .card{backdrop-filter:blur(14px)}

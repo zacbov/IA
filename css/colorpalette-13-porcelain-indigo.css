@@ -1,0 +1,32 @@
+/* ============================================
+   Palette : Porcelain & Indigo (blanc porcelaine + indigo profond)
+   Règle 60-30-10 : 60% blanc porcelaine quasi pur (dominante), 30% indigo
+   profond (structure), 10% corail rosé (accent unique, chaleur ponctuelle).
+   Harmonie : monochrome froid (blanc→indigo) percé par un seul accent
+   chaud à faible saturation pour ne jamais dominer. Registre : santé
+   digitale, produit de soin, application bien-être, fintech personnelle.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#FDFDFC;
+  --surface:#FFFFFF;
+  --surface-alt:#EEF0F6;
+
+  --primary:#28305C;
+  --primary-dark:#171C3C;
+  --primary-light:#454F82;
+
+  --accent:#F0837A;
+  --accent-dark:#D2645B;
+  --accent-light:#F7AEA8;
+
+  --text:#161A2E;
+  --text-muted:#5F6480;
+  --text-on-primary:#FDFDFC;
+  --text-on-accent:#2E0E0B;
+
+  --success:#3E9E75;
+  --warning:#DDA23B;
+  --danger:#E0615A;
+  --border:#E4E6EF;
+}

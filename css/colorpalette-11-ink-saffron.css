@@ -1,0 +1,34 @@
+/* ============================================
+   Palette : Ink & Saffron (encre bleu-noir + safran)
+   Règle 60-30-10 : 60% papier blanc cassé légèrement froid (dominante),
+   30% bleu encre quasi-noir (structure/texte fort), 10% safran chaud
+   (accent, très saturé, utilisé seul).
+   Harmonie : split-complémentaire — le bleu encre est froid et neutre,
+   le safran vient d'une zone chaude opposée mais désaturée dans les tons
+   moyens, ce qui évite le choc criard. Contraste texte/fond ~16:1.
+   Registre : presse indépendante, maison d'édition, marque culturelle.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#F7F7F4;
+  --surface:#FFFFFF;
+  --surface-alt:#ECEBE4;
+
+  --primary:#12182B;
+  --primary-dark:#080B16;
+  --primary-light:#2A3350;
+
+  --accent:#E8A33D;
+  --accent-dark:#C4801E;
+  --accent-light:#F3C374;
+
+  --text:#0C0F1A;
+  --text-muted:#5C6070;
+  --text-on-primary:#F7F7F4;
+  --text-on-accent:#1F1400;
+
+  --success:#3E8E63;
+  --warning:#E8A33D;
+  --danger:#C7433C;
+  --border:#E2E1D8;
+}

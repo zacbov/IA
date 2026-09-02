@@ -1,0 +1,12 @@
+/* ============================================
+   Design theme: nordic
+   Extrait de ZACBOV — Projets (index.html)
+   A importer comme fichier d'inspiration design/couleurs
+   ============================================ */
+
+html[data-theme="nordic"]{
+  --bg:#e5eaf0; --card:#fbfcfe; --ink:#2e3440; --mut:#5e6a7a;
+  --jeux:#bf616a; --pedago:#a3be8c; --fac:#5e81ac; --perso:#d08770; --sites:#8871b8;
+  --shadow-out:0 6px 18px rgba(46,52,64,.1); --shadow-in:inset 0 0 0 1px rgba(46,52,64,.06);
+  --radius-card:14px; --radius-chip:20px;
+}

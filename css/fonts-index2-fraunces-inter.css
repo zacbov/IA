@@ -1,0 +1,12 @@
+/* ============================================
+   Polices : Fraunces + IBM Plex Mono + Inter (index__2_.html)
+   Fraunces = titres serif expressifs, Inter = corps de texte, IBM Plex Mono = accents techniques
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --font-display:'Fraunces', serif;
+  --font-sans:'Inter', system-ui, sans-serif;
+  --font-mono:'IBM Plex Mono', monospace;
+}

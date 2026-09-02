@@ -1,0 +1,9 @@
+/* ============================================
+   Polices : Système natif (index__1_.html)
+   Pile de polices système (pas d'import Google Fonts)
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+:root{
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}

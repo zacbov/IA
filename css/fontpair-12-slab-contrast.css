@@ -1,0 +1,19 @@
+/* ============================================
+   Paire de polices : Slab serif affirmé
+   Zilla Slab (titres) + Work Sans (texte)
+   Pourquoi ça marche : un slab-serif à empattements carrés apporte de
+   l'autorité et de la présence sur les gros titres sans tomber dans le
+   classicisme du serif traditionnel ; Work Sans reste neutre en dessous.
+   Registre éditorial contemporain, presse indépendante, essais, longform.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=Work+Sans:wght@400;500;600&display=swap');
+
+:root{
+  --font-display:'Zilla Slab', serif;
+  --font-body:'Work Sans', sans-serif;
+}
+
+h1, h2, .display{ font-family:var(--font-display); font-weight:600; }
+body, p, .body-text{ font-family:var(--font-body); font-weight:400; line-height:1.62; }
+.pullquote{ font-family:var(--font-display); font-weight:500; font-style:italic; }

@@ -1,0 +1,44 @@
+/* ============================================
+   Design : Palette "Space Neon" (pharmaville.html)
+   Reconstitution à partir des couleurs hexadécimales les plus utilisées
+   dans le code (app React à styles inline, sans variables CSS natives).
+   Fond spatial très sombre, accents néon violet/vert/ambre.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#0a0e1a;
+  --text:#e0e8ff;
+
+  /* Panneaux / surfaces sombres */
+  --panel-1:#1e293b;
+  --panel-2:#334155;
+  --panel-3:#475569;
+  --panel-4:#64748b;
+  --panel-5:#94a3b8;
+  --deep:#1e1b4b;
+
+  /* Accents néon */
+  --violet:#7c3aed;
+  --indigo:#4f46e5;
+  --green-neon:#86efac;
+  --green:#22c55e;
+  --green-dark:#15803d;
+  --green-deep:#14532d;
+  --amber:#f59e0b;
+  --amber-light:#fde68a;
+  --amber-dark:#78350f;
+  --amber-dark2:#b45309;
+  --red-soft:#fca5a5;
+  --red:#ef4444;
+  --red-strong:#dc2626;
+  --red-deep:#7f1d1d;
+
+  /* Bleus / violets clairs (badges, glow) */
+  --blue-light:#93c5fd;
+  --blue-royal:#1d4ed8;
+  --blue-deep:#1e3a5f;
+  --purple-light:#c084fc;
+  --purple-star:#a855f7;
+  --indigo-light:#818cf8;
+  --sky:#38bdf8;
+}

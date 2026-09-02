@@ -1,0 +1,20 @@
+/* ============================================
+   Paire de polices : Éditorial occulte / ésotérique
+   Cinzel (titres gravés, capitales romaines) + Cormorant Garamond (texte)
+   Pourquoi ça marche : Cinzel évoque la gravure lapidaire, les frontons,
+   les tarots et grimoires anciens sans tomber dans le kitsch gothique ;
+   Cormorant Garamond en dessous garde une élégance manuscrite discrète.
+   Registre : tarot, astrologie, marque ésotérique haut de gamme, éditions
+   rares, parfumerie de niche.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&display=swap');
+
+:root{
+  --font-display:'Cinzel', serif;
+  --font-body:'Cormorant Garamond', serif;
+}
+
+h1, h2, .display{ font-family:var(--font-display); font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+body, p, .body-text{ font-family:var(--font-body); font-weight:400; font-size:1.08em; line-height:1.65; }
+.rune-label{ font-family:var(--font-display); font-weight:500; letter-spacing:.14em; font-size:.7em; }

@@ -1,0 +1,33 @@
+/* ============================================
+   Palette : Alchemy Tarot (bordeaux profond + or vieilli)
+   Règle 60-30-10 : 60% ivoire vieilli façon parchemin (dominante), 30%
+   bordeaux/grenat profond (structure, couvertures de grimoire), 10% or
+   vieilli (accent, symboles, filigranes).
+   Harmonie : analogue chaud grenat→or, désaturé pour évoquer le papier
+   ancien et le cuir plutôt que le velours criard. Registre : tarot,
+   astrologie, éditions ésotériques, boutique de rituels.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#F2E9D8;
+  --surface:#FAF4E7;
+  --surface-alt:#E8DBBE;
+
+  --primary:#5C1A24;
+  --primary-dark:#3C0E15;
+  --primary-light:#7E2E3A;
+
+  --accent:#B8923F;
+  --accent-dark:#93741F;
+  --accent-light:#D4B76C;
+
+  --text:#2A1610;
+  --text-muted:#7A6650;
+  --text-on-primary:#F2E9D8;
+  --text-on-accent:#2A1D00;
+
+  --success:#556B3A;
+  --warning:#B8923F;
+  --danger:#8C2A2A;
+  --border:#DACBA5;
+}

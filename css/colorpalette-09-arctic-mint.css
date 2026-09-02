@@ -1,0 +1,31 @@
+/* ============================================
+   Palette : Arctic Mint (bleu glacier + menthe)
+   Règle 60-30-10 : 60% blanc glacé (dominante), 30% bleu ardoise froid
+   (structure), 10% menthe vive (accent).
+   Harmonie : analogue froid bleu→vert, très aéré et propre. Ambiance
+   climat, tech durable, wellness, produit clean/scandinave.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#F5FAFA;
+  --surface:#FFFFFF;
+  --surface-alt:#E6F0EF;
+
+  --primary:#2E4756;
+  --primary-dark:#1C2E38;
+  --primary-light:#4A6A7B;
+
+  --accent:#2FD9A8;
+  --accent-dark:#1FAE84;
+  --accent-light:#83EBCB;
+
+  --text:#16232A;
+  --text-muted:#5F7580;
+  --text-on-primary:#F5FAFA;
+  --text-on-accent:#052E22;
+
+  --success:#2FD9A8;
+  --warning:#E0B24A;
+  --danger:#E0615A;
+  --border:#DCE9E8;
+}

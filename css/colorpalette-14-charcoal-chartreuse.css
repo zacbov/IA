@@ -1,0 +1,33 @@
+/* ============================================
+   Palette : Charcoal & Chartreuse (charbon + chartreuse)
+   Règle 60-30-10 : 60% charbon profond (dominante, mode sombre), 30% gris
+   ardoise moyen (structure/cartes), 10% chartreuse acide (accent unique,
+   utilisé avec grande parcimonie).
+   Harmonie : neutre chaud désaturé + un seul accent vif à forte luminance
+   pour un contraste maximal sur fond sombre (>13:1). Registre : outil
+   créatif pro, musique, motion design, application technique premium.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#161513;
+  --surface:#1E1D1A;
+  --surface-alt:#28271F;
+
+  --primary:#4A4740;
+  --primary-dark:#302E28;
+  --primary-light:#6B675C;
+
+  --accent:#D4F04E;
+  --accent-dark:#AEC834;
+  --accent-light:#E5F896;
+
+  --text:#F2F1EA;
+  --text-muted:#9A968A;
+  --text-on-primary:#F2F1EA;
+  --text-on-accent:#1A1D06;
+
+  --success:#7FD68C;
+  --warning:#EAC15C;
+  --danger:#E4685E;
+  --border:#33322A;
+}

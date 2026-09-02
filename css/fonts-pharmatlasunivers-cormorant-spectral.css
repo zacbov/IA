@@ -1,0 +1,12 @@
+/* ============================================
+   Polices : Cormorant Garamond + Spectral + IBM Plex Mono (pharmatlas-univers.html)
+   Cormorant Garamond = titres élégants serif, Spectral = corps de texte lisible, IBM Plex Mono = accents techniques
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Spectral:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root{
+  --font-display:'Cormorant Garamond', serif;
+  --font-serif:'Spectral', serif;
+  --font-mono:'IBM Plex Mono', monospace;
+}

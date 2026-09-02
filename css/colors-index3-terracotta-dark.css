@@ -1,0 +1,15 @@
+/* ============================================
+   Design : Palette "Terracotta Dark" (index__3_.html)
+   Fond brun très sombre, accents terracotta/or, ambiance chaleureuse nocturne
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#140e0e; --bg2:#1d1514; --panel:#221917; --panel2:#2a1f1d;
+  --ink:#f3ece9; --ink-dim:#bba9a4; --ink-faint:#8a7773;
+  --line:#352b28; --line2:#473733;
+  --accent:#e07a5f; --accent2:#d8a657; --gold:#d8a657;
+  --danger:#e0564a; --danger2:#c44536; --green:#7fb069;
+  --paper:#f4f0e4; --paper-ink:#5a5040;
+  --shadow:0 18px 50px -18px rgba(0,0,0,.7);
+  --r:16px;
+}

@@ -1,0 +1,15 @@
+/* ============================================
+   Design : Palette "Papier Antique" (pharmatlas-univers.html)
+   Fond parchemin/beige, accent bordeaux, or, ambiance carte/atlas ancien
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --ink:#1c1814;
+  --paper:#e9e2d0;
+  --paper2:#ded4bd;
+  --line:#b8a888;
+  --accent:#7a2e2e;
+  --gold:#a8863a;
+  --muted:#6a5f4c;
+  --shadow:rgba(28,24,20,.18);
+}

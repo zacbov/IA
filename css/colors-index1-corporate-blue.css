@@ -1,0 +1,11 @@
+/* ============================================
+   Design : Palette "Corporate Bleu" (index__1_.html)
+   Bleu institutionnel, gris neutre, style sobre / documentaire
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bleu:#00457c;
+  --bleu-clair:#e8f0f7;
+  --gris:#5a6470;
+  --bord:#d4dae1;
+}

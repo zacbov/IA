@@ -1,0 +1,19 @@
+/* ============================================
+   Paire de polices : Sci-fi / interface futuriste
+   Orbitron (titres/UI système) + Rajdhani (texte, labels)
+   Pourquoi ça marche : deux polices à angles géométriques partagés
+   (formes carrées, coupes nettes) mais Orbitron réservé aux très gros
+   titres/logos (illisible en petit corps), Rajdhani prend le relais pour
+   tout le reste. Ambiance gaming, HUD, data-viz futuriste.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Rajdhani:wght@400;500;600;700&display=swap');
+
+:root{
+  --font-display:'Orbitron', sans-serif;
+  --font-body:'Rajdhani', sans-serif;
+}
+
+h1, .logo, .display{ font-family:var(--font-display); font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+h2, h3, .card-title{ font-family:var(--font-body); font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
+body, p{ font-family:var(--font-body); font-weight:500; line-height:1.5; }

@@ -1,0 +1,33 @@
+/* ============================================
+   Palette : Moss & Brick (mousse profonde + brique cuite)
+   Règle 60-30-10 : 60% blanc cassé verdâtre (dominante), 30% vert mousse
+   profond quasi noir (structure), 10% brique cuite orangée (accent).
+   Harmonie : complémentaire vert/rouge désaturé — rare et risqué, mais
+   tenu grâce à des tons profonds côté vert et un seul ton chaud contrôlé
+   côté brique. Registre : architecture paysagère, marque outdoor premium,
+   café de spécialité, éditorial nature.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#F4F6F1;
+  --surface:#FFFFFF;
+  --surface-alt:#E7ECE0;
+
+  --primary:#1F2E1C;
+  --primary-dark:#101B0E;
+  --primary-light:#3A4F34;
+
+  --accent:#B85C38;
+  --accent-dark:#95452A;
+  --accent-light:#D68B67;
+
+  --text:#161F13;
+  --text-muted:#5E6B57;
+  --text-on-primary:#F4F6F1;
+  --text-on-accent:#2A0F04;
+
+  --success:#3E7D4A;
+  --warning:#C9962E;
+  --danger:#B8452F;
+  --border:#DEE5D6;
+}

@@ -1,0 +1,21 @@
+/* ============================================
+   Paire de polices : Suisse éditoriale
+   Neue Haas Grotesk (via Helvetica Now Text fallback) + Söhne — non disponibles
+   sur Google Fonts, remplacées ici par leurs équivalents libres les plus proches :
+   Work Sans (titres) + IBM Plex Sans (texte)
+   Pourquoi ça marche : deux grotesques suisses neutres, sans fioriture,
+   mais avec une différence subtile de largeur qui crée une hiérarchie sans
+   changer de personnalité. C'est le pairing du design system international
+   (Vignelli, Müller-Brockmann) — grille, précision, silence typographique.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+:root{
+  --font-display:'Work Sans', sans-serif;
+  --font-body:'IBM Plex Sans', sans-serif;
+}
+
+h1, h2, .display{ font-family:var(--font-display); font-weight:600; letter-spacing:-.015em; }
+body, p, .body-text{ font-family:var(--font-body); font-weight:400; line-height:1.6; }
+.caption, .meta{ font-family:var(--font-body); font-weight:500; font-size:.85em; color:var(--text-muted); }

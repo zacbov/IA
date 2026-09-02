@@ -1,0 +1,34 @@
+/* ============================================
+   Palette : Arcade Cabinet (noir borne + magenta/cyan néon)
+   Règle 60-30-10 adaptée dark saturé : 60% noir profond (dominante),
+   30% violet-magenta vif (structure, réservé aux blocs, pas au fond
+   entier), 10% cyan électrique (accent, boutons/scores).
+   Harmonie : complémentaire froid/chaud à saturation maximale, typique
+   des enseignes néon et bornes d'arcade des années 80. Utiliser magenta
+   et cyan chacun en zones séparées, jamais superposés sur le même texte.
+   Registre : jeu vidéo rétro, événementiel gaming, culture pop 80s.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#0A0512;
+  --surface:#160B26;
+  --surface-alt:#1F1235;
+
+  --primary:#D6299E;
+  --primary-dark:#A81C7A;
+  --primary-light:#EB5FC1;
+
+  --accent:#2EE6E6;
+  --accent-dark:#1BBBBB;
+  --accent-light:#7FF5F5;
+
+  --text:#F3EAFB;
+  --text-muted:#9C8CB8;
+  --text-on-primary:#0A0512;
+  --text-on-accent:#031A1A;
+
+  --success:#3EE67A;
+  --warning:#F0D93D;
+  --danger:#F0473D;
+  --border:#2A1B45;
+}

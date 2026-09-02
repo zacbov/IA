@@ -1,0 +1,16 @@
+/* ============================================
+   Design : Palette "Glass Teal" (pharmatlas-preview-v4.html)
+   Fond clair, accent turquoise, effet verre (glassmorphism)
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --ink:#1a1a1a;
+  --ink-soft:#888;
+  --line:rgba(26,26,26,.10);
+  --accent:#2a9d85;
+  --accent-dark:#1e7566;
+  --accent-glow:rgba(42,157,133,.35);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.6);
+}

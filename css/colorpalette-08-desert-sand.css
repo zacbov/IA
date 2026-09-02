@@ -1,0 +1,32 @@
+/* ============================================
+   Palette : Desert Sand (sable + brique)
+   Règle 60-30-10 : 60% sable clair (dominante), 30% brun brique profond
+   (structure), 10% orange cuivré (accent).
+   Harmonie : monochrome chaud dégradé du clair au foncé, un seul accent
+   plus saturé pour guider l'œil. Ambiance voyage, architecture,
+   artisanat, marque outdoor.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#F5EDE2;
+  --surface:#FFFCF7;
+  --surface-alt:#EBDDC8;
+
+  --primary:#5C3A2E;
+  --primary-dark:#3D2419;
+  --primary-light:#7D5642;
+
+  --accent:#D97B34;
+  --accent-dark:#B15F22;
+  --accent-light:#F0A868;
+
+  --text:#2B1D14;
+  --text-muted:#7A6552;
+  --text-on-primary:#F5EDE2;
+  --text-on-accent:#2B1000;
+
+  --success:#5F8C5A;
+  --warning:#D9A441;
+  --danger:#C0523E;
+  --border:#E0D0B8;
+}

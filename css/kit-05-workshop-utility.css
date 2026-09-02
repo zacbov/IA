@@ -1,0 +1,64 @@
+/* ================================================================
+   KIT COMPLET : "Workshop Utility"
+   Palette  : Workshop Canvas (toile écrue + acier + orange sécurité)
+   Polices  : Oswald (titres) + Roboto Mono (texte technique)
+   Registre : atelier, manufacture, outillage, marque workwear/outdoor
+   Personnalité : robuste, signalétique, fonctionnel, zéro fioriture
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap');
+
+:root{
+  --bg:#EFEAE0;
+  --surface:#F8F5EE;
+  --surface-alt:#E2DBC9;
+  --primary:#3E4247;
+  --primary-dark:#26292D;
+  --primary-light:#5C6167;
+  --accent:#E8590C;
+  --accent-dark:#BF4708;
+  --accent-light:#F58A4E;
+  --text:#232322;
+  --text-muted:#6B6862;
+  --text-on-primary:#EFEAE0;
+  --text-on-accent:#2A0E00;
+  --success:#4C8B5C;
+  --warning:#E8590C;
+  --danger:#C0392B;
+  --border:#D9D1BC;
+
+  --font-display:'Oswald', sans-serif;
+  --font-body:'Roboto Mono', monospace;
+
+  --text-xs:11px;   --text-sm:13px;  --text-base:14px;
+  --text-lg:17px;   --text-xl:22px;  --text-2xl:30px;
+  --text-3xl:42px;  --text-4xl:56px;
+  --leading-tight:1.1; --leading-normal:1.55; --leading-relaxed:1.6;
+  --weight-display:600; --weight-body:400; --weight-strong:700;
+  --tracking-caps:.06em;
+
+  --space-1:4px;  --space-2:8px;  --space-3:12px; --space-4:16px;
+  --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px;
+  --space-12:48px; --space-16:64px; --space-20:80px; --space-24:96px;
+
+  /* Rayons minimes : évoque le métal, les plaques, les caisses */
+  --radius-sm:2px; --radius-md:3px; --radius-lg:4px; --radius-full:999px;
+
+  --shadow-sm:0 1px 0 rgba(0,0,0,.08);
+  --shadow-md:0 4px 10px rgba(0,0,0,.14);
+  --shadow-lg:0 10px 24px rgba(0,0,0,.18);
+
+  --ease-standard:cubic-bezier(.3,.7,.4,1);
+  --duration-fast:100ms; --duration-normal:160ms; --duration-slow:240ms;
+
+  --border-width:2px; /* traits plus épais, esprit pochoir */
+}
+
+body{ background:var(--bg); color:var(--text); font:400 var(--text-base)/var(--leading-normal) var(--font-body); }
+h1,h2,h3{ font-family:var(--font-display); font-weight:var(--weight-display); text-transform:uppercase; letter-spacing:var(--tracking-caps); color:var(--primary); }
+h1{ font-size:var(--text-4xl); line-height:var(--leading-tight); }
+h2{ font-size:var(--text-3xl); }
+.part-number, .spec, .badge{ font-family:var(--font-body); font-weight:500; }
+.card{ background:var(--surface); border:var(--border-width) solid var(--primary); border-radius:var(--radius-md); padding:var(--space-5); box-shadow:var(--shadow-sm); }
+.btn{ font-family:var(--font-display); font-weight:600; text-transform:uppercase; letter-spacing:var(--tracking-caps); border-radius:var(--radius-sm); padding:var(--space-3) var(--space-6); border:none; cursor:pointer; transition:filter var(--duration-fast) var(--ease-standard); }
+.btn-primary{ background:var(--accent); color:var(--text-on-accent); }
+.btn-primary:hover{ filter:brightness(1.08); }

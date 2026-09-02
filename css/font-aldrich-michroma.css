@@ -1,0 +1,13 @@
+/* ============================================
+   Polices : Aldrich + Michroma (police display du thème "marathon")
+   Extrait de ZACBOV — Projets (index.html)
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Aldrich&family=Michroma&display=swap');
+
+:root{
+  --font-display:'Aldrich','Michroma','JetBrains Mono', monospace;
+}
+
+.logo, .card h2{ font-family: var(--font-display); text-transform:uppercase; letter-spacing:.06em; }

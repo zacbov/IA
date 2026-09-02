@@ -1,0 +1,13 @@
+/* ============================================
+   Design theme: pastel
+   Extrait de ZACBOV — Projets (index.html)
+   A importer comme fichier d'inspiration design/couleurs
+   ============================================ */
+
+html[data-theme="pastel"]{
+  --bg:#fdf1f7; --card:#ffffff; --ink:#4a3b52; --mut:#a08bab;
+  --jeux:#ffb3c6; --pedago:#b5ead7; --fac:#a0c4ff; --perso:#ffe5a0; --sites:#d0a0ff;
+  --shadow-out:8px 8px 24px rgba(160,140,180,.18); --shadow-in:inset 4px 4px 10px rgba(160,140,180,.1);
+  --radius-card:26px; --radius-chip:26px;
+}
+html[data-theme="pastel"] .tag{color:#4a3b52}

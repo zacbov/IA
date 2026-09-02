@@ -1,0 +1,19 @@
+/* ============================================
+   Paire de polices : Signalétique industrielle
+   Oswald (titres condensés, façon pochoir d'atelier) + Roboto Mono (texte technique)
+   Pourquoi ça marche : Oswald reprend la logique des lettrages peints au
+   pochoir sur caisses et machines industrielles ; Roboto Mono en dessous
+   évoque les plaques signalétiques et références de pièces. Registre :
+   atelier, manufacture, outillage, marque utilitaire/workwear.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
+
+:root{
+  --font-display:'Oswald', sans-serif;
+  --font-body:'Roboto Mono', monospace;
+}
+
+h1, h2, .display{ font-family:var(--font-display); font-weight:600; text-transform:uppercase; letter-spacing:.02em; }
+body, p{ font-family:var(--font-body); font-weight:400; line-height:1.6; font-size:.95em; }
+.part-number, .spec{ font-family:var(--font-body); font-weight:500; }

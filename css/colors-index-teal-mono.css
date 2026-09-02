@@ -1,0 +1,16 @@
+/* ============================================
+   Design : Palette "Teal Zen" (index.html)
+   Accent turquoise, fond clair, ambiance minimaliste éditoriale
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --accent:rgb(58,176,158);
+  --accent-light:rgba(58,176,158,0.12);
+  --accent-dark:rgb(48,146,138);
+  --bg:#f5f5f3;
+  --white:#fff;
+  --text:#1a1a1a;
+  --muted:#888;
+  --border:#e0e0e0;
+  --paper2:#fafaf8;
+}

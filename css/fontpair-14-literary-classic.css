@@ -1,0 +1,20 @@
+/* ============================================
+   Paire de polices : Littéraire classique
+   Source Serif 4 (titres et longform) + Source Sans 3 (UI, légendes)
+   Pourquoi ça marche : la famille Source a été dessinée pour fonctionner
+   en paire dès l'origine — mêmes proportions, même hauteur d'x, seule la
+   structure (empattement/sans) change. C'est le choix le plus sûr pour un
+   contenu où serif et sans doivent cohabiter sans jamais se battre visuellement.
+   Registre revues, essais, documentation longue.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Source+Sans+3:wght@400;500;600&display=swap');
+
+:root{
+  --font-display:'Source Serif 4', serif;
+  --font-body:'Source Sans 3', sans-serif;
+}
+
+h1, h2, .display{ font-family:var(--font-display); font-weight:600; }
+article p, .longform{ font-family:var(--font-display); font-weight:400; line-height:1.7; font-size:1.05em; }
+.ui, button, nav{ font-family:var(--font-body); font-weight:500; }

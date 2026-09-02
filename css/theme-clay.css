@@ -1,0 +1,17 @@
+/* ============================================
+   Design theme: clay (thème par défaut)
+   Extrait de ZACBOV — Projets (index.html)
+   Ce thème correspond aux variables :root de base (aucune surcharge)
+   A importer comme fichier d'inspiration design/couleurs
+   ============================================ */
+
+:root{
+:root{
+  --bg:#E7E2D9; --card:#F1EDE4; --ink:#20201D; --mut:#736C5E;
+  --jeux:#B23A2E; --pedago:#1F6E4E; --fac:#1F4E8C; --perso:#B5760F; --sites:#5B3B8C;
+  --shadow-out:8px 8px 20px rgba(32,32,29,.14), -8px -8px 20px rgba(255,255,255,.75);
+  --shadow-in: inset 4px 4px 10px rgba(32,32,29,.12), inset -4px -4px 10px rgba(255,255,255,.65);
+  --radius-card:28px; --radius-chip:24px; --font-head:'Poppins',sans-serif; --font-mono:'JetBrains Mono',monospace;
+  --card-border:none; --extra-fx:none; --font-display:'Poppins',sans-serif; --list-mode:0;
+}
+}

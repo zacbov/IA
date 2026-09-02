@@ -1,0 +1,32 @@
+/* ============================================
+   Palette : Mono Graphite (noir & blanc + un seul accent)
+   Règle 60-30-10 stricte : 60% blanc pur (dominante), 30% graphite
+   quasi-noir (structure), 10% un accent unique électrique.
+   Harmonie : monochrome neutre absolu + accent complémentaire saturé.
+   Contraste maximal (>18:1). Ambiance design system, portfolio design,
+   agence créative, mode.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#FFFFFF;
+  --surface:#FFFFFF;
+  --surface-alt:#F2F2F2;
+
+  --primary:#141414;
+  --primary-dark:#000000;
+  --primary-light:#3A3A3A;
+
+  --accent:#3D5CFF;
+  --accent-dark:#2A3FCC;
+  --accent-light:#8497FF;
+
+  --text:#0A0A0A;
+  --text-muted:#6B6B6B;
+  --text-on-primary:#FFFFFF;
+  --text-on-accent:#FFFFFF;
+
+  --success:#1EA35A;
+  --warning:#E0A100;
+  --danger:#E23D3D;
+  --border:#E4E4E4;
+}

@@ -1,0 +1,19 @@
+/* ============================================
+   Paire de polices : Corporate / confiance institutionnelle
+   Libre Franklin (titres) + Public Sans (texte)
+   Pourquoi ça marche : deux grotesques nord-américains conçus pour la
+   lisibilité institutionnelle (Public Sans vient du design system du
+   gouvernement US) — sobriété, neutralité, accessibilité maximale.
+   Ambiance banque, assurance, gouvernement, B2B sérieux.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@600;700;800&family=Public+Sans:wght@400;500;600&display=swap');
+
+:root{
+  --font-display:'Libre Franklin', sans-serif;
+  --font-body:'Public Sans', sans-serif;
+}
+
+h1, h2, .display{ font-family:var(--font-display); font-weight:700; letter-spacing:-.01em; }
+body, p, .body-text{ font-family:var(--font-body); font-weight:400; line-height:1.6; }
+nav, .ui-label{ font-family:var(--font-body); font-weight:600; }

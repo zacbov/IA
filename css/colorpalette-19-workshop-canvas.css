@@ -1,0 +1,33 @@
+/* ============================================
+   Palette : Workshop Canvas (toile brute + safety orange)
+   Règle 60-30-10 : 60% toile écrue/beige atelier (dominante), 30% gris
+   acier (structure, métal brossé), 10% orange sécurité (accent, signal
+   d'action — littéralement la couleur des équipements industriels).
+   Harmonie : neutre chaud + neutre froid + un seul accent signalétique
+   très saturé, jamais décoratif. Registre : atelier, manufacture,
+   outillage, marque workwear/outdoor utilitaire.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#EFEAE0;
+  --surface:#F8F5EE;
+  --surface-alt:#E2DBC9;
+
+  --primary:#3E4247;
+  --primary-dark:#26292D;
+  --primary-light:#5C6167;
+
+  --accent:#E8590C;
+  --accent-dark:#BF4708;
+  --accent-light:#F58A4E;
+
+  --text:#232322;
+  --text-muted:#6B6862;
+  --text-on-primary:#EFEAE0;
+  --text-on-accent:#2A0E00;
+
+  --success:#4C8B5C;
+  --warning:#E8590C;
+  --danger:#C0392B;
+  --border:#D9D1BC;
+}

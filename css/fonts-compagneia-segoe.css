@@ -1,0 +1,8 @@
+/* ============================================
+   Police : Segoe UI / système (compagne-ia.html)
+   Pile de police système, pas d'import Google Fonts
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+:root{
+  --font-sans:'Segoe UI', system-ui, sans-serif;
+}

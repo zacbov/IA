@@ -1,0 +1,20 @@
+/* ============================================
+   Paire de polices : Moderne géométrique
+   Space Grotesk (titres) + Inter (texte)
+   Pourquoi ça marche : deux sans-serifs de la même famille visuelle
+   (géométrique / grotesque contemporain) mais avec un contraste de
+   personnalité — Space Grotesk apporte du caractère technique dans les
+   titres, Inter reste neutre et ultra-lisible en UI. Association très
+   utilisée en SaaS / startups / produits tech.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --font-display:'Space Grotesk', sans-serif;
+  --font-body:'Inter', sans-serif;
+}
+
+h1, h2, .display{ font-family:var(--font-display); font-weight:700; letter-spacing:-.02em; }
+body, p, .body-text{ font-family:var(--font-body); font-weight:400; line-height:1.6; }
+button, .ui-label{ font-family:var(--font-body); font-weight:600; }

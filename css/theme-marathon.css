@@ -1,0 +1,50 @@
+/* ============================================
+   Design theme: marathon
+   Extrait de ZACBOV — Projets (index.html)
+   A importer comme fichier d'inspiration design/couleurs
+   ============================================ */
+
+html[data-theme="marathon"]{
+  --bg:#07060d; --card:#111022; --ink:#f2f4ff; --mut:#8891c4;
+  --jeux:#ff3d81; --pedago:#26e0ff; --fac:#7c5cff; --perso:#ffb020; --sites:#26e0ff;
+  --shadow-out:0 0 0 1px rgba(38,224,255,.16), 0 8px 30px rgba(124,92,255,.18);
+  --shadow-in: inset 0 0 0 1px rgba(38,224,255,.22), inset 0 0 18px rgba(124,92,255,.16);
+  --font-head:'JetBrains Mono',monospace; --font-mono:'JetBrains Mono',monospace;
+  --radius-card:6px; --radius-chip:2px;
+  --card-border:1px solid rgba(38,224,255,.28);
+  --font-display:'Aldrich','Michroma','JetBrains Mono',monospace;
+}
+html[data-theme="marathon"] body{
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(124,92,255,.28), transparent 55%),
+    radial-gradient(ellipse at 85% 110%, rgba(255,61,129,.14), transparent 50%),
+    repeating-linear-gradient(180deg, rgba(38,224,255,.035) 0 1px, transparent 1px 3px),
+    var(--bg);
+}
+html[data-theme="marathon"] .card, html[data-theme="marathon"] .chip, html[data-theme="marathon"] .count, html[data-theme="marathon"] .theme-btn{
+  clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+}
+html[data-theme="marathon"] .card{background:linear-gradient(160deg, rgba(124,92,255,.1), rgba(17,16,34,.9))}
+html[data-theme="marathon"] .logo, html[data-theme="marathon"] .card h2, html[data-theme="marathon"] .tag,
+html[data-theme="marathon"] nav.top a, html[data-theme="marathon"] .chip{text-transform:uppercase;letter-spacing:.06em}
+html[data-theme="marathon"] .tag{color:#07060d;box-shadow:0 0 12px var(--c-tag,var(--c))}
+html[data-theme="marathon"] .card:hover{box-shadow:0 0 0 1px var(--c),0 0 34px -6px var(--c);transform:translateY(-5px)}
+html[data-theme="marathon"] .bar i{box-shadow:0 0 8px var(--c)}
+html[data-theme="marathon"] .blob{border-radius:0;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);box-shadow:0 0 16px var(--pedago);background:linear-gradient(135deg,var(--pedago),var(--fac))}
+html[data-theme="marathon"] .card{position:relative}
+html[data-theme="marathon"] .card::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(180deg, rgba(38,224,255,.05) 0 1px, transparent 1px 3px);
+  mix-blend-mode:screen;
+}
+html[data-theme="marathon"] .card::after{
+  content:"";position:absolute;top:8px;left:8px;width:10px;height:10px;
+  border-top:2px solid var(--c);border-left:2px solid var(--c);opacity:.8;pointer-events:none;
+}
+html[data-theme="marathon"] .open::before{content:"◈";position:absolute}
+html[data-theme="marathon"] body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:200;
+  background:linear-gradient(180deg, transparent, rgba(38,224,255,.06) 50%, transparent);
+  height:6px;width:100%;animation:marathon-sweep 5s linear infinite;opacity:0;
+}
+html[data-theme="marathon"] body::after{opacity:.6}

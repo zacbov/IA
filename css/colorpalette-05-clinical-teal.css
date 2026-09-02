@@ -1,0 +1,38 @@
+/* ============================================
+   Palette : Clinical Teal (santé / confiance)
+   Règle 60-30-10 : 60% blanc bleuté (dominante, propreté clinique),
+   30% bleu-gris ardoise (structure, sérieux), 10% turquoise vif (accent,
+   action/vitalité).
+   Harmonie : analogue froid (bleu-gris → turquoise) avec un saut de
+   saturation contrôlé pour l'accent. Ambiance santé, pharma, fintech,
+   confiance institutionnelle.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  /* Dominante (~60%) */
+  --bg:#F4F8F9;
+  --surface:#FFFFFF;
+  --surface-alt:#E7EFF1;
+
+  /* Secondaire / structure (~30%) */
+  --primary:#3A4E58;
+  --primary-dark:#26343B;
+  --primary-light:#57707C;
+
+  /* Accent (~10%) */
+  --accent:#0FA3A3;
+  --accent-dark:#0B7C7C;
+  --accent-light:#5FD1CE;
+
+  /* Texte */
+  --text:#1A2226;
+  --text-muted:#647178;
+  --text-on-primary:#F4F8F9;
+  --text-on-accent:#04211F;
+
+  /* États */
+  --success:#2E9E6B;
+  --warning:#D9A441;
+  --danger:#D2504A;
+  --border:#DCE6E8;
+}

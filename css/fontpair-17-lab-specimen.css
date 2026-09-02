@@ -1,0 +1,21 @@
+/* ============================================
+   Paire de polices : Carnet de laboratoire / spécimen scientifique
+   Newsreader (texte d'observation, notes) + Space Mono (données, mesures)
+   Pourquoi ça marche : Newsreader est un serif d'écran conçu pour la
+   lecture longue façon carnet de terrain ; Space Mono à chasse fixe
+   restitue l'esthétique des fiches de mesure, étiquettes d'herbier,
+   tableaux de données. Registre : jardin botanique, muséum, herbier
+   numérique, carnet naturaliste.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;1,400&family=Space+Mono:wght@400;700&display=swap');
+
+:root{
+  --font-display:'Newsreader', serif;
+  --font-body:'Newsreader', serif;
+  --font-mono:'Space Mono', monospace;
+}
+
+h1, h2, .display{ font-family:var(--font-display); font-weight:500; font-style:italic; }
+body, p{ font-family:var(--font-body); font-weight:400; line-height:1.65; }
+.specimen-id, .measurement, .label{ font-family:var(--font-mono); font-weight:400; letter-spacing:.02em; }

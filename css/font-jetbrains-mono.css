@@ -1,0 +1,16 @@
+/* ============================================
+   Police : JetBrains Mono (police monospace / UI technique)
+   Extrait de ZACBOV — Projets (index.html)
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root{
+  --font-mono:'JetBrains Mono', monospace;
+}
+
+nav.top{ font:600 13px 'JetBrains Mono'; }
+.count{ font:600 12px 'JetBrains Mono'; }
+.orbit-hub .oh-eyebrow{ font:700 9px var(--font-mono); letter-spacing:.14em; text-transform:uppercase; }
+.orbit-hub .oh-close{ font:600 10px var(--font-mono); }

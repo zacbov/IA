@@ -1,0 +1,14 @@
+/* ============================================
+   Design : Palette "Violet & Rose" (compagne-ia.html)
+   Fond violet profond en dégradé, accents rose/lavande, ambiance chat/IA
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg1:#2d1b3d;
+  --bg2:#4a2c5e;
+  --accent:#ff8fb1;
+  --accent2:#c77dff;
+  --bubble-user:#5e3a7a;
+  --bubble-ai:#ffffff10;
+  --text:#f5eefc;
+}

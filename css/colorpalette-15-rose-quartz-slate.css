@@ -1,0 +1,34 @@
+/* ============================================
+   Palette : Rose Quartz & Slate (quartz rose + ardoise)
+   Règle 60-30-10 : 60% blanc quartz très légèrement rosé (dominante),
+   30% ardoise bleu-gris (structure, sérieux tempéré), 10% rose profond
+   (accent, sophistiqué plutôt que "pastel mignon").
+   Harmonie : complémentaire doux rose/bleu-gris à faible saturation —
+   évite le cliché "pastel girly" en gardant les tons profonds plutôt que
+   clairs sur le primary et l'accent. Registre : marque D2C élégante,
+   beauté genre-neutre, application lifestyle premium.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#FAF7F7;
+  --surface:#FFFFFF;
+  --surface-alt:#F0E9EA;
+
+  --primary:#3E4650;
+  --primary-dark:#282E36;
+  --primary-light:#5D6771;
+
+  --accent:#B5495B;
+  --accent-dark:#8F3646;
+  --accent-light:#D67F8C;
+
+  --text:#211E20;
+  --text-muted:#736A6C;
+  --text-on-primary:#FAF7F7;
+  --text-on-accent:#FCEEF0;
+
+  --success:#4C8B6C;
+  --warning:#D3A24A;
+  --danger:#B5495B;
+  --border:#EBDEE0;
+}

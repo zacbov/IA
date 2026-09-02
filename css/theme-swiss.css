@@ -1,0 +1,34 @@
+/* ============================================
+   Design theme: swiss
+   Extrait de ZACBOV — Projets (index.html)
+   A importer comme fichier d'inspiration design/couleurs
+   ============================================ */
+
+html[data-theme="swiss"]{
+  --bg:#ffffff; --card:#ffffff; --ink:#111111; --mut:#666666;
+  --jeux:#e2001a; --pedago:#111111; --fac:#111111; --perso:#e2001a; --sites:#111111;
+  --shadow-out:none; --shadow-in:none;
+  --font-head:'Poppins',sans-serif; --radius-card:0; --radius-chip:0;
+  --card-border:2px solid #111111;
+}
+html[data-theme="swiss"] .chip{border:2px solid #111111}
+html[data-theme="swiss"] .card:hover{transform:none;background:#111111;color:#fff}
+html[data-theme="swiss"] .card:hover .card-body{opacity:1;transform:none}
+html[data-theme="swiss"] .card:hover p{color:#ccc}
+html[data-theme="swiss"] .grid{display:flex;flex-direction:column;gap:0}
+html[data-theme="swiss"] .card-preview,
+html[data-theme="swiss"] .card-hover-tag{display:none}
+html[data-theme="swiss"] .card{
+  flex-direction:row;align-items:center;gap:0;padding:18px 22px;
+  border-left:none;border-right:none;border-top:none;border-bottom:2px solid #111;
+  border-radius:0;backdrop-filter:none;-webkit-backdrop-filter:none;background:transparent;
+}
+html[data-theme="swiss"] .grid a:first-child{border-top:2px solid #111}
+html[data-theme="swiss"] .card-body{flex-direction:row;align-items:center;gap:24px}
+html[data-theme="swiss"] .card h2{font-size:17px;width:220px;flex-shrink:0}
+html[data-theme="swiss"] .card p{margin:0}
+html[data-theme="swiss"] .tag-row{width:100px;flex-shrink:0;flex-wrap:wrap;gap:4px}
+html[data-theme="swiss"] .tag{border-radius:0;text-align:center;font-size:10px;flex:1;min-width:78px}
+html[data-theme="swiss"] .meta{width:160px;flex-shrink:0}
+html[data-theme="swiss"] .open{position:static;margin-left:auto}
+html[data-theme="swiss"] .card:hover .open{background:#fff;color:#111}

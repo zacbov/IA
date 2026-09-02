@@ -1,0 +1,12 @@
+/* ============================================
+   Polices : Bebas Neue + Montserrat (pharmatlas-preview-v4.html)
+   Identique à index.html : Bebas Neue en display, Montserrat en texte courant
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+:root{
+  --disp:'Bebas Neue', sans-serif;
+  --sans:'Montserrat', sans-serif;
+  --mono:'Montserrat', sans-serif;
+}

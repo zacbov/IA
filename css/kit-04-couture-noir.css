@@ -1,0 +1,64 @@
+/* ================================================================
+   KIT COMPLET : "Couture Noir"
+   Palette  : Couture Noir (noir mat + blush + or fin)
+   Polices  : Bodoni Moda (titres) + Antic (texte)
+   Registre : mode, beauté, parfumerie, packaging de luxe
+   Personnalité : contraste extrême, silence, détails métalliques fins
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,500;0,700;1,500&family=Antic&display=swap');
+
+:root{
+  --bg:#111010;
+  --surface:#1A1818;
+  --surface-alt:#241F1F;
+  --primary:#E7C9C4;
+  --primary-dark:#D1A9A2;
+  --primary-light:#F2DEDA;
+  --accent:#C9A24A;
+  --accent-dark:#A9832F;
+  --accent-light:#E0C077;
+  --text:#F5F1EE;
+  --text-muted:#A69D98;
+  --text-on-primary:#221512;
+  --text-on-accent:#211500;
+  --success:#6FA383;
+  --warning:#C9A24A;
+  --danger:#C15C5C;
+  --border:#2E2828;
+
+  --font-display:'Bodoni Moda', serif;
+  --font-body:'Antic', sans-serif;
+
+  --text-xs:12px;   --text-sm:14px;  --text-base:16px;
+  --text-lg:19px;   --text-xl:26px;  --text-2xl:36px;
+  --text-3xl:52px;  --text-4xl:72px;
+  --leading-tight:1.05; --leading-normal:1.55; --leading-relaxed:1.7;
+  --weight-display:500; --weight-body:400; --weight-strong:700;
+  --tracking-tight:-0.01em; --tracking-wide:.08em;
+
+  --space-1:4px;  --space-2:10px; --space-3:16px; --space-4:22px;
+  --space-5:28px; --space-6:34px; --space-8:44px; --space-10:56px;
+  --space-12:68px; --space-16:88px; --space-20:112px; --space-24:140px;
+
+  /* Rayons quasi nuls : luxe = angle net, pas "friendly rounded" */
+  --radius-sm:0px; --radius-md:2px; --radius-lg:2px; --radius-full:999px;
+
+  --shadow-sm:0 1px 0 rgba(201,162,74,.15);
+  --shadow-md:0 12px 32px rgba(0,0,0,.5);
+  --shadow-lg:0 24px 60px rgba(0,0,0,.6);
+
+  --ease-standard:cubic-bezier(.4,0,.2,1);
+  --duration-fast:180ms; --duration-normal:320ms; --duration-slow:500ms;
+
+  --border-width:1px;
+  --border-gold:1px solid var(--accent);
+}
+
+body{ background:var(--bg); color:var(--text); font:400 var(--text-base)/var(--leading-relaxed) var(--font-body); letter-spacing:.01em; }
+h1,h2,h3{ font-family:var(--font-display); font-weight:var(--weight-display); color:var(--primary); }
+h1{ font-size:var(--text-4xl); line-height:var(--leading-tight); }
+h2{ font-size:var(--text-3xl); line-height:var(--leading-tight); }
+.eyebrow, .label{ font-family:var(--font-body); font-weight:400; letter-spacing:var(--tracking-wide); text-transform:uppercase; font-size:var(--text-xs); color:var(--accent); }
+.card{ background:var(--surface); border:var(--border-width) solid var(--border); border-radius:var(--radius-md); padding:var(--space-6); box-shadow:var(--shadow-sm); }
+.btn{ font-family:var(--font-body); font-weight:400; letter-spacing:var(--tracking-wide); text-transform:uppercase; font-size:var(--text-sm); border-radius:var(--radius-sm); padding:var(--space-3) var(--space-6); border:var(--border-gold); background:transparent; color:var(--accent); cursor:pointer; transition:background var(--duration-normal) var(--ease-standard), color var(--duration-normal) var(--ease-standard); }
+.btn:hover{ background:var(--accent); color:var(--text-on-accent); }

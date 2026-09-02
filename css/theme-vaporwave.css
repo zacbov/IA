@@ -1,0 +1,14 @@
+/* ============================================
+   Design theme: vaporwave
+   Extrait de ZACBOV — Projets (index.html)
+   A importer comme fichier d'inspiration design/couleurs
+   ============================================ */
+
+html[data-theme="vaporwave"]{
+  --bg:#1a0b2e; --card:#2a1454; --ink:#ffe1f5; --mut:#c9a0e0;
+  --jeux:#ff71ce; --pedago:#01cdfe; --fac:#b967ff; --perso:#fffb96; --sites:#05ffa1;
+  --shadow-out:6px 6px 0 rgba(255,113,206,.35); --shadow-in:inset 4px 4px 0 rgba(1,205,254,.25);
+  --radius-card:18px; --radius-chip:30px;
+}
+html[data-theme="vaporwave"] body{background:linear-gradient(180deg,#1a0b2e,#3a1560 60%,#ff71ce)}
+html[data-theme="vaporwave"] .card:hover{transform:translateY(-5px) rotate(-.5deg)}

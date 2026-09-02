@@ -1,0 +1,21 @@
+/* ============================================
+   Paire de polices : Néo-vintage
+   DM Serif Display (titres) + DM Sans (texte)
+   Pourquoi ça marche : DM Serif Display évoque les didones du début du
+   XXe siècle (fort contraste de graisse, empattements fins) réactualisées
+   pour l'écran ; DM Sans, de la même fonderie, prolonge la même tension
+   verticale en version sans-serif. Registre maison d'édition, marque de
+   café/vin, identité rétro-moderne.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;700&display=swap');
+
+:root{
+  --font-display:'DM Serif Display', serif;
+  --font-body:'DM Sans', sans-serif;
+}
+
+h1, h2, .display{ font-family:var(--font-display); font-weight:400; letter-spacing:-.01em; }
+em, .accent-word{ font-family:var(--font-display); font-style:italic; }
+body, p, .body-text{ font-family:var(--font-body); font-weight:400; line-height:1.6; }
+button, .cta{ font-family:var(--font-body); font-weight:700; }

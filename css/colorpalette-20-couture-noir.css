@@ -1,0 +1,34 @@
+/* ============================================
+   Palette : Couture Noir (noir mat + blush + or fin)
+   Règle 60-30-10 : 60% noir mat profond (dominante, fond éditorial),
+   30% blush poudré (structure, cartes/surfaces, feminité tempérée),
+   10% or fin (accent, détails typographiques et bordures).
+   Harmonie : contraste extrême noir/blush avec un accent métallique
+   neutre — logique de packaging cosmétique haut de gamme. Le blush
+   n'est jamais utilisé comme fond de texte long, seulement en aplat
+   de carte. Registre : mode, beauté, parfumerie de luxe.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#111010;
+  --surface:#1A1818;
+  --surface-alt:#241F1F;
+
+  --primary:#E7C9C4;
+  --primary-dark:#D1A9A2;
+  --primary-light:#F2DEDA;
+
+  --accent:#C9A24A;
+  --accent-dark:#A9832F;
+  --accent-light:#E0C077;
+
+  --text:#F5F1EE;
+  --text-muted:#A69D98;
+  --text-on-primary:#221512;
+  --text-on-accent:#211500;
+
+  --success:#6FA383;
+  --warning:#C9A24A;
+  --danger:#C15C5C;
+  --border:#2E2828;
+}

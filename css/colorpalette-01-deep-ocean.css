@@ -1,0 +1,36 @@
+/* ============================================
+   Palette : Deep Ocean (bleu profond + corail)
+   Règle 60-30-10 : 60% dominante neutre claire, 30% bleu profond (structure),
+   10% corail (accent CTA). Contraste texte/fond >7:1 (AAA) sur --bg.
+   Harmonie : complémentaire froid/chaud — le corail (chaud) fait vibrer
+   le bleu marine (froid) sans jamais rivaliser en surface.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  /* Dominante (~60%) : fond et surfaces */
+  --bg:#F6F8FA;
+  --surface:#FFFFFF;
+  --surface-alt:#EAEFF3;
+
+  /* Secondaire / structure (~30%) : bleu profond */
+  --primary:#0B3D5C;
+  --primary-dark:#082A40;
+  --primary-light:#1E5C82;
+
+  /* Accent (~10%) : corail, réservé aux CTA et points d'attention */
+  --accent:#FF6B4A;
+  --accent-dark:#E14F30;
+  --accent-light:#FFA98F;
+
+  /* Texte */
+  --text:#0F1B24;      /* contraste ~15:1 sur --bg */
+  --text-muted:#5B6B76;
+  --text-on-primary:#FFFFFF;
+  --text-on-accent:#1A0A05;
+
+  /* États */
+  --success:#1E8E5A;
+  --warning:#D9A441;
+  --danger:#D64545;
+  --border:#DCE3E8;
+}

@@ -1,0 +1,16 @@
+/* ============================================
+   Design theme: cyberterm
+   Extrait de ZACBOV — Projets (index.html)
+   A importer comme fichier d'inspiration design/couleurs
+   ============================================ */
+
+html[data-theme="cyberterm"]{
+  --bg:#040a04; --card:#08140a; --ink:#8dffb0; --mut:#3f8f57;
+  --jeux:#ff5f56; --pedago:#8dffb0; --fac:#5fd7ff; --perso:#ffd75f; --sites:#8dffb0;
+  --shadow-out:0 0 0 1px rgba(141,255,176,.25); --shadow-in:inset 0 0 0 1px rgba(141,255,176,.3);
+  --font-head:'JetBrains Mono',monospace; --font-mono:'JetBrains Mono',monospace;
+  --radius-card:4px; --radius-chip:4px;
+}
+html[data-theme="cyberterm"] body{text-shadow:0 0 2px rgba(141,255,176,.5)}
+html[data-theme="cyberterm"] .card{border:1px solid rgba(141,255,176,.2)}
+html[data-theme="cyberterm"] .card h2::before{content:"> "}

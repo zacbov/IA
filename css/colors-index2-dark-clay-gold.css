@@ -1,0 +1,22 @@
+/* ============================================
+   Design : Palette "Dark Clay & Gold" (index__2_.html)
+   Fond très sombre (encre), accent doré/moutarde, ambiance premium/atelier
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --ink:#0E1418;
+  --ink-2:#161F24;
+  --ink-3:#1F2B31;
+  --line:#2A383F;
+  --mist:#9DB1B8;
+  --paper:#E8EDEC;
+  --clay:#C9A227;
+  --clay-dim:#7A6417;
+  --r:6px;
+}
+/* Variante dynamique (personnalisable via config du site) */
+:root{
+  --accent-custom: var(--clay);
+  --text-custom: var(--paper);
+  --bg-custom: var(--ink);
+}

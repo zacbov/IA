@@ -1,0 +1,37 @@
+/* ============================================
+   Palette : Midnight Violet (dark mode premium)
+   Règle 60-30-10 adaptée dark : 60% encre bleu-nuit (dominante),
+   30% violet profond (structure, cartes), 10% lime électrique (accent).
+   Harmonie : complémentaire froid/vif — le lime au contraste maximal
+   attire l'œil sans jamais saturer l'interface. Contraste texte/fond
+   >12:1. Ambiance produit tech premium, dashboards, IA.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  /* Dominante (~60%) : fond sombre */
+  --bg:#0D0E1A;
+  --surface:#15172A;
+  --surface-alt:#1E2138;
+
+  /* Secondaire / structure (~30%) */
+  --primary:#4C3B8C;
+  --primary-dark:#332867;
+  --primary-light:#7160B8;
+
+  /* Accent (~10%), à utiliser avec parcimonie */
+  --accent:#C6F135;
+  --accent-dark:#9FC220;
+  --accent-light:#DDF77A;
+
+  /* Texte */
+  --text:#EDEFFB;
+  --text-muted:#9195B8;
+  --text-on-primary:#FFFFFF;
+  --text-on-accent:#12140A;
+
+  /* États */
+  --success:#3FD68C;
+  --warning:#F0B94A;
+  --danger:#FF6B6B;
+  --border:#2A2D48;
+}

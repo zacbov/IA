@@ -1,0 +1,32 @@
+/* ============================================
+   Palette : Sunset Plum (prune + pêche)
+   Règle 60-30-10 : 60% blanc rosé (dominante), 30% prune profond
+   (structure), 10% pêche vif (accent).
+   Harmonie : analogue chaud/froid autour du magenta — le prune calme
+   le pêche vif, contraste texte/fond >10:1. Ambiance créative, beauté,
+   marque lifestyle premium.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#FBF6F7;
+  --surface:#FFFFFF;
+  --surface-alt:#F3E7EA;
+
+  --primary:#4A1E3D;
+  --primary-dark:#301028;
+  --primary-light:#6E3A5C;
+
+  --accent:#FF8C6B;
+  --accent-dark:#E06A48;
+  --accent-light:#FFB79E;
+
+  --text:#241019;
+  --text-muted:#7A5F70;
+  --text-on-primary:#FBF6F7;
+  --text-on-accent:#2B0F03;
+
+  --success:#4C9169;
+  --warning:#DDA23B;
+  --danger:#D14F4F;
+  --border:#EAD9DF;
+}

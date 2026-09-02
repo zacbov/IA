@@ -1,0 +1,20 @@
+/* ============================================
+   Paire de polices : Chaleureux humaniste
+   Fraunces (titres) + Karla (texte)
+   Pourquoi ça marche : Fraunces est un serif "wonky" à empattements souples,
+   très expressif ; Karla est un sans-serif humaniste doux avec des courbes
+   qui font écho aux formes de Fraunces. Le résultat évite la froideur du
+   pairing serif/sans classique — idéal pour marques artisanales, food,
+   lifestyle, éducation.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Karla:wght@400;500;700&display=swap');
+
+:root{
+  --font-display:'Fraunces', serif;
+  --font-body:'Karla', sans-serif;
+}
+
+h1, h2, .display{ font-family:var(--font-display); font-weight:600; font-style:normal; }
+em, .accent-word{ font-family:var(--font-display); font-style:italic; font-weight:500; }
+body, p, .body-text{ font-family:var(--font-body); font-weight:400; line-height:1.65; }

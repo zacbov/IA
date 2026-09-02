@@ -1,0 +1,37 @@
+/* ============================================
+   Design : Palette "Parchemin & Or" (jardin_botanique.html)
+   Fond parchemin clair, encre brune, accent doré, chips de couleur par catégorie
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --parchment:#fbf8f0;
+  --parchment-dark:#f1e9d6;
+  --parchment-mid:#f5eeda;
+  --ink:#221a0f;
+  --ink-light:#5a4a30;
+  --gold:#a8790a;
+  --gold-light:#c99a1e;
+  --border:rgba(139,107,43,0.22);
+  --soil-bg:#fffdf8;
+  --soil-header:rgba(168,121,10,0.06);
+  --soil-border:rgba(139,107,43,0.16);
+  --chip-bg:rgba(34,26,15,0.045);
+  --chip-bg-hover:rgba(168,121,10,0.1);
+  --panel-bg:rgba(255,253,248,0.9);
+  --shadow-soft:0 3px 14px rgba(90,70,30,0.1);
+  --shadow-lift:0 8px 22px rgba(90,70,30,0.16);
+
+  /* Couleurs de catégories (chips) */
+  --c-toxiques:#d84f3e;
+  --c-cutanes:#d2792e;
+  --c-neurotropes:#8e5bc4;
+  --c-cardiotoniques:#d84f4f;
+  --c-bulbes:#5a9a3f;
+  --c-graminees:#3fae66;
+  --c-aromatiques:#b4941f;
+  --c-arbustes:#3f9a76;
+  --c-fruits:#c8477a;
+  --c-exotiques:#93a026;
+  --c-fougeres:#2f9c58;
+  --c-autres:#5b7ec7;
+}

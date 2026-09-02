@@ -1,0 +1,19 @@
+/* ============================================
+   Paire de polices : Brutaliste / anti-design
+   Archivo Black (titres) + Archivo (texte)
+   Pourquoi ça marche : même famille typographique du poids extrême au
+   poids courant — cohérence totale de forme, contraste uniquement par
+   la graisse. Look brut, affiche, sans fioriture. Ambiance mode
+   avant-gardiste, culture, événementiel.
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;700&display=swap');
+
+:root{
+  --font-display:'Archivo Black', sans-serif;
+  --font-body:'Archivo', sans-serif;
+}
+
+h1, h2, .display{ font-family:var(--font-display); text-transform:uppercase; letter-spacing:-.01em; line-height:.95; }
+body, p, .body-text{ font-family:var(--font-body); font-weight:400; line-height:1.55; }
+.label, button{ font-family:var(--font-body); font-weight:700; text-transform:uppercase; letter-spacing:.04em; }

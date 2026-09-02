@@ -1,0 +1,32 @@
+/* ============================================
+   Palette : Royal Amber (violet impérial + ambre)
+   Règle 60-30-10 : 60% ivoire chaud (dominante), 30% violet impérial
+   profond (structure, luxe), 10% ambre doré (accent).
+   Harmonie : complémentaire violet/jaune desaturé côté dominante,
+   contraste fort côté accent. Ambiance luxe, édition limitée, culture,
+   gastronomie haut de gamme.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  --bg:#FAF7F0;
+  --surface:#FFFFFF;
+  --surface-alt:#EFE7D8;
+
+  --primary:#3B1F5C;
+  --primary-dark:#26123D;
+  --primary-light:#5A3985;
+
+  --accent:#E0A82E;
+  --accent-dark:#B8871B;
+  --accent-light:#F0C868;
+
+  --text:#1E1526;
+  --text-muted:#6E6178;
+  --text-on-primary:#FAF7F0;
+  --text-on-accent:#2B1D00;
+
+  --success:#4C8B5C;
+  --warning:#E0A82E;
+  --danger:#C24B4B;
+  --border:#E5DCC8;
+}

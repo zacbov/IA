@@ -1,0 +1,36 @@
+/* ============================================
+   Palette : Warm Neutral Studio (minimalisme chaud)
+   Règle 60-30-10 : 60% blanc cassé chaud (dominante), 30% brun charbon
+   (structure/typographie), 10% ocre moutarde (accent).
+   Harmonie : monochrome chaud à faible saturation, ponctué d'un seul
+   accent net. Ambiance studio créatif, portfolio, marque personnelle.
+   A importer comme fichier d'inspiration couleurs
+   ============================================ */
+:root{
+  /* Dominante (~60%) */
+  --bg:#FAF8F5;
+  --surface:#FFFFFF;
+  --surface-alt:#F0ECE4;
+
+  /* Secondaire / structure (~30%) */
+  --primary:#2B2620;
+  --primary-dark:#171410;
+  --primary-light:#544B3E;
+
+  /* Accent (~10%) */
+  --accent:#D99B2B;
+  --accent-dark:#B37E1D;
+  --accent-light:#EFC170;
+
+  /* Texte */
+  --text:#211D18;
+  --text-muted:#7A7266;
+  --text-on-primary:#FAF8F5;
+  --text-on-accent:#231600;
+
+  /* États */
+  --success:#5A8A5E;
+  --warning:#D99B2B;
+  --danger:#C0524A;
+  --border:#E4DED2;
+}

@@ -1,0 +1,8 @@
+/* ============================================
+   Police : Système natif (pharmaville.html)
+   Pile de police système (pas d'import Google Fonts)
+   A importer comme fichier d'inspiration typographique
+   ============================================ */
+:root{
+  --font-sans: system-ui, sans-serif;
+}
