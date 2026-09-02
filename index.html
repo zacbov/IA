@@ -181,6 +181,7 @@
     <button id="save-keys">Enregistrer</button>
     <button id="open-shortcuts" style="width:100%;background:none;border:1px solid var(--cyan);color:var(--cyan);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:10px;">🤗 Gérer mes raccourcis de Space</button>
     <button id="open-connectors" style="width:100%;background:none;border:1px solid var(--cyan);color:var(--cyan);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:8px;">🔌 Mes connecteurs personnalisés</button>
+    <button id="open-memory" style="width:100%;background:none;border:1px solid var(--cyan);color:var(--cyan);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:8px;">🧠 Ma mémoire (toutes conversations)</button>
     <div class="divider"></div>
     <div class="field"><label>Instructions permanentes</label>
       <textarea id="custom-instructions" rows="4" style="width:100%;background:#0e1512;border:1px solid var(--line);color:var(--text);padding:10px 11px;border-radius:8px;font-size:13px;font-family:inherit;" placeholder="Ex: réponds toujours en français familier, sois concis."></textarea>
@@ -250,6 +251,20 @@
     <div id="cn-test-result" style="font-size:11.5px;font-family:monospace;padding:8px;border-radius:8px;margin-bottom:8px;display:none;white-space:pre-wrap;word-break:break-word;max-height:150px;overflow-y:auto;"></div>
     <button id="cn-add" style="width:100%;background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:11px;border-radius:8px;font-size:13px;cursor:pointer;">Ajouter le connecteur</button>
     <button id="close-connectors" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:10px;">Fermer</button>
+  </div>
+</div>
+
+<!-- Mémoire inter-conversations -->
+<div class="overlay" id="overlay-memory" style="align-items:flex-end;">
+  <div id="sheet">
+    <h2>🧠 Ma mémoire</h2>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:14px;">Ce que l'IA a retenu sur toi à travers TOUTES tes conversations (pas juste celle-ci). Elle ajoute des faits toute seule via la compétence "remember" — tu peux aussi en ajouter ou en retirer ici.</div>
+    <div id="memory-list" style="margin-bottom:14px;"></div>
+    <div style="display:flex;gap:6px;">
+      <input type="text" id="mem-add-input" placeholder="Ajouter un fait manuellement..." style="flex:1;background:#0e1512;border:1px solid var(--line);color:var(--text);padding:9px 10px;border-radius:8px;font-size:12px;">
+      <button id="mem-add-btn" style="background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:9px 14px;border-radius:8px;font-size:12px;cursor:pointer;">Ajouter</button>
+    </div>
+    <button id="close-memory" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:12px;">Fermer</button>
   </div>
 </div>
 
@@ -605,12 +620,11 @@ const OA_PROVIDERS = {
   cerebras: { url:'https://api.cerebras.ai/v1/chat/completions', model:'gpt-oss-120b', tag:'CEREBRAS', cls:'engine-cerebras' },
   mistral: { url:'https://api.mistral.ai/v1/chat/completions', model:'mistral-small-latest', tag:'MISTRAL', cls:'engine-mistral' },
   'mistral-code': { key:'mistral', url:'https://api.mistral.ai/v1/chat/completions', model:'codestral-latest', tag:'MISTRAL·CODE', cls:'engine-mistral' },
-  openrouter: { url:'https://openrouter.ai/api/v1/chat/completions', model:'meta-llama/llama-3.3-70b-instruct:free', tag:'OPENROUTER', cls:'engine-openrouter' },
-  'openrouter-code': { key:'openrouter', url:'https://openrouter.ai/api/v1/chat/completions', model:'qwen/qwen3-coder:free', tag:'OPENROUTER·CODE', cls:'engine-openrouter' },
+  openrouter: { url:'https://openrouter.ai/api/v1/chat/completions', model:'openai/gpt-oss-120b:free', tag:'OPENROUTER', cls:'engine-openrouter' },
+  'openrouter-code': { key:'openrouter', url:'https://openrouter.ai/api/v1/chat/completions', model:'openai/gpt-oss-120b:free', tag:'OPENROUTER·CODE', cls:'engine-openrouter' },
   nvidia: { url:'https://integrate.api.nvidia.com/v1/chat/completions', model:'meta/llama-3.3-70b-instruct', tag:'NVIDIA', cls:'engine-nvidia' },
-  hf: { url:'https://api-inference.huggingface.co/v1/chat/completions', model:'meta-llama/Llama-3.3-70B-Instruct', tag:'HF', cls:'engine-hf' },
-  github: { url:'https://models.inference.ai.azure.com/chat/completions', model:'gpt-4o', tag:'GITHUB · GPT-4O', cls:'engine-hf' },
-  zai: { url:'https://api.z.ai/api/paas/v4/chat/completions', model:'glm-4.5-flash', tag:'Z.AI · GLM', cls:'engine-cerebras' },
+  hf: { url:'https://router.huggingface.co/v1/chat/completions', model:'meta-llama/Llama-3.3-70B-Instruct', tag:'HF', cls:'engine-hf' },
+  zai: { url:'https://api.z.ai/api/paas/v4/chat/completions', model:'glm-4.6', tag:'Z.AI · GLM', cls:'engine-cerebras' },
   llm7: { url:'https://api.llm7.io/v1/chat/completions', model:'default', tag:'LLM7', cls:'engine-hf' },
 };
 
@@ -829,6 +843,7 @@ const SKILLS = [
   { type:'function', function:{ name:'generate_3d_model', description:"Génère un vrai modèle 3D (fichier .glb téléchargeable) à partir d'une description texte, via Tripo3D. Peut prendre 30 à 90 secondes.", parameters:{ type:'object', properties:{ prompt:{type:'string'} }, required:['prompt'] } } },
   { type:'function', function:{ name:'generate_music', description:"Génère un court morceau de musique instrumentale à partir d'une description texte (via Hugging Face MusicGen). ~10-15 secondes de musique, prend 20-60s à générer.", parameters:{ type:'object', properties:{ prompt:{type:'string', description:"Description du style/ambiance musicale souhaitée"} }, required:['prompt'] } } },
   { type:'function', function:{ name:'text_to_speech', description:"Lit un texte à voix haute avec une vraie voix expressive (via Hume AI). Utilise seulement quand on demande explicitement d'entendre/écouter un texte.", parameters:{ type:'object', properties:{ text:{type:'string'}, description:{type:'string', description:"Description optionnelle du style vocal souhaité, ex: 'voix calme et posée'"} }, required:['text'] } } },
+  { type:'function', function:{ name:'remember', description:"Mémorise durablement un fait important sur l'utilisateur ou ses projets, pour t'en souvenir dans TOUTES ses futures conversations (pas juste celle-ci). N'utilise que pour de vraies informations durables (préférences, projets en cours, contexte récurrent) — jamais pour des détails ponctuels sans intérêt à long terme.", parameters:{ type:'object', properties:{ fact:{type:'string', description:"Le fait à retenir, formulé clairement et de façon autonome"} }, required:['fact'] } } },
   { type:'function', function:{ name:'translate_text', description:"Traduit un texte d'une langue vers une autre", parameters:{ type:'object', properties:{ text:{type:'string'}, from:{type:'string', description:"Code langue source, ex: fr"}, to:{type:'string', description:"Code langue cible, ex: en"} }, required:['text','to'] } } },
   { type:'function', function:{ name:'web_search_real', description:"Fait une vraie recherche web (pas juste Wikipédia) pour de l'actualité générale ou une question précise nécessitant des résultats web à jour", parameters:{ type:'object', properties:{ query:{type:'string'} }, required:['query'] } } },
   { type:'function', function:{ name:'iss_location', description:"Donne la position actuelle de la Station Spatiale Internationale", parameters:{ type:'object', properties:{} } } },
@@ -934,6 +949,16 @@ async function testConnector(url, method, paramName, testValue){
   }
 }
 document.getElementById('open-connectors').onclick = ()=>{ closeSettings(); renderConnectors(); document.getElementById('overlay-connectors').classList.add('show'); };
+document.getElementById('open-memory').onclick = ()=>{ closeSettings(); renderMemoryList(); document.getElementById('overlay-memory').classList.add('show'); };
+document.getElementById('close-memory').onclick = ()=> document.getElementById('overlay-memory').classList.remove('show');
+document.getElementById('overlay-memory').onclick = (e)=>{ if(e.target.id==='overlay-memory') document.getElementById('overlay-memory').classList.remove('show'); };
+document.getElementById('mem-add-btn').onclick = ()=>{
+  const val = document.getElementById('mem-add-input').value.trim();
+  if(!val) return;
+  LONG_TERM_MEMORY.push(val);
+  persistMemory(); renderMemoryList();
+  document.getElementById('mem-add-input').value = '';
+};
 document.getElementById('close-connectors').onclick = ()=> document.getElementById('overlay-connectors').classList.remove('show');
 document.getElementById('overlay-connectors').onclick = (e)=>{ if(e.target.id==='overlay-connectors') document.getElementById('overlay-connectors').classList.remove('show'); };
 document.getElementById('cn-test').onclick = async ()=>{
@@ -1347,6 +1372,13 @@ async function runSkill(name, args){
       const audioUrl = URL.createObjectURL(blob);
       pushMessage({ role:'bot', cat:'VOIX', tag:'HUME · TTS', tagClass:'engine-cerebras', text:'🔊 "'+args.text.slice(0,80)+(args.text.length>80?'…':'')+'"', audioSrc:audioUrl });
       return 'Texte lu à voix haute avec succès — le lecteur audio est apparu juste au-dessus dans le chat.';
+    }
+    if(name === 'remember'){
+      if(!LONG_TERM_MEMORY.includes(args.fact)){
+        LONG_TERM_MEMORY.push(args.fact);
+        await persistMemory();
+      }
+      return 'Mémorisé pour les prochaines conversations : "' + args.fact + '".';
     }
     if(name === 'translate_text'){
       const langpair = (args.from || 'auto') + '|' + args.to;
@@ -1813,7 +1845,7 @@ function renderReplyContent(bubble, text){
   if(block.after){ const p=document.createElement('div'); p.innerHTML=renderMarkdown(block.after); p.style.marginTop='8px'; bubble.appendChild(p); }
 }
 
-const SKILL_LABELS = { get_weather:'météo', convert_currency:'conversion devise', wikipedia_lookup:'recherche Wikipédia', calculate:'calcul', get_timezone:'fuseau horaire', jours_feries_fr:'jours fériés', make_qrcode:'QR code', shorten_link:'raccourcissement de lien', color_palette:'palette de couleurs', color_info:'infos couleur', icon_search:'recherche d\'icônes', texture_search:'recherche de textures/HDRI', search_hf_hub:'recherche Hugging Face Hub', call_hf_space:'appel d\'un Space Hugging Face', github_list_repos:'liste des dépôts GitHub', github_latest_commit:'dernier commit GitHub', github_list_issues:'issues GitHub', generate_3d_model:'génération de modèle 3D (Tripo3D)', generate_music:'génération musicale (MusicGen)', translate_text:'traduction', web_search_real:'recherche web', iss_location:'position ISS', hackernews_top:'Hacker News', french_address_lookup:'recherche d\'adresse', text_to_speech:'synthèse vocale (Hume)', read_project_file:'consultation de la zone de dépôt' };
+const SKILL_LABELS = { get_weather:'météo', convert_currency:'conversion devise', wikipedia_lookup:'recherche Wikipédia', calculate:'calcul', get_timezone:'fuseau horaire', jours_feries_fr:'jours fériés', make_qrcode:'QR code', shorten_link:'raccourcissement de lien', color_palette:'palette de couleurs', color_info:'infos couleur', icon_search:'recherche d\'icônes', texture_search:'recherche de textures/HDRI', search_hf_hub:'recherche Hugging Face Hub', call_hf_space:'appel d\'un Space Hugging Face', github_list_repos:'liste des dépôts GitHub', github_latest_commit:'dernier commit GitHub', github_list_issues:'issues GitHub', generate_3d_model:'génération de modèle 3D (Tripo3D)', generate_music:'génération musicale (MusicGen)', translate_text:'traduction', web_search_real:'recherche web', iss_location:'position ISS', hackernews_top:'Hacker News', french_address_lookup:'recherche d\'adresse', text_to_speech:'synthèse vocale (Hume)', read_project_file:'consultation de la zone de dépôt', remember:'mémorisation' };
 function skillLabel(name){
   if(name.startsWith('connector_')){ const c = CUSTOM_CONNECTORS[name.slice('connector_'.length)]; return c ? c.name : name; }
   return SKILL_LABELS[name] || name;
@@ -2308,6 +2340,7 @@ if('serviceWorker' in navigator){
   await loadConnectors();
   await loadInstructions();
   await loadCss();
+  await loadMemory();
   updateOfflineBanner();
 })();
 </script>
