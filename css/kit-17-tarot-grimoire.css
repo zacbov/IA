@@ -1,0 +1,63 @@
+/* ================================================================
+   KIT COMPLET : "Tarot Grimoire"
+   Palette  : alchemy-tarot
+   Polices  : 'Cinzel', serif (titres) + 'Cormorant Garamond', serif (texte)
+   Registre : tarot, astrologie, éditions ésotériques, boutique de rituels
+   Personnalité : gravé, cérémoniel, dense en texte, filigranes dorés
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&display=swap');
+
+:root{
+  --bg:#F2E9D8;
+  --surface:#FAF4E7;
+  --surface-alt:#E8DBBE;
+  --primary:#5C1A24;
+  --primary-dark:#3C0E15;
+  --primary-light:#7E2E3A;
+  --accent:#B8923F;
+  --accent-dark:#93741F;
+  --accent-light:#D4B76C;
+  --text:#2A1610;
+  --text-muted:#7A6650;
+  --text-on-primary:#F2E9D8;
+  --text-on-accent:#2A1D00;
+  --success:#556B3A;
+  --warning:#B8923F;
+  --danger:#8C2A2A;
+  --border:#DACBA5;
+
+  --font-display:'Cinzel', serif;
+  --font-body:'Cormorant Garamond', serif;
+
+  --text-xs:13px;   --text-sm:14px;  --text-base:17px;
+  --text-lg:20px;   --text-xl:26px;  --text-2xl:34px;
+  --text-3xl:46px;  --text-4xl:58px;
+  --leading-tight:1.1; --leading-normal:1.65; --leading-relaxed:1.75;
+
+  --space-1:4px;  --space-2:8px;  --space-3:14px; --space-4:20px;
+  --space-5:26px; --space-6:32px; --space-8:40px; --space-10:52px;
+  --space-12:64px; --space-16:84px; --space-20:104px; --space-24:128px;
+
+  --radius-sm:2px; --radius-md:4px; --radius-lg:6px; --radius-full:999px;
+
+  --shadow-sm:0 1px 0 rgba(184,146,63,.25);
+  --shadow-md:0 12px 28px rgba(92,26,36,.18);
+  --shadow-lg:0 24px 54px rgba(92,26,36,.22);
+
+  --ease-standard:cubic-bezier(.4,0,.2,1);
+  --duration-fast:200ms; --duration-normal:340ms; --duration-slow:520ms;
+
+  --border-width:1px;
+}
+
+body{ background:var(--bg); color:var(--text); font:400 var(--text-base)/var(--leading-normal) var(--font-body); }
+h1,h2,h3{ font-family:var(--font-display); color:var(--text); line-height:var(--leading-tight); }
+h1{ font-size:var(--text-4xl); }
+h2{ font-size:var(--text-3xl); }
+h3{ font-size:var(--text-xl); }
+p{ font-family:var(--font-body); line-height:var(--leading-relaxed); color:var(--text); }
+.card{ background:var(--surface); border:var(--border-width) solid var(--border); border-radius:var(--radius-lg); padding:var(--space-6); box-shadow:var(--shadow-sm); transition:box-shadow var(--duration-normal) var(--ease-standard); }
+.card:hover{ box-shadow:var(--shadow-md); }
+.btn{ font-family:var(--font-body); font-weight:600; border-radius:var(--radius-md); padding:var(--space-3) var(--space-5); border:none; cursor:pointer; transition:all var(--duration-fast) var(--ease-standard); }
+.btn-primary{ background:var(--accent); color:var(--text-on-accent); }
+.btn-primary:hover{ filter:brightness(1.06); }

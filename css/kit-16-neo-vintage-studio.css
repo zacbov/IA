@@ -1,0 +1,63 @@
+/* ================================================================
+   KIT COMPLET : "Neo Vintage Studio"
+   Palette  : warm-neutral-studio
+   Polices  : 'DM Serif Display', serif (titres) + 'DM Sans', sans-serif (texte)
+   Registre : portfolio créatif, marque café/vin, identité rétro-moderne
+   Personnalité : contraste vertical fort, clin d'œil rétro assumé mais épuré
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;700&display=swap');
+
+:root{
+  --bg:#FAF8F5;
+  --surface:#FFFFFF;
+  --surface-alt:#F0ECE4;
+  --primary:#2B2620;
+  --primary-dark:#171410;
+  --primary-light:#544B3E;
+  --accent:#D99B2B;
+  --accent-dark:#B37E1D;
+  --accent-light:#EFC170;
+  --text:#211D18;
+  --text-muted:#7A7266;
+  --text-on-primary:#FAF8F5;
+  --text-on-accent:#231600;
+  --success:#5A8A5E;
+  --warning:#D99B2B;
+  --danger:#C0524A;
+  --border:#E4DED2;
+
+  --font-display:'DM Serif Display', serif;
+  --font-body:'DM Sans', sans-serif;
+
+  --text-xs:13px;   --text-sm:14px;  --text-base:16px;
+  --text-lg:19px;   --text-xl:25px;  --text-2xl:34px;
+  --text-3xl:46px;  --text-4xl:60px;
+  --leading-tight:1.05; --leading-normal:1.55; --leading-relaxed:1.65;
+
+  --space-1:4px;  --space-2:8px;  --space-3:12px; --space-4:18px;
+  --space-5:22px; --space-6:28px; --space-8:36px; --space-10:44px;
+  --space-12:56px; --space-16:72px; --space-20:92px; --space-24:112px;
+
+  --radius-sm:6px; --radius-md:10px; --radius-lg:16px; --radius-full:999px;
+
+  --shadow-sm:0 2px 6px rgba(43,38,32,.08);
+  --shadow-md:0 8px 20px rgba(43,38,32,.12);
+  --shadow-lg:0 18px 40px rgba(43,38,32,.16);
+
+  --ease-standard:cubic-bezier(.3,.7,.3,1);
+  --duration-fast:150ms; --duration-normal:240ms; --duration-slow:360ms;
+
+  --border-width:1px;
+}
+
+body{ background:var(--bg); color:var(--text); font:400 var(--text-base)/var(--leading-normal) var(--font-body); }
+h1,h2,h3{ font-family:var(--font-display); color:var(--text); line-height:var(--leading-tight); }
+h1{ font-size:var(--text-4xl); }
+h2{ font-size:var(--text-3xl); }
+h3{ font-size:var(--text-xl); }
+p{ font-family:var(--font-body); line-height:var(--leading-relaxed); color:var(--text); }
+.card{ background:var(--surface); border:var(--border-width) solid var(--border); border-radius:var(--radius-lg); padding:var(--space-6); box-shadow:var(--shadow-sm); transition:box-shadow var(--duration-normal) var(--ease-standard); }
+.card:hover{ box-shadow:var(--shadow-md); }
+.btn{ font-family:var(--font-body); font-weight:600; border-radius:var(--radius-md); padding:var(--space-3) var(--space-5); border:none; cursor:pointer; transition:all var(--duration-fast) var(--ease-standard); }
+.btn-primary{ background:var(--accent); color:var(--text-on-accent); }
+.btn-primary:hover{ filter:brightness(1.06); }

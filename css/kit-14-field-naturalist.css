@@ -1,0 +1,63 @@
+/* ================================================================
+   KIT COMPLET : "Field Naturalist"
+   Palette  : moss-brick
+   Polices  : 'Zilla Slab', serif (titres) + 'Work Sans', sans-serif (texte)
+   Registre : paysage, botanique, marque nature premium, éditorial vert
+   Personnalité : organique mais sérieux, texture papier, empattements carrés affirmés
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Zilla+Slab:wght@500;600;700&family=Work+Sans:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#F4F6F1;
+  --surface:#FFFFFF;
+  --surface-alt:#E7ECE0;
+  --primary:#1F2E1C;
+  --primary-dark:#101B0E;
+  --primary-light:#3A4F34;
+  --accent:#B85C38;
+  --accent-dark:#95452A;
+  --accent-light:#D68B67;
+  --text:#161F13;
+  --text-muted:#5E6B57;
+  --text-on-primary:#F4F6F1;
+  --text-on-accent:#2A0F04;
+  --success:#3E7D4A;
+  --warning:#C9962E;
+  --danger:#B8452F;
+  --border:#DEE5D6;
+
+  --font-display:'Zilla Slab', serif;
+  --font-body:'Work Sans', sans-serif;
+
+  --text-xs:13px;   --text-sm:14px;  --text-base:16px;
+  --text-lg:19px;   --text-xl:24px;  --text-2xl:32px;
+  --text-3xl:44px;  --text-4xl:58px;
+  --leading-tight:1.1; --leading-normal:1.6; --leading-relaxed:1.7;
+
+  --space-1:4px;  --space-2:8px;  --space-3:12px; --space-4:18px;
+  --space-5:22px; --space-6:28px; --space-8:36px; --space-10:44px;
+  --space-12:56px; --space-16:72px; --space-20:92px; --space-24:112px;
+
+  --radius-sm:6px; --radius-md:10px; --radius-lg:14px; --radius-full:999px;
+
+  --shadow-sm:0 2px 6px rgba(31,46,28,.08);
+  --shadow-md:0 8px 20px rgba(31,46,28,.12);
+  --shadow-lg:0 18px 40px rgba(31,46,28,.16);
+
+  --ease-standard:cubic-bezier(.25,.7,.3,1);
+  --duration-fast:150ms; --duration-normal:240ms; --duration-slow:360ms;
+
+  --border-width:1px;
+}
+
+body{ background:var(--bg); color:var(--text); font:400 var(--text-base)/var(--leading-normal) var(--font-body); }
+h1,h2,h3{ font-family:var(--font-display); color:var(--text); line-height:var(--leading-tight); }
+h1{ font-size:var(--text-4xl); }
+h2{ font-size:var(--text-3xl); }
+h3{ font-size:var(--text-xl); }
+p{ font-family:var(--font-body); line-height:var(--leading-relaxed); color:var(--text); }
+.card{ background:var(--surface); border:var(--border-width) solid var(--border); border-radius:var(--radius-lg); padding:var(--space-6); box-shadow:var(--shadow-sm); transition:box-shadow var(--duration-normal) var(--ease-standard); }
+.card:hover{ box-shadow:var(--shadow-md); }
+.btn{ font-family:var(--font-body); font-weight:600; border-radius:var(--radius-md); padding:var(--space-3) var(--space-5); border:none; cursor:pointer; transition:all var(--duration-fast) var(--ease-standard); }
+.btn-primary{ background:var(--accent); color:var(--text-on-accent); }
+.btn-primary:hover{ filter:brightness(1.06); }

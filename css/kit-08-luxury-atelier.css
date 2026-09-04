@@ -1,0 +1,63 @@
+/* ================================================================
+   KIT COMPLET : "Luxury Atelier"
+   Palette  : royal-amber
+   Polices  : 'Cormorant', serif (titres) + 'Jost', sans-serif (texte)
+   Registre : mode, joaillerie, parfumerie, maison de couture
+   Personnalité : fin, aéré à l'excès, majuscules espacées, retenue absolue
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&display=swap');
+
+:root{
+  --bg:#FAF7F0;
+  --surface:#FFFFFF;
+  --surface-alt:#EFE7D8;
+  --primary:#3B1F5C;
+  --primary-dark:#26123D;
+  --primary-light:#5A3985;
+  --accent:#E0A82E;
+  --accent-dark:#B8871B;
+  --accent-light:#F0C868;
+  --text:#1E1526;
+  --text-muted:#6E6178;
+  --text-on-primary:#FAF7F0;
+  --text-on-accent:#2B1D00;
+  --success:#4C8B5C;
+  --warning:#E0A82E;
+  --danger:#C24B4B;
+  --border:#E5DCC8;
+
+  --font-display:'Cormorant', serif;
+  --font-body:'Jost', sans-serif;
+
+  --text-xs:12px;   --text-sm:13px;  --text-base:16px;
+  --text-lg:19px;   --text-xl:26px;  --text-2xl:38px;
+  --text-3xl:54px;  --text-4xl:74px;
+  --leading-tight:1.05; --leading-normal:1.7; --leading-relaxed:1.8;
+
+  --space-1:4px;  --space-2:10px;  --space-3:16px; --space-4:24px;
+  --space-5:32px; --space-6:40px; --space-8:52px; --space-10:68px;
+  --space-12:84px; --space-16:108px; --space-20:136px; --space-24:168px;
+
+  --radius-sm:0px; --radius-md:1px; --radius-lg:1px; --radius-full:999px;
+
+  --shadow-sm:0 1px 0 rgba(224,168,46,.18);
+  --shadow-md:0 16px 40px rgba(59,31,92,.16);
+  --shadow-lg:0 30px 70px rgba(59,31,92,.20);
+
+  --ease-standard:cubic-bezier(.4,0,.2,1);
+  --duration-fast:200ms; --duration-normal:340ms; --duration-slow:520ms;
+
+  --border-width:1px;
+}
+
+body{ background:var(--bg); color:var(--text); font:400 var(--text-base)/var(--leading-normal) var(--font-body); }
+h1,h2,h3{ font-family:var(--font-display); color:var(--text); line-height:var(--leading-tight); }
+h1{ font-size:var(--text-4xl); }
+h2{ font-size:var(--text-3xl); }
+h3{ font-size:var(--text-xl); }
+p{ font-family:var(--font-body); line-height:var(--leading-relaxed); color:var(--text); }
+.card{ background:var(--surface); border:var(--border-width) solid var(--border); border-radius:var(--radius-lg); padding:var(--space-6); box-shadow:var(--shadow-sm); transition:box-shadow var(--duration-normal) var(--ease-standard); }
+.card:hover{ box-shadow:var(--shadow-md); }
+.btn{ font-family:var(--font-body); font-weight:600; border-radius:var(--radius-md); padding:var(--space-3) var(--space-5); border:none; cursor:pointer; transition:all var(--duration-fast) var(--ease-standard); }
+.btn-primary{ background:var(--accent); color:var(--text-on-accent); }
+.btn-primary:hover{ filter:brightness(1.06); }

@@ -1,0 +1,63 @@
+/* ================================================================
+   KIT COMPLET : "Friendly Community"
+   Palette  : sunset-plum
+   Polices  : 'Baloo 2', sans-serif (titres) + 'Nunito Sans', sans-serif (texte)
+   Registre : app grand public, communauté, éducation, santé bienveillante
+   Personnalité : doux, rond, chaleureux sans être enfantin, très accessible
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito+Sans:wght@400;600;700&display=swap');
+
+:root{
+  --bg:#FBF6F7;
+  --surface:#FFFFFF;
+  --surface-alt:#F3E7EA;
+  --primary:#4A1E3D;
+  --primary-dark:#301028;
+  --primary-light:#6E3A5C;
+  --accent:#FF8C6B;
+  --accent-dark:#E06A48;
+  --accent-light:#FFB79E;
+  --text:#241019;
+  --text-muted:#7A5F70;
+  --text-on-primary:#FBF6F7;
+  --text-on-accent:#2B0F03;
+  --success:#4C9169;
+  --warning:#DDA23B;
+  --danger:#D14F4F;
+  --border:#EAD9DF;
+
+  --font-display:'Baloo 2', sans-serif;
+  --font-body:'Nunito Sans', sans-serif;
+
+  --text-xs:13px;   --text-sm:15px;  --text-base:16px;
+  --text-lg:19px;   --text-xl:24px;  --text-2xl:32px;
+  --text-3xl:42px;  --text-4xl:54px;
+  --leading-tight:1.15; --leading-normal:1.6; --leading-relaxed:1.65;
+
+  --space-1:4px;  --space-2:8px;  --space-3:14px; --space-4:18px;
+  --space-5:24px; --space-6:28px; --space-8:36px; --space-10:44px;
+  --space-12:56px; --space-16:72px; --space-20:92px; --space-24:112px;
+
+  --radius-sm:10px; --radius-md:16px; --radius-lg:24px; --radius-full:999px;
+
+  --shadow-sm:0 2px 8px rgba(74,30,61,.08);
+  --shadow-md:0 10px 24px rgba(74,30,61,.12);
+  --shadow-lg:0 20px 44px rgba(74,30,61,.16);
+
+  --ease-standard:cubic-bezier(.3,.8,.4,1);
+  --duration-fast:150ms; --duration-normal:240ms; --duration-slow:360ms;
+
+  --border-width:1px;
+}
+
+body{ background:var(--bg); color:var(--text); font:400 var(--text-base)/var(--leading-normal) var(--font-body); }
+h1,h2,h3{ font-family:var(--font-display); color:var(--text); line-height:var(--leading-tight); }
+h1{ font-size:var(--text-4xl); }
+h2{ font-size:var(--text-3xl); }
+h3{ font-size:var(--text-xl); }
+p{ font-family:var(--font-body); line-height:var(--leading-relaxed); color:var(--text); }
+.card{ background:var(--surface); border:var(--border-width) solid var(--border); border-radius:var(--radius-lg); padding:var(--space-6); box-shadow:var(--shadow-sm); transition:box-shadow var(--duration-normal) var(--ease-standard); }
+.card:hover{ box-shadow:var(--shadow-md); }
+.btn{ font-family:var(--font-body); font-weight:600; border-radius:var(--radius-md); padding:var(--space-3) var(--space-5); border:none; cursor:pointer; transition:all var(--duration-fast) var(--ease-standard); }
+.btn-primary{ background:var(--accent); color:var(--text-on-accent); }
+.btn-primary:hover{ filter:brightness(1.06); }

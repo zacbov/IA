@@ -1,0 +1,63 @@
+/* ================================================================
+   KIT COMPLET : "Wellness Longform"
+   Palette  : porcelain-indigo
+   Polices  : 'Source Serif 4', serif (titres) + 'Source Sans 3', sans-serif (texte)
+   Registre : application bien-être, méditation, contenu longform santé
+   Personnalité : apaisant, lisible, contraste doux, jamais criard
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Source+Sans+3:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#FDFDFC;
+  --surface:#FFFFFF;
+  --surface-alt:#EEF0F6;
+  --primary:#28305C;
+  --primary-dark:#171C3C;
+  --primary-light:#454F82;
+  --accent:#F0837A;
+  --accent-dark:#D2645B;
+  --accent-light:#F7AEA8;
+  --text:#161A2E;
+  --text-muted:#5F6480;
+  --text-on-primary:#FDFDFC;
+  --text-on-accent:#2E0E0B;
+  --success:#3E9E75;
+  --warning:#DDA23B;
+  --danger:#E0615A;
+  --border:#E4E6EF;
+
+  --font-display:'Source Serif 4', serif;
+  --font-body:'Source Sans 3', sans-serif;
+
+  --text-xs:13px;   --text-sm:15px;  --text-base:17px;
+  --text-lg:19px;   --text-xl:24px;  --text-2xl:31px;
+  --text-3xl:40px;  --text-4xl:52px;
+  --leading-tight:1.15; --leading-normal:1.65; --leading-relaxed:1.75;
+
+  --space-1:4px;  --space-2:8px;  --space-3:14px; --space-4:18px;
+  --space-5:24px; --space-6:28px; --space-8:36px; --space-10:44px;
+  --space-12:56px; --space-16:72px; --space-20:92px; --space-24:112px;
+
+  --radius-sm:10px; --radius-md:14px; --radius-lg:20px; --radius-full:999px;
+
+  --shadow-sm:0 2px 8px rgba(40,48,92,.06);
+  --shadow-md:0 10px 24px rgba(40,48,92,.08);
+  --shadow-lg:0 20px 44px rgba(40,48,92,.10);
+
+  --ease-standard:cubic-bezier(.3,.7,.3,1);
+  --duration-fast:160ms; --duration-normal:260ms; --duration-slow:380ms;
+
+  --border-width:1px;
+}
+
+body{ background:var(--bg); color:var(--text); font:400 var(--text-base)/var(--leading-normal) var(--font-body); }
+h1,h2,h3{ font-family:var(--font-display); color:var(--text); line-height:var(--leading-tight); }
+h1{ font-size:var(--text-4xl); }
+h2{ font-size:var(--text-3xl); }
+h3{ font-size:var(--text-xl); }
+p{ font-family:var(--font-body); line-height:var(--leading-relaxed); color:var(--text); }
+.card{ background:var(--surface); border:var(--border-width) solid var(--border); border-radius:var(--radius-lg); padding:var(--space-6); box-shadow:var(--shadow-sm); transition:box-shadow var(--duration-normal) var(--ease-standard); }
+.card:hover{ box-shadow:var(--shadow-md); }
+.btn{ font-family:var(--font-body); font-weight:600; border-radius:var(--radius-md); padding:var(--space-3) var(--space-5); border:none; cursor:pointer; transition:all var(--duration-fast) var(--ease-standard); }
+.btn-primary{ background:var(--accent); color:var(--text-on-accent); }
+.btn-primary:hover{ filter:brightness(1.06); }

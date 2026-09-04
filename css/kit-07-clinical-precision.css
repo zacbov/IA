@@ -1,0 +1,64 @@
+/* ================================================================
+   KIT COMPLET : "Clinical Precision"
+   Palette  : clinical-teal
+   Polices  : 'Manrope', sans-serif (titres) + 'Manrope', sans-serif (texte) + 'JetBrains Mono', monospace (technique)
+   Registre : santé digitale, dashboard médical, produit fintech B2B
+   Personnalité : net, technique mais rassurant, chiffres bien alignés, aucune fantaisie
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#F4F8F9;
+  --surface:#FFFFFF;
+  --surface-alt:#E7EFF1;
+  --primary:#3A4E58;
+  --primary-dark:#26343B;
+  --primary-light:#57707C;
+  --accent:#0FA3A3;
+  --accent-dark:#0B7C7C;
+  --accent-light:#5FD1CE;
+  --text:#1A2226;
+  --text-muted:#647178;
+  --text-on-primary:#F4F8F9;
+  --text-on-accent:#04211F;
+  --success:#2E9E6B;
+  --warning:#D9A441;
+  --danger:#D2504A;
+  --border:#DCE6E8;
+
+  --font-display:'Manrope', sans-serif;
+  --font-body:'Manrope', sans-serif;
+  --font-mono:'JetBrains Mono', monospace;
+
+  --text-xs:12px;   --text-sm:13px;  --text-base:15px;
+  --text-lg:17px;   --text-xl:21px;  --text-2xl:28px;
+  --text-3xl:38px;  --text-4xl:50px;
+  --leading-tight:1.15; --leading-normal:1.5; --leading-relaxed:1.6;
+
+  --space-1:4px;  --space-2:8px;  --space-3:12px; --space-4:16px;
+  --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px;
+  --space-12:48px; --space-16:64px; --space-20:80px; --space-24:96px;
+
+  --radius-sm:6px; --radius-md:10px; --radius-lg:14px; --radius-full:999px;
+
+  --shadow-sm:0 1px 3px rgba(58,78,88,.08);
+  --shadow-md:0 4px 12px rgba(58,78,88,.10);
+  --shadow-lg:0 14px 32px rgba(58,78,88,.14);
+
+  --ease-standard:cubic-bezier(.2,.8,.2,1);
+  --duration-fast:120ms; --duration-normal:180ms; --duration-slow:260ms;
+
+  --border-width:1px;
+}
+
+body{ background:var(--bg); color:var(--text); font:400 var(--text-base)/var(--leading-normal) var(--font-body); }
+h1,h2,h3{ font-family:var(--font-display); color:var(--text); line-height:var(--leading-tight); }
+h1{ font-size:var(--text-4xl); }
+h2{ font-size:var(--text-3xl); }
+h3{ font-size:var(--text-xl); }
+p{ font-family:var(--font-body); line-height:var(--leading-relaxed); color:var(--text); }
+.card{ background:var(--surface); border:var(--border-width) solid var(--border); border-radius:var(--radius-lg); padding:var(--space-6); box-shadow:var(--shadow-sm); transition:box-shadow var(--duration-normal) var(--ease-standard); }
+.card:hover{ box-shadow:var(--shadow-md); }
+.btn{ font-family:var(--font-body); font-weight:600; border-radius:var(--radius-md); padding:var(--space-3) var(--space-5); border:none; cursor:pointer; transition:all var(--duration-fast) var(--ease-standard); }
+.btn-primary{ background:var(--accent); color:var(--text-on-accent); }
+.btn-primary:hover{ filter:brightness(1.06); }

@@ -1,0 +1,63 @@
+/* ================================================================
+   KIT COMPLET : "Artisan Journal"
+   Palette  : desert-sand
+   Polices  : 'Lora', serif (titres) + 'Mulish', sans-serif (texte)
+   Registre : voyage, artisanat, marque outdoor, carnet de bord
+   Personnalité : chaud, terreux, texte confortable à lire longtemps
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,500;0,600;1,500&family=Mulish:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#F5EDE2;
+  --surface:#FFFCF7;
+  --surface-alt:#EBDDC8;
+  --primary:#5C3A2E;
+  --primary-dark:#3D2419;
+  --primary-light:#7D5642;
+  --accent:#D97B34;
+  --accent-dark:#B15F22;
+  --accent-light:#F0A868;
+  --text:#2B1D14;
+  --text-muted:#7A6552;
+  --text-on-primary:#F5EDE2;
+  --text-on-accent:#2B1000;
+  --success:#5F8C5A;
+  --warning:#D9A441;
+  --danger:#C0523E;
+  --border:#E0D0B8;
+
+  --font-display:'Lora', serif;
+  --font-body:'Mulish', sans-serif;
+
+  --text-xs:13px;   --text-sm:15px;  --text-base:17px;
+  --text-lg:20px;   --text-xl:25px;  --text-2xl:32px;
+  --text-3xl:42px;  --text-4xl:54px;
+  --leading-tight:1.15; --leading-normal:1.65; --leading-relaxed:1.75;
+
+  --space-1:4px;  --space-2:8px;  --space-3:14px; --space-4:18px;
+  --space-5:24px; --space-6:28px; --space-8:36px; --space-10:44px;
+  --space-12:56px; --space-16:72px; --space-20:92px; --space-24:112px;
+
+  --radius-sm:8px; --radius-md:12px; --radius-lg:18px; --radius-full:999px;
+
+  --shadow-sm:0 2px 6px rgba(92,58,46,.08);
+  --shadow-md:0 8px 20px rgba(92,58,46,.12);
+  --shadow-lg:0 18px 40px rgba(92,58,46,.16);
+
+  --ease-standard:cubic-bezier(.25,.7,.3,1);
+  --duration-fast:160ms; --duration-normal:260ms; --duration-slow:400ms;
+
+  --border-width:1px;
+}
+
+body{ background:var(--bg); color:var(--text); font:400 var(--text-base)/var(--leading-normal) var(--font-body); }
+h1,h2,h3{ font-family:var(--font-display); color:var(--text); line-height:var(--leading-tight); }
+h1{ font-size:var(--text-4xl); }
+h2{ font-size:var(--text-3xl); }
+h3{ font-size:var(--text-xl); }
+p{ font-family:var(--font-body); line-height:var(--leading-relaxed); color:var(--text); }
+.card{ background:var(--surface); border:var(--border-width) solid var(--border); border-radius:var(--radius-lg); padding:var(--space-6); box-shadow:var(--shadow-sm); transition:box-shadow var(--duration-normal) var(--ease-standard); }
+.card:hover{ box-shadow:var(--shadow-md); }
+.btn{ font-family:var(--font-body); font-weight:600; border-radius:var(--radius-md); padding:var(--space-3) var(--space-5); border:none; cursor:pointer; transition:all var(--duration-fast) var(--ease-standard); }
+.btn-primary{ background:var(--accent); color:var(--text-on-accent); }
+.btn-primary:hover{ filter:brightness(1.06); }

@@ -1,0 +1,64 @@
+/* ================================================================
+   KIT COMPLET : "Arcade Neon"
+   Palette  : arcade-cabinet
+   Polices  : 'Press Start 2P', monospace (titres) + 'VT323', monospace (texte) + 'VT323', monospace (technique)
+   Registre : jeu vidéo rétro, borne d'arcade, culture pop années 80
+   Personnalité : saturé, contrasté, énergique, effet écran cathodique
+   ================================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+:root{
+  --bg:#0A0512;
+  --surface:#160B26;
+  --surface-alt:#1F1235;
+  --primary:#D6299E;
+  --primary-dark:#A81C7A;
+  --primary-light:#EB5FC1;
+  --accent:#2EE6E6;
+  --accent-dark:#1BBBBB;
+  --accent-light:#7FF5F5;
+  --text:#F3EAFB;
+  --text-muted:#9C8CB8;
+  --text-on-primary:#0A0512;
+  --text-on-accent:#031A1A;
+  --success:#3EE67A;
+  --warning:#F0D93D;
+  --danger:#F0473D;
+  --border:#2A1B45;
+
+  --font-display:'Press Start 2P', monospace;
+  --font-body:'VT323', monospace;
+  --font-mono:'VT323', monospace;
+
+  --text-xs:14px;   --text-sm:16px;  --text-base:19px;
+  --text-lg:22px;   --text-xl:1.4em;  --text-2xl:1.8em;
+  --text-3xl:2.4em;  --text-4xl:3em;
+  --leading-tight:1.2; --leading-normal:1.4; --leading-relaxed:1.5;
+
+  --space-1:4px;  --space-2:8px;  --space-3:12px; --space-4:16px;
+  --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px;
+  --space-12:48px; --space-16:64px; --space-20:80px; --space-24:96px;
+
+  --radius-sm:0px; --radius-md:0px; --radius-lg:0px; --radius-full:999px;
+
+  --shadow-sm:0 0 0 2px rgba(46,230,230,.5);
+  --shadow-md:0 0 20px rgba(214,41,158,.4);
+  --shadow-lg:0 0 40px rgba(46,230,230,.5);
+
+  --ease-standard:steps(2,end);
+  --duration-fast:60ms; --duration-normal:100ms; --duration-slow:160ms;
+
+  --border-width:1px;
+}
+
+body{ background:var(--bg); color:var(--text); font:400 var(--text-base)/var(--leading-normal) var(--font-body); }
+h1,h2,h3{ font-family:var(--font-display); color:var(--text); line-height:var(--leading-tight); }
+h1{ font-size:var(--text-4xl); }
+h2{ font-size:var(--text-3xl); }
+h3{ font-size:var(--text-xl); }
+p{ font-family:var(--font-body); line-height:var(--leading-relaxed); color:var(--text); }
+.card{ background:var(--surface); border:var(--border-width) solid var(--border); border-radius:var(--radius-lg); padding:var(--space-6); box-shadow:var(--shadow-sm); transition:box-shadow var(--duration-normal) var(--ease-standard); }
+.card:hover{ box-shadow:var(--shadow-md); }
+.btn{ font-family:var(--font-body); font-weight:600; border-radius:var(--radius-md); padding:var(--space-3) var(--space-5); border:none; cursor:pointer; transition:all var(--duration-fast) var(--ease-standard); }
+.btn-primary{ background:var(--accent); color:var(--text-on-accent); }
+.btn-primary:hover{ filter:brightness(1.06); }
