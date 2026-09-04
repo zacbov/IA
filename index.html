@@ -143,6 +143,7 @@
 <div id="inputbar">
   <button id="attach">📎</button>
   <button id="scan-code" title="Scanner du code" style="background:none; border:1px solid var(--line); color:var(--dim); width:44px; height:44px; border-radius:10px; font-size:16px; cursor:pointer; flex-shrink:0;">📷</button>
+  <button id="mic-btn" title="Dictée vocale" style="background:none; border:1px solid var(--line); color:var(--dim); width:44px; height:44px; border-radius:10px; font-size:16px; cursor:pointer; flex-shrink:0;">🎤</button>
   <textarea id="input" rows="1" placeholder="Écris ton message…"></textarea>
   <button id="send">➤</button>
 </div>
@@ -172,7 +173,7 @@
     <div style="font-size:11px;color:var(--dim);background:#0e1512;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.5;">
       ℹ️ Groq, Gemini, Mistral, Cerebras, OpenRouter, NVIDIA, Hugging Face, Cloudflare, Z.ai, Tripo3D et Hume sont désormais gérés par ton Worker Cloudflare — plus besoin de coller ces clés ici. Seuls les deux champs ci-dessous restent nécessaires (compétences qui n'utilisent pas encore le proxy).
     </div>
-    <div class="field"><label>GitHub Models</label><input type="password" id="key-github"><p>github.com/settings/tokens — utilisée aussi par les compétences GitHub (dépôts, commits, issues), pas encore proxyfiées.</p></div>
+    <div class="field"><label>GitHub</label><input type="password" id="key-github"><p>github.com/settings/tokens — GitHub Models (chat) a définitivement fermé le 30 juillet 2026. Cette clé sert désormais uniquement aux compétences GitHub (dépôts, commits, issues).</p></div>
     <div class="field"><label>Brave Search</label><input type="password" id="key-brave"><p>api.search.brave.com → gratuit 2000 requêtes/mois — pour une vraie recherche web.</p></div>
     <div class="divider"></div>
     <div style="font-size:11px;color:var(--dim);margin-bottom:6px;" class="mono">PROXY CLOUDFLARE (optionnel — cache tes clés côté serveur)</div>
@@ -353,7 +354,7 @@ async function loadKeysFromStorage(){
   try{ const raw = localStorage.getItem('routeur-ia-keys'); if(raw) KEYS = JSON.parse(raw); }catch(e){}
 }
 const ALL_KEY_IDS = ['groq','gemini','mistral','cerebras','openrouter','nvidia','hf','github','cloudflare','cf_account','zai','tripo','proxy_url','proxy_secret','brave','hume'];
-const PROXIED_IDS = ['groq','mistral','cerebras','openrouter','nvidia','hf','github','zai','gemini','tripo'];
+const PROXIED_IDS = ['groq','mistral','cerebras','openrouter','nvidia','hf','zai','gemini','tripo'];
 function reflectStatus(){
   ALL_KEY_IDS.forEach(id=>{
     const dot = document.getElementById('dot-'+id);
@@ -554,7 +555,25 @@ function renderMessage(m, index){
     const regenBtn = document.createElement('button');
     regenBtn.textContent = '🔄 Régénérer'; regenBtn.style.cssText = btnStyle;
     regenBtn.onclick = ()=> regenerate(index);
-    actions.appendChild(copyBtn); actions.appendChild(regenBtn);
+    const speakBtn = document.createElement('button');
+    speakBtn.textContent = '🔊'; speakBtn.title = 'Lire à voix haute'; speakBtn.style.cssText = btnStyle;
+    speakBtn.onclick = async ()=>{
+      const clean = (m.text||'').replace(/```[\s\S]*?```/g,' bloc de code. ').slice(0,3000);
+      speakBtn.disabled = true; const orig = speakBtn.textContent; speakBtn.textContent = '⏳';
+      try{
+        const blob = await fetchHumeAudio(clean);
+        new Audio(URL.createObjectURL(blob)).play();
+      }catch(e){
+        if('speechSynthesis' in window){
+          speechSynthesis.cancel();
+          const utter = new SpeechSynthesisUtterance(clean);
+          utter.lang = 'fr-FR';
+          speechSynthesis.speak(utter);
+        }
+      }
+      speakBtn.disabled = false; speakBtn.textContent = orig;
+    };
+    actions.appendChild(copyBtn); actions.appendChild(regenBtn); actions.appendChild(speakBtn);
     wrap.appendChild(actions);
   }
   if(m.role === 'user'){
@@ -622,16 +641,16 @@ const OA_PROVIDERS = {
   'mistral-code': { key:'mistral', url:'https://api.mistral.ai/v1/chat/completions', model:'codestral-latest', tag:'MISTRAL·CODE', cls:'engine-mistral' },
   openrouter: { url:'https://openrouter.ai/api/v1/chat/completions', model:'openai/gpt-oss-120b:free', tag:'OPENROUTER', cls:'engine-openrouter' },
   'openrouter-code': { key:'openrouter', url:'https://openrouter.ai/api/v1/chat/completions', model:'openai/gpt-oss-120b:free', tag:'OPENROUTER·CODE', cls:'engine-openrouter' },
-  nvidia: { url:'https://integrate.api.nvidia.com/v1/chat/completions', model:'meta/llama-3.3-70b-instruct', tag:'NVIDIA', cls:'engine-nvidia' },
+  nvidia: { url:'https://integrate.api.nvidia.com/v1/chat/completions', model:'nvidia/llama-3.3-nemotron-super-49b-v1.5', tag:'NVIDIA', cls:'engine-nvidia' },
   hf: { url:'https://router.huggingface.co/v1/chat/completions', model:'meta-llama/Llama-3.3-70B-Instruct', tag:'HF', cls:'engine-hf' },
-  zai: { url:'https://api.z.ai/api/paas/v4/chat/completions', model:'glm-4.6', tag:'Z.AI · GLM', cls:'engine-cerebras' },
+  zai: { url:'https://api.z.ai/api/paas/v4/chat/completions', model:'glm-5.2-flash', tag:'Z.AI · GLM', cls:'engine-cerebras' },
   llm7: { url:'https://api.llm7.io/v1/chat/completions', model:'default', tag:'LLM7', cls:'engine-hf' },
 };
 
 const ROUTES = {
-  chat:      ['groq','zai','mistral','openrouter','nvidia','github','hf','cerebras','llm7'],
-  code:      ['mistral-code','zai','openrouter-code','github','groq','hf','llm7'],
-  reasoning: ['gemini','github','nvidia','mistral','zai','cerebras'],
+  chat:      ['groq','zai','mistral','openrouter','nvidia','hf','llm7'],
+  code:      ['mistral-code','zai','openrouter-code','groq','hf','llm7'],
+  reasoning: ['gemini','nvidia','mistral','zai'],
   image:     ['pollinations','gemini'],
   vision:    ['gemini'],
 };
@@ -646,9 +665,8 @@ const SELECTABLE_ENGINES = [
   { key:'openrouter-code', label:'OpenRouter Qwen Coder', type:'text', needKey:'openrouter' },
   { key:'nvidia', label:'NVIDIA', type:'text', needKey:'nvidia' },
   { key:'hf', label:'Hugging Face', type:'text', needKey:'hf' },
-  { key:'github', label:'GitHub GPT-4o', type:'text', needKey:'github' },
-  { key:'gemini', label:'Gemini', type:'text', needKey:'gemini' },
   { key:'zai', label:'Z.ai GLM', type:'text', needKey:'zai' },
+  { key:'gemini', label:'Gemini', type:'text', needKey:'gemini' },
   { key:'llm7', label:'LLM7 (sans clé)', type:'text', needKey:null },
   { key:'gemini', label:'Gemini (image)', type:'image', needKey:'gemini' },
   { key:'pollinations', label:'Pollinations (image)', type:'image', needKey:null },
@@ -748,7 +766,7 @@ const DIAG_TARGETS = [
   { id:'groq', label:'Groq' }, { id:'cerebras', label:'Cerebras' }, { id:'mistral', label:'Mistral' },
   { id:'mistral-code', label:'Mistral Codestral' }, { id:'openrouter', label:'OpenRouter' },
   { id:'openrouter-code', label:'OpenRouter Qwen Coder' }, { id:'nvidia', label:'NVIDIA' },
-  { id:'hf', label:'Hugging Face' }, { id:'github', label:'GitHub GPT-4o' }, { id:'zai', label:'Z.ai' },
+  { id:'hf', label:'Hugging Face' }, { id:'zai', label:'Z.ai' },
   { id:'gemini-text', label:'Gemini (texte)' }, { id:'llm7', label:'LLM7' },
 ];
 
@@ -842,7 +860,7 @@ const SKILLS = [
   { type:'function', function:{ name:'github_list_issues', description:"Liste les issues ouvertes d'un dépôt GitHub", parameters:{ type:'object', properties:{ owner:{type:'string'}, repo:{type:'string'} }, required:['owner','repo'] } } },
   { type:'function', function:{ name:'generate_3d_model', description:"Génère un vrai modèle 3D (fichier .glb téléchargeable) à partir d'une description texte, via Tripo3D. Peut prendre 30 à 90 secondes.", parameters:{ type:'object', properties:{ prompt:{type:'string'} }, required:['prompt'] } } },
   { type:'function', function:{ name:'generate_music', description:"Génère un court morceau de musique instrumentale à partir d'une description texte (via Hugging Face MusicGen). ~10-15 secondes de musique, prend 20-60s à générer.", parameters:{ type:'object', properties:{ prompt:{type:'string', description:"Description du style/ambiance musicale souhaitée"} }, required:['prompt'] } } },
-  { type:'function', function:{ name:'text_to_speech', description:"Lit un texte à voix haute avec une vraie voix expressive (via Hume AI). Utilise seulement quand on demande explicitement d'entendre/écouter un texte.", parameters:{ type:'object', properties:{ text:{type:'string'}, description:{type:'string', description:"Description optionnelle du style vocal souhaité, ex: 'voix calme et posée'"} }, required:['text'] } } },
+  { type:'function', function:{ name:'text_to_speech', description:"Lit un texte à voix haute avec une vraie voix expressive (via Hume AI). Voix de femme par défaut. Utilise seulement quand on demande explicitement d'entendre/écouter un texte.", parameters:{ type:'object', properties:{ text:{type:'string'}, description:{type:'string', description:"Description optionnelle du style vocal souhaité (par défaut : voix de femme chaleureuse), ex: 'voix d'homme grave'"} }, required:['text'] } } },
   { type:'function', function:{ name:'remember', description:"Mémorise durablement un fait important sur l'utilisateur ou ses projets, pour t'en souvenir dans TOUTES ses futures conversations (pas juste celle-ci). N'utilise que pour de vraies informations durables (préférences, projets en cours, contexte récurrent) — jamais pour des détails ponctuels sans intérêt à long terme.", parameters:{ type:'object', properties:{ fact:{type:'string', description:"Le fait à retenir, formulé clairement et de façon autonome"} }, required:['fact'] } } },
   { type:'function', function:{ name:'translate_text', description:"Traduit un texte d'une langue vers une autre", parameters:{ type:'object', properties:{ text:{type:'string'}, from:{type:'string', description:"Code langue source, ex: fr"}, to:{type:'string', description:"Code langue cible, ex: en"} }, required:['text','to'] } } },
   { type:'function', function:{ name:'web_search_real', description:"Fait une vraie recherche web (pas juste Wikipédia) pour de l'actualité générale ou une question précise nécessitant des résultats web à jour", parameters:{ type:'object', properties:{ query:{type:'string'} }, required:['query'] } } },
@@ -1026,12 +1044,6 @@ function renderMemoryList(){
     btn.onclick = ()=>{ LONG_TERM_MEMORY.splice(+btn.dataset.i, 1); persistMemory(); renderMemoryList(); };
   });
 }
-function getSystemContext(){
-  const parts = [];
-  if(CUSTOM_INSTRUCTIONS) parts.push(CUSTOM_INSTRUCTIONS);
-  if(LONG_TERM_MEMORY.length) parts.push('Ce que tu sais déjà sur l\'utilisateur (mémorisé lors de conversations précédentes) :\n- ' + LONG_TERM_MEMORY.join('\n- '));
-  return parts.join('\n\n');
-}
 
 // --- CSS de référence (plusieurs fichiers) ---
 let CUSTOM_CSS_FILES = {}; // { id: {name, content} }
@@ -1187,6 +1199,20 @@ async function fetchJson(url, options, ms){
   const res = await fetchWithTimeout(url, options, ms || 10000);
   if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error('HTTP ' + res.status + ' ' + t.slice(0,120)); }
   return await safeJson(res);
+}
+
+async function fetchHumeAudio(text, description){
+  const useProxyTts = proxyActive();
+  if(!useProxyTts && !KEYS.hume) throw new Error('Clé Hume AI non configurée.');
+  const body = JSON.stringify({ utterances: [{ text, description: description || 'Voix de femme, chaleureuse, claire et naturelle, ton posé' }] });
+  const res = await fetchWithTimeout(
+    useProxyTts ? proxyTarget('hume-tts') : 'https://api.hume.ai/v0/tts/file',
+    { method:'POST',
+      headers: useProxyTts ? proxyHeaders() : { 'Content-Type':'application/json', 'X-Hume-Api-Key':KEYS.hume },
+      body },
+    30000);
+  if(!res.ok){ const t = await res.text().catch(()=>''); throw new Error(`HTTP ${res.status} ${t.slice(0,120)}`); }
+  return await res.blob();
 }
 
 async function runSkill(name, args){
@@ -1358,17 +1384,9 @@ async function runSkill(name, args){
       return 'Musique générée avec succès — le lecteur audio est apparu juste au-dessus dans le chat.';
     }
     if(name === 'text_to_speech'){
-      const useProxyTts = proxyActive();
-      if(!useProxyTts && !KEYS.hume) return 'Clé Hume AI non configurée.';
-      const body = JSON.stringify({ utterances: [{ text: args.text, description: args.description || undefined }] });
-      const res = await fetchWithTimeout(
-        useProxyTts ? proxyTarget('hume-tts') : 'https://api.hume.ai/v0/tts/file',
-        { method:'POST',
-          headers: useProxyTts ? proxyHeaders() : { 'Content-Type':'application/json', 'X-Hume-Api-Key':KEYS.hume },
-          body },
-        30000);
-      if(!res.ok){ const t = await res.text().catch(()=>''); return `Échec de la synthèse vocale (HTTP ${res.status}) ${t.slice(0,120)}`; }
-      const blob = await res.blob();
+      let blob;
+      try{ blob = await fetchHumeAudio(args.text, args.description); }
+      catch(e){ return `Échec de la synthèse vocale : ${e.message}`; }
       const audioUrl = URL.createObjectURL(blob);
       pushMessage({ role:'bot', cat:'VOIX', tag:'HUME · TTS', tagClass:'engine-cerebras', text:'🔊 "'+args.text.slice(0,80)+(args.text.length>80?'…':'')+'"', audioSrc:audioUrl });
       return 'Texte lu à voix haute avec succès — le lecteur audio est apparu juste au-dessus dans le chat.';
@@ -1479,7 +1497,7 @@ async function callOpenAICompatible(cfg, userText, history, onSkillUse, onChunk)
   const apiKey = useProxy ? null : KEYS[providerKey];
   const targetUrl = useProxy ? proxyTarget(providerKey) : cfg.url;
   const headers = useProxy ? proxyHeaders() : { 'Content-Type':'application/json', 'Authorization':'Bearer ' + apiKey };
-  const sysCtx = getSystemContext();
+  const sysCtx = currentSystemContext;
   let messages = sysCtx ? [{role:'system', content:sysCtx}, ...history, {role:'user', content:userText}] : [...history, {role:'user', content:userText}];
   let toolsEnabled = true;
   for(let round=0; round<3; round++){
@@ -1574,7 +1592,7 @@ async function callOpenAICompatible(cfg, userText, history, onSkillUse, onChunk)
   }
   return '(trop d\'appels d\'outils, réponse interrompue)';
 }
-const GEMINI_TEXT_CASCADE = ['gemini-flash-latest', 'gemini-2.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.5-flash-lite', 'gemma-4-27b-it'];
+const GEMINI_TEXT_CASCADE = ['gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-3-flash-preview', 'gemma-3-27b-it'];
 
 async function callGeminiText(userText, imagePart, history){
   const parts = [];
@@ -1583,7 +1601,7 @@ async function callGeminiText(userText, imagePart, history){
   const contents = history.map(h=>({ role: h.role==='assistant'?'model':'user', parts:[{text:h.content}] }));
   contents.push({ role:'user', parts });
   const useProxy = proxyActive();
-  const baseBody = getSystemContext() ? { contents, systemInstruction:{ parts:[{text:getSystemContext()}] } } : { contents };
+  const baseBody = currentSystemContext ? { contents, systemInstruction:{ parts:[{text:currentSystemContext}] } } : { contents };
 
   let lastErr = null;
   for(const model of GEMINI_TEXT_CASCADE){
@@ -1598,8 +1616,8 @@ async function callGeminiText(userText, imagePart, history){
       if(!res.ok){
         const t = await res.text().catch(()=> '');
         const err = new Error('HTTP ' + res.status + ' ' + t.slice(0,180));
-        // 429 = rafale sur CE modèle précis -> on tente le suivant, plus de marge
-        if(res.status === 429){ lastErr = err; continue; }
+        // 429 = rafale, 400/404 = modèle inexistant/retiré pour ce compte -> on tente le suivant
+        if(res.status === 429 || res.status === 400 || res.status === 404){ lastErr = err; continue; }
         throw err;
       }
       const data = await safeJson(res);
@@ -1610,11 +1628,11 @@ async function callGeminiText(userText, imagePart, history){
       if(!text || !text.trim()) throw new Error('Réponse vide reçue de Gemini.');
       return text;
     }catch(e){
-      if(e.message && e.message.includes('429')){ lastErr = e; continue; }
+      if(e.message && /\b(429|400|404)\b/.test(e.message)){ lastErr = e; continue; }
       throw e;
     }
   }
-  throw lastErr || new Error('Tous les modèles Gemini sont saturés (rafale).');
+  throw lastErr || new Error('Tous les modèles Gemini testés sont indisponibles.');
 }
 async function callGeminiImage(userText, imagePart){
   const parts = [];
@@ -1689,6 +1707,34 @@ async function callPollinationsImage(prompt){
 function chatHistoryFor(c){
   return c.messages.filter(m=>m.text && !m.isError).slice(-20).map(m=>({ role: m.role==='user'?'user':'assistant', content:m.text }));
 }
+
+async function updateHistorySummary(c){
+  if(c.summarizedUpTo === undefined) c.summarizedUpTo = 0;
+  const usable = c.messages.filter(m=>m.text && !m.isError);
+  const overflow = usable.length - 20; // ce qui dépasse la fenêtre active
+  if(overflow <= c.summarizedUpTo) return; // rien de nouveau à résumer
+  const toSummarize = usable.slice(c.summarizedUpTo, overflow);
+  if(!toSummarize.length) return;
+  const text = toSummarize.map(m=>(m.role==='user'?'Utilisateur: ':'IA: ')+m.text.slice(0,500)).join('\n');
+  try{
+    const prompt = c.historySummary
+      ? `Résumé existant de cette conversation :\n${c.historySummary}\n\nNouveaux échanges à intégrer au résumé :\n${text}\n\nRéponds uniquement avec le résumé mis à jour, fusionné et concis (5-8 phrases maximum), sans rien d'autre.`
+      : `Résume ces échanges de conversation en 5-8 phrases concises, en gardant les infos et décisions importantes :\n${text}`;
+    const summary = await callOpenAICompatible(OA_PROVIDERS.groq, prompt, []);
+    c.historySummary = summary.trim();
+    c.summarizedUpTo = overflow;
+    persistConvos();
+  }catch(e){ /* pas grave, on retentera au prochain message */ }
+}
+
+function getSystemContext(c){
+  const parts = [];
+  if(CUSTOM_INSTRUCTIONS) parts.push(CUSTOM_INSTRUCTIONS);
+  if(LONG_TERM_MEMORY.length) parts.push('Ce que tu sais déjà sur l\'utilisateur (mémorisé lors de conversations précédentes) :\n- ' + LONG_TERM_MEMORY.join('\n- '));
+  if(c && c.historySummary) parts.push('Résumé des échanges plus anciens de cette conversation (trop nombreux pour être inclus en entier) :\n' + c.historySummary);
+  return parts.join('\n\n');
+}
+let currentSystemContext = '';
 
 const EXT_MAP = { html:'html', htm:'html', javascript:'js', js:'js', jsx:'jsx', json:'json', css:'css', python:'py', py:'py', xml:'xml', yaml:'yml', yml:'yml', markdown:'md', md:'md', txt:'txt', sql:'sql', bash:'sh', sh:'sh', c:'c', cpp:'cpp', java:'java' };
 function extractCodeBlock(text){
@@ -1952,6 +1998,7 @@ Réponds uniquement par un seul mot parmi ces 5, rien d'autre.`;
 
 async function runRequest(text, pendingImage, targetC, classifyHint, forceCategory){
   const c = targetC || getCurrent();
+  currentSystemContext = getSystemContext(c);
   const hasAttachment = !!pendingImage;
   const category = forceCategory || await classifySmart(classifyHint || text, hasAttachment);
   if(category === 'code' && c.lastArtifact && !extractCodeBlock(text)){
@@ -2054,6 +2101,41 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
 }
 
 document.getElementById('scan-code').onclick = ()=> document.getElementById('camera-input').click();
+
+// --- Dictée vocale (native navigateur, gratuit, sans clé) ---
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+const micBtn = document.getElementById('mic-btn');
+if(!SpeechRec){
+  micBtn.style.display = 'none'; // pas supporté sur ce navigateur
+} else {
+  let recognizing = false;
+  let recognition = null;
+  micBtn.onclick = ()=>{
+    if(recognizing){ recognition.stop(); return; }
+    recognition = new SpeechRec();
+    recognition.lang = 'fr-FR';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = ()=>{
+      recognizing = true;
+      micBtn.textContent = '🔴';
+      micBtn.style.borderColor = 'var(--danger)'; micBtn.style.color = 'var(--danger)';
+    };
+    recognition.onresult = (event)=>{
+      const transcript = event.results[0][0].transcript;
+      inputEl.value = (inputEl.value ? inputEl.value + ' ' : '') + transcript;
+      inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight,110)+'px';
+      inputEl.focus();
+    };
+    recognition.onerror = ()=>{};
+    recognition.onend = ()=>{
+      recognizing = false;
+      micBtn.textContent = '🎤';
+      micBtn.style.borderColor = 'var(--line)'; micBtn.style.color = 'var(--dim)';
+    };
+    recognition.start();
+  };
+}
 document.getElementById('camera-input').onchange = async (e)=>{
   const f = e.target.files[0];
   document.getElementById('camera-input').value = '';
@@ -2107,11 +2189,11 @@ document.getElementById('project-mode-btn').onclick = ()=>{
 const PROJECT_ROLES = {
   content: [ { p:'groq', label:'GROQ' }, { p:'mistral', label:'MISTRAL' }, { p:'openrouter', label:'OPENROUTER' }, { p:'gemini', label:'GEMINI' } ],
   design:  [ { p:'zai', label:'Z.AI GLM' }, { p:'openrouter', label:'OPENROUTER' }, { p:'groq', label:'GROQ' }, { p:'cerebras', label:'CEREBRAS' }, { p:'mistral', label:'MISTRAL' } ],
-  code:    [ { p:'mistral-code', label:'MISTRAL CODESTRAL' }, { p:'zai', label:'Z.AI GLM' }, { p:'openrouter-code', label:'OPENROUTER QWEN CODER' }, { p:'github', label:'GITHUB GPT-4O' }, { p:'gemini', label:'GEMINI' } ],
+  code:    [ { p:'mistral-code', label:'MISTRAL CODESTRAL' }, { p:'zai', label:'Z.AI GLM' }, { p:'openrouter-code', label:'OPENROUTER QWEN CODER' }, { p:'gemini', label:'GEMINI' } ],
 };
 
 async function callAgent(providerKey, systemPrompt, userPrompt){
-  const sysCtx = getSystemContext();
+  const sysCtx = currentSystemContext;
   const fullSystem = sysCtx ? systemPrompt + '\n\nÀ respecter aussi : ' + sysCtx : systemPrompt;
   if(providerKey === 'gemini') return await callGeminiText(fullSystem + '\n\n' + userPrompt, null, []);
   const cfg = OA_PROVIDERS[providerKey];
