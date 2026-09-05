@@ -89,7 +89,7 @@
 <header>
   <div class="left">
     <button id="menu-btn">☰</button>
-    <div class="title mono">Routeur <b>IA</b> · <span id="current-title">Nouvelle conversation</span></div>
+    <div class="title mono">Routeur <b>IA</b> · <span id="current-title" style="text-decoration:underline dotted;cursor:pointer;">Nouvelle conversation</span></div>
   </div>
   <div style="display:flex; gap:6px;">
     <button id="knowledge-btn" title="Zone de dépôt du projet" style="background:none; border:1px solid var(--line); color:var(--dim); width:34px; height:34px; border-radius:6px; font-size:15px; cursor:pointer;">📚</button>
@@ -285,6 +285,15 @@
     <h2>📊 Usage du jour</h2>
     <div id="usage-list"></div>
     <button id="close-usage" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:16px;">Fermer</button>
+  </div>
+</div>
+
+<!-- Indicateur de contexte -->
+<div class="overlay" id="overlay-context" style="align-items:flex-end;">
+  <div id="sheet">
+    <h2>🧠 Contexte de cette conversation</h2>
+    <div id="context-details" style="font-size:12.5px;line-height:1.8;"></div>
+    <button id="close-context" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:16px;">Fermer</button>
   </div>
 </div>
 
@@ -758,6 +767,22 @@ document.getElementById('refresh-news').onclick = ()=> loadNews(true);
 document.getElementById('usage-btn').onclick = ()=>{ renderUsage(); document.getElementById('overlay-usage').classList.add('show'); };
 
 // --- Diagnostic des modèles ---
+document.getElementById('current-title').onclick = ()=>{
+  const c = getCurrent();
+  const total = c.messages.filter(m=>m.text && !m.isError).length;
+  const active = Math.min(total, 20);
+  const el = document.getElementById('context-details');
+  el.innerHTML = `
+    <div>📨 <b>${total}</b> message(s) utile(s) dans cette conversation</div>
+    <div>🔵 <b>${active}</b> des plus récents envoyés en entier à chaque demande</div>
+    <div>📝 Résumé des plus anciens : ${c.historySummary ? '<b>oui</b> ('+c.historySummary.length+' caractères)' : '<b>aucun pour l\'instant</b> (moins de 20 messages, ou pas encore généré)'}</div>
+    ${c.historySummary ? `<div style="margin-top:10px;padding:8px;background:#0e1512;border:1px solid var(--line);border-radius:8px;font-size:11.5px;color:var(--dim);">${escapeHtml(c.historySummary)}</div>` : ''}
+  `;
+  document.getElementById('overlay-context').classList.add('show');
+};
+document.getElementById('close-context').onclick = ()=> document.getElementById('overlay-context').classList.remove('show');
+document.getElementById('overlay-context').onclick = (e)=>{ if(e.target.id==='overlay-context') document.getElementById('overlay-context').classList.remove('show'); };
+
 document.getElementById('diag-btn').onclick = ()=>{ document.getElementById('overlay-diag').classList.add('show'); };
 document.getElementById('close-diag').onclick = ()=> document.getElementById('overlay-diag').classList.remove('show');
 document.getElementById('overlay-diag').onclick = (e)=>{ if(e.target.id==='overlay-diag') document.getElementById('overlay-diag').classList.remove('show'); };
@@ -800,6 +825,31 @@ document.getElementById('run-diag-btn').onclick = async ()=>{
 };
 
 // --- Zone de dépôt du projet (propre à chaque conversation) ---
+function chunkContent(content, targetChunks=30){
+  const chunkSize = Math.max(1200, Math.ceil(content.length / targetChunks));
+  const lines = content.split('\n');
+  const chunks = [];
+  let current = '';
+  for(const line of lines){
+    if(current.length + line.length > chunkSize && current){ chunks.push(current); current = ''; }
+    current += (current?'\n':'') + line;
+  }
+  if(current) chunks.push(current);
+  return chunks;
+}
+async function indexKnowledgeFile(f, progressCb){
+  const rawChunks = chunkContent(f.content);
+  f.chunks = [];
+  for(let i=0;i<rawChunks.length;i++){
+    if(progressCb) progressCb(i+1, rawChunks.length);
+    let summary = '(résumé indisponible)';
+    try{
+      summary = await callOpenAICompatible(OA_PROVIDERS.groq, `Résume en une phrase courte et précise ce que fait/contient cet extrait (code ou texte) :\n\n${rawChunks[i].slice(0,3000)}`, []);
+    }catch(e){}
+    f.chunks.push({ id:i, summary: summary.trim().slice(0,200), content: rawChunks[i] });
+  }
+}
+
 function renderKnowledgeList(){
   const c = getCurrent();
   document.getElementById('knowledge-convo-name').textContent = c.title;
@@ -821,12 +871,24 @@ document.getElementById('import-knowledge-btn').onclick = ()=> document.getEleme
 document.getElementById('knowledge-file-input').onchange = (e)=>{
   const f = e.target.files[0]; if(!f) return;
   const reader = new FileReader();
-  reader.onload = ()=>{
+  reader.onload = async ()=>{
     const c = getCurrent();
     if(!c.knowledgeFiles) c.knowledgeFiles = {};
     const id = 'kn' + Date.now();
-    c.knowledgeFiles[id] = { name:f.name, content:reader.result };
+    const fileObj = { name:f.name, content:reader.result };
+    c.knowledgeFiles[id] = fileObj;
     persistConvos(); renderKnowledgeList();
+    if(fileObj.content.length > 8000){
+      renderKnowledgeList(); // affiche tout de suite, avec état "indexation..."
+      const listEl = document.getElementById('knowledge-list');
+      const note = document.createElement('div');
+      note.style.cssText = 'font-size:11px;color:var(--dim);margin-bottom:8px;';
+      note.textContent = `⏳ Découpage et indexation de "${f.name}" en cours...`;
+      listEl.prepend(note);
+      await indexKnowledgeFile(fileObj, (i,total)=>{ note.textContent = `⏳ Indexation de "${f.name}" — morceau ${i}/${total}...`; });
+      persistConvos();
+      renderKnowledgeList();
+    }
   };
   reader.readAsText(f);
   document.getElementById('knowledge-file-input').value = '';
@@ -861,7 +923,7 @@ const SKILLS = [
   { type:'function', function:{ name:'generate_3d_model', description:"Génère un vrai modèle 3D (fichier .glb téléchargeable) à partir d'une description texte, via Tripo3D. Peut prendre 30 à 90 secondes.", parameters:{ type:'object', properties:{ prompt:{type:'string'} }, required:['prompt'] } } },
   { type:'function', function:{ name:'generate_music', description:"Génère un court morceau de musique instrumentale à partir d'une description texte (via Hugging Face MusicGen). ~10-15 secondes de musique, prend 20-60s à générer.", parameters:{ type:'object', properties:{ prompt:{type:'string', description:"Description du style/ambiance musicale souhaitée"} }, required:['prompt'] } } },
   { type:'function', function:{ name:'text_to_speech', description:"Lit un texte à voix haute avec une vraie voix expressive (via Hume AI). Voix de femme par défaut. Utilise seulement quand on demande explicitement d'entendre/écouter un texte.", parameters:{ type:'object', properties:{ text:{type:'string'}, description:{type:'string', description:"Description optionnelle du style vocal souhaité (par défaut : voix de femme chaleureuse), ex: 'voix d'homme grave'"} }, required:['text'] } } },
-  { type:'function', function:{ name:'remember', description:"Mémorise durablement un fait important sur l'utilisateur ou ses projets, pour t'en souvenir dans TOUTES ses futures conversations (pas juste celle-ci). N'utilise que pour de vraies informations durables (préférences, projets en cours, contexte récurrent) — jamais pour des détails ponctuels sans intérêt à long terme.", parameters:{ type:'object', properties:{ fact:{type:'string', description:"Le fait à retenir, formulé clairement et de façon autonome"} }, required:['fact'] } } },
+  { type:'function', function:{ name:'remember', description:"Mémorise durablement un fait important sur l'utilisateur ou ses projets créatifs/personnels, pour t'en souvenir dans TOUTES ses futures conversations. N'utilise que pour de vraies informations durables (préférences, projets en cours, contexte récurrent). INTERDIT ABSOLU : ne mémorise jamais d'URL, de clé API, de mot de passe, de token, ni aucun détail technique sur l'infrastructure de CET outil (Worker, proxy, endpoints) — ces informations ne doivent jamais apparaître dans du contenu généré pour d'autres projets.", parameters:{ type:'object', properties:{ fact:{type:'string', description:"Le fait à retenir, formulé clairement et de façon autonome"} }, required:['fact'] } } },
   { type:'function', function:{ name:'translate_text', description:"Traduit un texte d'une langue vers une autre", parameters:{ type:'object', properties:{ text:{type:'string'}, from:{type:'string', description:"Code langue source, ex: fr"}, to:{type:'string', description:"Code langue cible, ex: en"} }, required:['text','to'] } } },
   { type:'function', function:{ name:'web_search_real', description:"Fait une vraie recherche web (pas juste Wikipédia) pour de l'actualité générale ou une question précise nécessitant des résultats web à jour", parameters:{ type:'object', properties:{ query:{type:'string'} }, required:['query'] } } },
   { type:'function', function:{ name:'iss_location', description:"Donne la position actuelle de la Station Spatiale Internationale", parameters:{ type:'object', properties:{} } } },
@@ -1392,6 +1454,10 @@ async function runSkill(name, args){
       return 'Texte lu à voix haute avec succès — le lecteur audio est apparu juste au-dessus dans le chat.';
     }
     if(name === 'remember'){
+      const looksLikeSecret = /workers\.dev|APP_SECRET|api[_.]?key|bearer\s|token|\bhttps?:\/\/\S+\.(dev|workers)\b|sk-[a-z0-9]|gsk_|ghp_/i.test(args.fact);
+      if(looksLikeSecret){
+        return "Refusé : ce fait ressemble à une URL, une clé ou un secret d'infrastructure — je ne mémorise jamais ce type d'information pour éviter qu'elle ne fuite dans d'autres projets.";
+      }
       if(!LONG_TERM_MEMORY.includes(args.fact)){
         LONG_TERM_MEMORY.push(args.fact);
         await persistMemory();
@@ -2098,6 +2164,7 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
     pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:friendlyError(err), isError:true });
   }
   persistConvos();
+  updateHistorySummary(c); // asynchrone, pas bloquant pour l'affichage
 }
 
 document.getElementById('scan-code').onclick = ()=> document.getElementById('camera-input').click();
@@ -2241,6 +2308,7 @@ function renderProjectStatus(card, steps){
 }
 
 async function runProjectPipeline(prompt, c){
+  currentSystemContext = getSystemContext(c);
   const statusBubble = pushMessage({ role:'bot', cat:'PROJET', tag:'PIPELINE MULTI-AGENTS', tagClass:'engine-mistral', text:'' });
   const card = document.createElement('div');
   card.style.cssText = 'border:1px solid var(--line);border-radius:8px;padding:10px 12px;';
