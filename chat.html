@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0b0f0d; color: #e8e8e4; height: 100vh; display: flex; flex-direction: column;
+  }
+  #setup {
+    padding: 16px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #222;
+  }
+  #setup.hidden { display: none; }
+  #setup label { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #999; }
+  #setup input, #setup textarea {
+    width: 100%; background: #14201a; border: 1px solid #2a3d33; color: #e8e8e4;
+    padding: 9px 10px; border-radius: 8px; font-size: 13px; font-family: inherit;
+  }
+  #setup textarea { min-height: 90px; resize: vertical; }
+  #setup button {
+    background: #e0a34a; border: none; color: #1a1208; font-weight: 700;
+    padding: 11px; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 4px;
+  }
+  #topbar {
+    display: flex; align-items: center; justify-content: space-between; padding: 10px 14px;
+    border-bottom: 1px solid #222; flex-shrink: 0;
+  }
+  #topbar.hidden { display: none; }
+  #topbar span { font-size: 12px; color: #999; font-family: monospace; }
+  #topbar button {
+    background: none; border: 1px solid #333; color: #999; border-radius: 6px;
+    padding: 5px 10px; font-size: 11px; cursor: pointer;
+  }
+  #messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  #messages.hidden { display: none; }
+  .msg { max-width: 82%; padding: 10px 13px; border-radius: 12px; font-size: 14.5px; line-height: 1.45; white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; background: #e0a34a; color: #1a1208; }
+  .msg.bot { align-self: flex-start; background: #17221c; border: 1px solid #263329; }
+  .msg.err { align-self: center; background: #3a1414; color: #e0a0a0; font-size: 12.5px; font-family: monospace; }
+  #inputbar { display: flex; gap: 8px; padding: 10px 12px calc(env(safe-area-inset-bottom,0px) + 10px); border-top: 1px solid #222; flex-shrink: 0; }
+  #inputbar.hidden { display: none; }
+  #inputbar textarea {
+    flex: 1; resize: none; background: #14201a; border: 1px solid #2a3d33; color: #e8e8e4;
+    border-radius: 10px; padding: 11px 12px; font-size: 15px; font-family: inherit; max-height: 100px;
+  }
+  #send { background: #e0a34a; border: none; color: #1a1208; font-weight: 700; width: 46px; border-radius: 10px; font-size: 18px; cursor: pointer; flex-shrink: 0; }
+  #send:disabled { background: #3a3a34; color: #777; }
+  .typing { align-self: flex-start; color: #777; font-size: 13px; font-style: italic; padding: 4px 4px; }
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <div>
+    <label>Mot de passe (worker)</label>
+    <input type="password" id="password" placeholder="Mot de passe">
+  </div>
+  <div>
+    <label>Prompt système / personnalité</label>
+    <textarea id="systemPrompt" placeholder="Décris ici le personnage, le ton, le style de réponse attendu..."></textarea>
+  </div>
+  <button id="startBtn">Démarrer la conversation</button>
+</div>
+
+<div id="topbar" class="hidden">
+  <span>Session active</span>
+  <button id="resetBtn">↺ Réinitialiser</button>
+</div>
+
+<div id="messages" class="hidden"></div>
+
+<div id="inputbar" class="hidden">
+  <textarea id="input" rows="1" placeholder="Écris ton message..."></textarea>
+  <button id="send">➤</button>
+</div>
+
+<script>
+const WORKER_URL = 'https://routeur-ia-proxy.zacharybov.workers.dev';
+const HISTORY_WINDOW = 8;
+
+let password = '';
+let systemPrompt = '';
+let history = [];
+
+const setup = document.getElementById('setup');
+const topbar = document.getElementById('topbar');
+const messagesEl = document.getElementById('messages');
+const inputbar = document.getElementById('inputbar');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  password = document.getElementById('password').value.trim();
+  systemPrompt = document.getElementById('systemPrompt').value.trim();
+  if (!password) {
+    alert('Entre le mot de passe du worker.');
+    return;
+  }
+  setup.classList.add('hidden');
+  topbar.classList.remove('hidden');
+  messagesEl.classList.remove('hidden');
+  inputbar.classList.remove('hidden');
+  history = [];
+  if (systemPrompt) {
+    sendToWorker('__init__');
+  }
+  input.focus();
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  history = [];
+  messagesEl.innerHTML = '';
+  if (systemPrompt) {
+    sendToWorker('__init__');
+  }
+});
+
+function addMessage(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  div.textContent = text;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+
+function buildPayload(userText, isInit) {
+  const recent = history.slice(-HISTORY_WINDOW);
+  let parts = [];
+  if (systemPrompt) {
+    parts.push('[INSTRUCTIONS SYSTÈME]\n' + systemPrompt);
+  }
+  if (recent.length) {
+    const convo = recent.map(m => (m.role === 'user' ? 'Utilisateur: ' : 'Assistant: ') + m.content).join('\n');
+    parts.push('[HISTORIQUE RÉCENT]\n' + convo);
+  }
+  if (isInit) {
+    parts.push('[TÂCHE]\nInitie la conversation maintenant, en restant fidèle au personnage et au ton décrits ci-dessus. Un seul message.');
+  } else {
+    parts.push('[NOUVEAU MESSAGE UTILISATEUR]\n' + userText);
+  }
+  return parts.join('\n\n');
+}
+
+async function sendToWorker(userText) {
+  const isInit = userText === '__init__';
+  let typingEl = null;
+  try {
+    sendBtn.disabled = true;
+    typingEl = addMessage('...', 'typing');
+    typingEl.classList.remove('msg');
+
+    const payload = buildPayload(userText, isInit);
+
+    const response = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${password}`
+      },
+      body: JSON.stringify({ message: payload })
+    });
+
+    typingEl.remove();
+
+    if (!response.ok) {
+      const errText = await response.text();
+      addMessage('Erreur ' + response.status + ' : ' + errText.slice(0, 200), 'err');
+      return;
+    }
+
+    const data = await response.json();
+    const botText = data.response || data.message || JSON.stringify(data);
+
+    addMessage(botText, 'bot');
+    if (!isInit) {
+      history.push({ role: 'user', content: userText });
+    }
+    history.push({ role: 'assistant', content: botText });
+
+  } catch (err) {
+    if (typingEl) typingEl.remove();
+    addMessage('Erreur réseau : ' + err.message, 'err');
+  } finally {
+    sendBtn.disabled = false;
+  }
+}
+
+function handleSend() {
+  const text = input.value.trim();
+  if (!text) return;
+  addMessage(text, 'user');
+  input.value = '';
+  input.style.height = 'auto';
+  sendToWorker(text);
+}
+
+sendBtn.addEventListener('click', handleSend);
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    handleSend();
+  }
+});
+input.addEventListener('input', () => {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+});
+</script>
+</body>
+</html>
