@@ -78,7 +78,8 @@
 </div>
 
 <script>
-const WORKER_URL = 'https://routeur-ia-proxy.zacharybov.workers.dev';
+const WORKER_URL = 'https://routeur-ia-proxy.zacharybov.workers.dev/proxy/groq';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const HISTORY_WINDOW = 8;
 
 let password = '';
@@ -127,22 +128,21 @@ function addMessage(text, cls) {
   return div;
 }
 
-function buildPayload(userText, isInit) {
+function buildMessages(userText, isInit) {
   const recent = history.slice(-HISTORY_WINDOW);
-  let parts = [];
+  const messages = [];
   if (systemPrompt) {
-    parts.push('[INSTRUCTIONS SYSTÈME]\n' + systemPrompt);
+    messages.push({ role: 'system', content: systemPrompt });
   }
-  if (recent.length) {
-    const convo = recent.map(m => (m.role === 'user' ? 'Utilisateur: ' : 'Assistant: ') + m.content).join('\n');
-    parts.push('[HISTORIQUE RÉCENT]\n' + convo);
+  for (const m of recent) {
+    messages.push({ role: m.role, content: m.content });
   }
   if (isInit) {
-    parts.push('[TÂCHE]\nInitie la conversation maintenant, en restant fidèle au personnage et au ton décrits ci-dessus. Un seul message.');
+    messages.push({ role: 'user', content: 'Initie la conversation maintenant, en restant fidèle au personnage et au ton décrits dans tes instructions système. Un seul message.' });
   } else {
-    parts.push('[NOUVEAU MESSAGE UTILISATEUR]\n' + userText);
+    messages.push({ role: 'user', content: userText });
   }
-  return parts.join('\n\n');
+  return messages;
 }
 
 async function sendToWorker(userText) {
@@ -153,15 +153,15 @@ async function sendToWorker(userText) {
     typingEl = addMessage('...', 'typing');
     typingEl.classList.remove('msg');
 
-    const payload = buildPayload(userText, isInit);
+    const messages = buildMessages(userText, isInit);
 
     const response = await fetch(WORKER_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${password}`
+        'X-App-Secret': password
       },
-      body: JSON.stringify({ message: payload })
+      body: JSON.stringify({ model: GROQ_MODEL, messages: messages })
     });
 
     typingEl.remove();
@@ -173,7 +173,7 @@ async function sendToWorker(userText) {
     }
 
     const data = await response.json();
-    const botText = data.response || data.message || JSON.stringify(data);
+    const botText = data?.choices?.[0]?.message?.content || JSON.stringify(data);
 
     addMessage(botText, 'bot');
     if (!isInit) {
