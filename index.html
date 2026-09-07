@@ -648,8 +648,8 @@ const OA_PROVIDERS = {
   cerebras: { url:'https://api.cerebras.ai/v1/chat/completions', model:'gpt-oss-120b', tag:'CEREBRAS', cls:'engine-cerebras' },
   mistral: { url:'https://api.mistral.ai/v1/chat/completions', model:'mistral-small-latest', tag:'MISTRAL', cls:'engine-mistral' },
   'mistral-code': { key:'mistral', url:'https://api.mistral.ai/v1/chat/completions', model:'codestral-latest', tag:'MISTRAL·CODE', cls:'engine-mistral' },
-  openrouter: { url:'https://openrouter.ai/api/v1/chat/completions', model:'openai/gpt-oss-120b:free', tag:'OPENROUTER', cls:'engine-openrouter' },
-  'openrouter-code': { key:'openrouter', url:'https://openrouter.ai/api/v1/chat/completions', model:'openai/gpt-oss-120b:free', tag:'OPENROUTER·CODE', cls:'engine-openrouter' },
+  openrouter: { url:'https://openrouter.ai/api/v1/chat/completions', models:['openai/gpt-oss-120b:free','openai/gpt-oss-20b:free','meta-llama/llama-3.2-3b-instruct:free','google/gemma-2-9b-it:free','qwen/qwen-2.5-72b-instruct:free'], tag:'OPENROUTER', cls:'engine-openrouter' },
+  'openrouter-code': { key:'openrouter', url:'https://openrouter.ai/api/v1/chat/completions', models:['openai/gpt-oss-120b:free','qwen/qwen-2.5-72b-instruct:free','openai/gpt-oss-20b:free','google/gemma-2-9b-it:free'], tag:'OPENROUTER·CODE', cls:'engine-openrouter' },
   nvidia: { url:'https://integrate.api.nvidia.com/v1/chat/completions', model:'nvidia/llama-3.3-nemotron-super-49b-v1.5', tag:'NVIDIA', cls:'engine-nvidia' },
   hf: { url:'https://router.huggingface.co/v1/chat/completions', model:'meta-llama/Llama-3.3-70B-Instruct', tag:'HF', cls:'engine-hf' },
   zai: { url:'https://api.z.ai/api/paas/v4/chat/completions', model:'glm-5.2-flash', tag:'Z.AI · GLM', cls:'engine-cerebras' },
@@ -1266,7 +1266,11 @@ async function fetchJson(url, options, ms){
 async function fetchHumeAudio(text, description){
   const useProxyTts = proxyActive();
   if(!useProxyTts && !KEYS.hume) throw new Error('Clé Hume AI non configurée.');
-  const body = JSON.stringify({ utterances: [{ text, description: description || 'Voix de femme, chaleureuse, claire et naturelle, ton posé' }] });
+  const body = JSON.stringify({ utterances: [{
+    text,
+    voice: { id: '9e1f9e4f-691a-4bb0-b87c-e306a4c838ef', provider: 'HUME_AI' },
+    description: description || 'Voix chaleureuse, claire et naturelle, ton posé'
+  }] });
   const res = await fetchWithTimeout(
     useProxyTts ? proxyTarget('hume-tts') : 'https://api.hume.ai/v0/tts/file',
     { method:'POST',
@@ -1727,7 +1731,7 @@ async function callGeminiImage(userText, imagePart){
 
 function friendlyError(err){
   const msg = String(err && err.message || err || '');
-  if(msg.includes('429')) return "Plus de crédit gratuit disponible pour ce moteur aujourd'hui (quota atteint). Réessaie plus tard ou utilise-en un autre.";
+  if(msg.includes('429')) return "Trop de requêtes envoyées d'un coup à ce moteur (limite par minute) — pas forcément épuisé pour la journée, ça se libère en général en quelques secondes/minutes.";
   if(msg.includes('401') || msg.includes('403')) return "Clé refusée par ce moteur — vérifie qu'elle est correcte dans ⚙.";
   if(msg.includes('404')) return "Ce modèle n'existe plus chez ce fournisseur.";
   if(/reduce the length|maximum context|tokens_limit_reached|too large|context_length_exceeded/i.test(msg)) return "Message trop volumineux pour ce moteur (dépasse sa limite de contexte).";
@@ -2025,8 +2029,13 @@ async function tryWithRetry(fn){
   try{ return await fn(); }
   catch(err){
     const m = String(err && err.message || err || '');
-    if(m.includes('429') || m.includes('401') || m.includes('403') || m.includes('404')) throw err;
+    if(m.includes('401') || m.includes('403') || m.includes('404')) throw err;
     if(/reduce the length|maximum context|tokens_limit_reached|too large|context_length_exceeded/i.test(m)) throw err;
+    if(m.includes('429')){
+      // souvent une limite par minute (rafale), pas un vrai quota journalier épuisé -> on laisse le temps de se libérer
+      await new Promise(r=>setTimeout(r, 6000));
+      return await fn();
+    }
     await new Promise(r=>setTimeout(r, 600));
     return await fn();
   }
