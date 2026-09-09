@@ -945,7 +945,7 @@ const MODEL_DISCOVERY = {
 // Familles jugées fiables, dans l'ordre de préférence (pour trier le catalogue live)
 const PREFER_GENERAL = [/gpt-oss/i, /deepseek/i, /llama-3\.3/i, /qwen.*(3|2\.5)/i, /mistral|ministral|devstral/i, /glm-4/i, /gemma-3/i, /nemotron/i];
 const PREFER_CODE    = [/coder|codestral|devstral/i, /deepseek/i, /gpt-oss/i, /qwen.*(3|2\.5)/i, /glm-4/i];
-const EXCLUDE_MODEL  = /(embed|rerank|whisper|tts|stable-diffusion|flux|image|vision-only|guard|moderation)/i;
+const EXCLUDE_MODEL  = /(embed|rerank|whisper|tts|speech|audio|music|lyria|veo|imagen|sora|clip|omni|stable-diffusion|flux|image|vision-only|guard|moderation)/i;
 
 function scoreModel(id, prefer){
   for(let i=0;i<prefer.length;i++){ if(prefer[i].test(id)) return i; }
@@ -953,9 +953,11 @@ function scoreModel(id, prefer){
 }
 function orderModels(list, prefer){
   return list.slice().sort((a,b)=>{
+    const ta = a.tools === false ? 1 : 0, tb = b.tools === false ? 1 : 0;
+    if(ta !== tb) return ta - tb;                    // sait gérer le function calling
     const d = scoreModel(a.id, prefer) - scoreModel(b.id, prefer);
-    if(d !== 0) return d;
-    return (b.ctx||0) - (a.ctx||0);
+    if(d !== 0) return d;                            // famille fiable
+    return (b.ctx||0) - (a.ctx||0);                  // plus grand contexte
   }).map(m=>m.id);
 }
 async function fetchCatalog(providerKey){
@@ -968,14 +970,26 @@ async function fetchCatalog(providerKey){
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     const raw = Array.isArray(data) ? data : (data.data || data.models || []);
-    const list = raw.map(m=>({
-      id: m.id || m.name,
-      ctx: m.context_length || m.context_window || m.max_context_length || 0,
-      free: disc.freeOnly
-        ? (String(m.id||'').endsWith(':free') || (Number(m.pricing?.prompt||0) === 0 && Number(m.pricing?.completion||0) === 0))
-        : true,
-      tools: m.supported_parameters ? m.supported_parameters.includes('tools') : null,
-    })).filter(m => m.id && m.free && !EXCLUDE_MODEL.test(m.id));
+    const list = raw.map(m=>{
+      const arch = m.architecture || {};
+      const outs = arch.output_modalities || null;
+      const ins  = arch.input_modalities  || null;
+      // un modèle qui ne SORT pas que du texte n'a rien à faire dans un chat
+      let modalityOk = true;
+      if(Array.isArray(outs)) modalityOk = outs.includes('text') && outs.length === 1;
+      if(modalityOk && Array.isArray(ins)) modalityOk = ins.includes('text');
+      return {
+        id: m.id || m.name,
+        ctx: m.context_length || m.context_window || m.max_context_length || 0,
+        free: disc.freeOnly
+          ? (String(m.id||'').endsWith(':free') || (Number(m.pricing?.prompt||0) === 0 && Number(m.pricing?.completion||0) === 0))
+          : true,
+        modalityOk,
+        // le routeur envoie systématiquement des outils : un modèle qui ne les
+        // gère pas renvoie un 400 sec. On le sait à l'avance, on le déclasse.
+        tools: m.supported_parameters ? m.supported_parameters.includes('tools') : null,
+      };
+    }).filter(m => m.id && m.free && m.modalityOk && !EXCLUDE_MODEL.test(m.id));
     if(!list.length) throw new Error('catalogue vide');
     MODEL_CACHE[providerKey] = { list, ts: Date.now() };
     try{ localStorage.setItem('routeur-ia-catalogs', JSON.stringify(MODEL_CACHE)); }catch(e){}
@@ -1012,7 +1026,12 @@ async function resolveModels(providerKey, cfg, viewKey){
       const ids = catalog.map(m=>m.id);
       const live = orderModels(catalog, cfg.prefer || PREFER_GENERAL);
       const stillThere = list.filter(m => ids.includes(m)); // nos favoris, seulement s'ils existent encore
-      list = [...new Set([...stillThere, ...live])];
+      // preferKnown : le catalogue sert seulement à vérifier que nos favoris
+      // existent toujours, il ne sert pas à en ajouter (cas LLM7, où la plupart
+      // des modèles listés sont payants et répondent 402).
+      list = cfg.preferKnown && stillThere.length
+        ? stillThere
+        : [...new Set([...stillThere, ...live])];
     }
   }
   const usable = list.filter(m => !isModelDead(providerKey, m));
@@ -1028,10 +1047,13 @@ const OA_PROVIDERS = {
     models:['openai/gpt-oss-120b:free','deepseek/deepseek-chat-v3.1:free','meta-llama/llama-3.3-70b-instruct:free','qwen/qwen3-235b-a22b:free','google/gemma-3-27b-it:free'], tag:'OPENROUTER', cls:'engine-openrouter' },
   'openrouter-code': { key:'openrouter', url:'https://openrouter.ai/api/v1/chat/completions', routerFallback:true, prefer:PREFER_CODE,
     models:['qwen/qwen3-coder:free','deepseek/deepseek-chat-v3.1:free','openai/gpt-oss-120b:free','qwen/qwen-2.5-coder-32b-instruct:free'], tag:'OPENROUTER·CODE', cls:'engine-openrouter' },
-  nvidia: { url:'https://integrate.api.nvidia.com/v1/chat/completions', models:['meta/llama-3.3-70b-instruct','nvidia/llama-3.3-nemotron-super-49b-v1.5','qwen/qwen2.5-coder-32b-instruct','mistralai/mistral-small-24b-instruct','meta/llama-3.1-8b-instruct'], tag:'NVIDIA', cls:'engine-nvidia' },
+  nvidia: { url:'https://integrate.api.nvidia.com/v1/chat/completions', timeout:60000, models:['meta/llama-3.3-70b-instruct','nvidia/llama-3.3-nemotron-super-49b-v1.5','qwen/qwen2.5-coder-32b-instruct','mistralai/mistral-small-24b-instruct','meta/llama-3.1-8b-instruct'], tag:'NVIDIA', cls:'engine-nvidia' },
   hf: { url:'https://router.huggingface.co/v1/chat/completions', models:['meta-llama/Llama-3.3-70B-Instruct','Qwen/Qwen2.5-72B-Instruct','meta-llama/Llama-3.1-8B-Instruct','mistralai/Mistral-7B-Instruct-v0.3'], tag:'HF', cls:'engine-hf' },
   zai: { url:'https://api.z.ai/api/paas/v4/chat/completions', models:['glm-4.5-flash','glm-4-flash','glm-4.5-air','glm-4.6'], tag:'Z.AI · GLM', cls:'engine-cerebras' },
-  llm7: { url:'https://api.llm7.io/v1/chat/completions', models:['gpt-5-nano','gpt-4o-mini-2024-07-18','deepseek-v3','mistral-small-2503'], tag:'LLM7', cls:'engine-hf' },
+  // LLM7 liste ~43 modèles mais n'en offre qu'une poignée en gratuit : les autres
+  // renvoient 402. On garde donc nos favoris connus gratuits en priorité.
+  llm7: { url:'https://api.llm7.io/v1/chat/completions', preferKnown:true,
+    models:['deepseek-v3-0324','gpt-4o-mini','qwen2.5-coder-32b','mistral-small-3.1-24b','deepseek-r1-0528'], tag:'LLM7', cls:'engine-hf' },
 };
 
 const ROUTES = {
@@ -1723,7 +1745,7 @@ async function runSkill(name, args){
         res = await fetchWithTimeout(c.url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ [c.paramName]: value }) }, 15000);
       }
       const text = await res.text();
-      if(!res.ok) return `Erreur du connecteur "${c.name}" (HTTP ${res.status}) : ${text.slice(0,150)}`;
+      if(!res.ok) return `Erreur du connecteur "${c.name}" (HTTP ${res.status}) : ${text.slice(0,400)}`;
       return text.slice(0, 1500);
     }
     if(name === 'get_weather'){
@@ -2025,16 +2047,20 @@ async function runOACall(cfg, providerKey, model, candidates, userText, history,
       if(others.length) body.models = [model, ...others];
     }
     if(toolsEnabled){ body.tools = getSkills(); body.tool_choice = 'auto'; }
-    const res = await fetchWithTimeout(targetUrl, { method:'POST', headers, body: JSON.stringify(body) }, 30000);
+    const timeout = cfg.timeout || 30000;
+    const res = await fetchWithTimeout(targetUrl, { method:'POST', headers, body: JSON.stringify(body) }, timeout);
     if(!res.ok){
       const t = await res.text().catch(()=> '');
-      const kind = classifyHttpError(res.status, t);
+      let kind = classifyHttpError(res.status, t);
+      // "no endpoints support tool use", "tools not supported"… : c'est la requête
+      // qui ne convient pas, pas le modèle. On retente sans outils avant de le juger.
+      if(toolsEnabled && /tool|function[ _-]?call/i.test(t)) kind = 'bad';
       if(kind === 'bad' && toolsEnabled){
         // certains moteurs (ex: Z.ai sur modèle gratuit) refusent le function calling -> on retente sans
         toolsEnabled = false;
         round--; continue;
       }
-      const err = new Error('HTTP ' + res.status + ' [' + model + '] ' + t.slice(0,150));
+      const err = new Error('HTTP ' + res.status + ' [' + model + '] ' + t.slice(0,400));
       const ra = parseInt(res.headers.get('retry-after') || '', 10);
       registerFailure(providerKey, model, res.status, t, err);
       if(kind === 'rate' && isFinite(ra) && ra > 0) coolDown(providerKey, ra * 1000, 'limite de débit atteinte (429)');
@@ -2158,7 +2184,7 @@ async function callClaude(userText, history, opts){
       90000);
     if(!res.ok){
       const t = await res.text().catch(()=>'');
-      const err = new Error('HTTP '+res.status+' ['+model+'] '+t.slice(0,150));
+      const err = new Error('HTTP '+res.status+' ['+model+'] '+t.slice(0,400));
       const kind = registerFailure('claude_sfr', model, res.status, t, err);
       lastErr = err;
       if(err.__nextModel && kind === 'model') continue; // nom de modèle périmé -> on tente le suivant
@@ -2184,8 +2210,11 @@ async function callGeminiText(userText, imagePart, history){
   const blocked = providerBlockReason('gemini');
   if(blocked) throw new Error('Moteur en pause : ' + blocked);
 
-  const cascade = GEMINI_TEXT_CASCADE.filter(m => !isModelDead('gemini', m));
-  const tries = cascade.length ? cascade : GEMINI_TEXT_CASCADE.slice(0, 2);
+  // Le Worker connaît les modèles réellement activés sur TA clé : on lui fait confiance.
+  const gcat = await fetchProxyCatalog(false);
+  const base = (gcat && gcat.gemini && gcat.gemini.length) ? gcat.gemini : GEMINI_TEXT_CASCADE;
+  const cascade = base.filter(m => !isModelDead('gemini', m));
+  const tries = cascade.length ? cascade : base.slice(0, 2);
   let lastErr = null;
   for(const model of tries){
     try{
@@ -2198,7 +2227,7 @@ async function callGeminiText(userText, imagePart, history){
         }, 45000);
       if(!res.ok){
         const t = await res.text().catch(()=> '');
-        const err = new Error('HTTP ' + res.status + ' [' + model + '] ' + t.slice(0,150));
+        const err = new Error('HTTP ' + res.status + ' [' + model + '] ' + t.slice(0,400));
         // 404/400 = modèle retiré pour ce compte, 429 = rafale, 5xx = surcharge -> on tente le suivant
         registerFailure('gemini', model, res.status, t, err);
         if(err.__nextModel || res.status === 429){ lastErr = err; continue; }
@@ -2239,7 +2268,7 @@ async function callGeminiImage(userText, imagePart){
   const imgPart = respParts.find(p => p.inlineData || p.inline_data);
   const textPart = respParts.find(p => p.text);
   const inline = imgPart ? (imgPart.inlineData || imgPart.inline_data) : null;
-  if(!inline) throw new Error(textPart ? ('Gemini a répondu sans image : ' + textPart.text.slice(0,150)) : 'Gemini n\'a produit aucune image.');
+  if(!inline) throw new Error(textPart ? ('Gemini a répondu sans image : ' + textPart.text.slice(0,400)) : 'Gemini n\'a produit aucune image.');
   return { text: textPart?textPart.text:'', imgSrc: `data:${inline.mimeType||inline.mime_type};base64,${inline.data}` };
 }
 
@@ -2844,7 +2873,7 @@ async function callAgent(providerKey, systemPrompt, userPrompt){
     }, 60000);
     if(!res.ok){
       const t = await res.text().catch(()=>'');
-      const err = new Error('HTTP '+res.status+' ['+model+'] '+t.slice(0,150));
+      const err = new Error('HTTP '+res.status+' ['+model+'] '+t.slice(0,400));
       registerFailure(needKey, model, res.status, t, err);
       lastErr = err;
       if(err.__nextModel) continue;
