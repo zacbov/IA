@@ -881,6 +881,10 @@ function loadHealth(){
 // Traduit un code HTTP + le corps de la réponse en décision de routage
 function classifyHttpError(status, bodyText){
   const b = (bodyText || '').toLowerCase();
+  // Anthropic renvoie 400 invalid_request_error quand le solde API est vide.
+  // Sans ce test, l'app croit que c'est le modèle et met TOUS les Claude en
+  // quarantaine un par un, alors que c'est le compte qui n'a pas de crédit.
+  if(/credit balance|insufficient (credit|balance|quota|funds)|billing|payment required|solde/.test(b)) return 'credit';
   if(status === 401 || status === 403) return 'key';
   if(status === 402) return 'credit';
   if(status === 429) return 'rate';
@@ -953,7 +957,9 @@ function scoreModel(id, prefer){
 }
 function orderModels(list, prefer){
   return list.slice().sort((a,b)=>{
-    const ta = a.tools === false ? 1 : 0, tb = b.tools === false ? 1 : 0;
+    // 0 = outils confirmés, 1 = inconnu, 2 = explicitement non supportés
+    const tw = (x)=> x.tools === true ? 0 : (x.tools === false ? 2 : 1);
+    const ta = tw(a), tb = tw(b);
     if(ta !== tb) return ta - tb;                    // sait gérer le function calling
     const d = scoreModel(a.id, prefer) - scoreModel(b.id, prefer);
     if(d !== 0) return d;                            // famille fiable
@@ -1029,7 +1035,10 @@ async function resolveModels(providerKey, cfg, viewKey){
       // preferKnown : le catalogue sert seulement à vérifier que nos favoris
       // existent toujours, il ne sert pas à en ajouter (cas LLM7, où la plupart
       // des modèles listés sont payants et répondent 402).
-      list = cfg.preferKnown && stillThere.length
+      // preferKnown : on s'en tient aux gratuits connus… sauf s'ils sont tous
+      // en quarantaine, auquel cas mieux vaut tenter le catalogue que rien.
+      const knownAlive = stillThere.filter(m => !isModelDead(providerKey, m));
+      list = (cfg.preferKnown && knownAlive.length)
         ? stillThere
         : [...new Set([...stillThere, ...live])];
     }
@@ -1235,11 +1244,12 @@ document.getElementById('run-diag-btn').onclick = async ()=>{
   const btn = document.getElementById('run-diag-btn');
   const resultsEl = document.getElementById('diag-results');
   btn.disabled = true; btn.textContent = 'Test en cours…';
-  resultsEl.innerHTML = DIAG_TARGETS.map(t=>`<div id="diag-row-${t.id}" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px;"><span>${t.label}</span><span class="mono" style="color:var(--dim);">⏳</span></div>`).join('');
+  resultsEl.innerHTML = DIAG_TARGETS.map(t=>`<div id="diag-row-${t.id}" style="padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px;"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;"><span>${t.label}</span><span class="mono diag-state" style="color:var(--dim);">⏳</span></div><div class="diag-detail mono" style="display:none;margin-top:5px;padding:6px 8px;background:#0e1512;border-radius:6px;font-size:10.5px;color:var(--danger);white-space:pre-wrap;word-break:break-word;max-height:180px;overflow:auto;"></div></div>`).join('');
 
   for(const t of DIAG_TARGETS){
     const row = document.getElementById('diag-row-'+t.id);
-    const statusSpan = row.querySelector('span:last-child');
+    const statusSpan = row.querySelector('.diag-state');
+    const detailEl = row.querySelector('.diag-detail');
     try{
       // le diagnostic doit dire la VÉRITÉ du moment : on lève la pause du disjoncteur pour ce test
       const hKey = t.id === 'gemini-text' ? 'gemini' : t.id === 'claude' ? 'claude_sfr' : (OA_PROVIDERS[t.id] ? (OA_PROVIDERS[t.id].key || t.id) : t.id);
@@ -1257,10 +1267,17 @@ document.getElementById('run-diag-btn').onclick = async ()=>{
         await callOpenAICompatible(OA_PROVIDERS[t.id], 'Réponds juste "ok".', []);
       }
       statusSpan.textContent = '✅ OK'; statusSpan.style.color = 'var(--cyan)';
+      detailEl.style.display = 'none';
     }catch(e){
       const msg = friendlyError(e);
-      statusSpan.textContent = msg.includes('configuré') ? '⚪ non configuré' : '❌ ' + msg.slice(0,60);
-      statusSpan.style.color = msg.includes('configuré') ? 'var(--dim)' : 'var(--danger)';
+      const notCfg = msg.includes('configuré');
+      statusSpan.textContent = notCfg ? '⚪ non configuré' : '❌ échec';
+      statusSpan.style.color = notCfg ? 'var(--dim)' : 'var(--danger)';
+      if(!notCfg){
+        // message COMPLET : c'est lui qui dit ce qui ne va pas, le tronquer ne sert à rien
+        detailEl.textContent = String(e && e.message || e || '');
+        detailEl.style.display = 'block';
+      }
     }
   }
   btn.disabled = false; btn.textContent = '▶ Relancer le diagnostic';
