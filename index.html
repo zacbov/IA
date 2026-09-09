@@ -275,6 +275,7 @@
   <div id="convo-panel">
     <h2>Conversations</h2>
     <button id="new-convo">+ Nouvelle conversation</button>
+    <input id="convo-search" type="search" placeholder="🔍 Rechercher (titre ou contenu)…" style="width:100%;background:#0e1512;border:1px solid var(--line);color:var(--text);padding:9px 11px;border-radius:8px;font-size:13px;margin-bottom:8px;">
     <div id="convo-list"></div>
     <button id="close-convos">Fermer</button>
   </div>
@@ -417,18 +418,61 @@ function deleteConvo(id, ev){
   if(currentId===id){ if(conversations.length) currentId = conversations[0].id; else newConversation(); }
   renderConvoList(); renderMessages(); persistConvos();
 }
+let convoFilter = '';
+function convoMatches(c, q){
+  if(!q) return true;
+  if(c.title.toLowerCase().includes(q)) return true;
+  return c.messages.some(m => (m.text||'').toLowerCase().includes(q));
+}
 function renderConvoList(){
   const list = document.getElementById('convo-list');
   list.innerHTML = '';
-  conversations.forEach(c=>{
+  const q = convoFilter.trim().toLowerCase();
+  const shown = conversations.filter(c => convoMatches(c, q));
+  if(!shown.length){
+    list.innerHTML = `<div style="color:var(--dim);font-size:12.5px;padding:10px 2px;">Aucune conversation ne contient « ${escapeHtml(convoFilter)} ».</div>`;
+    return;
+  }
+  shown.forEach(c=>{
     const el = document.createElement('div');
     el.className = 'convo-item' + (c.id===currentId ? ' active':'');
-    el.innerHTML = `<span class="name">${escapeHtml(c.title)}</span><button class="rename-btn" style="margin-right:2px;">✏️</button><button>✕</button>`;
+    // extrait du message qui correspond, comme dans la recherche de l'app Claude
+    let hint = '';
+    if(q && !c.title.toLowerCase().includes(q)){
+      const hit = c.messages.find(m => (m.text||'').toLowerCase().includes(q));
+      if(hit){
+        const i = hit.text.toLowerCase().indexOf(q);
+        hint = `<div style="font-size:10.5px;color:var(--dim);margin-top:2px;">…${escapeHtml(hit.text.slice(Math.max(0,i-30), i+50))}…</div>`;
+      }
+    }
+    el.innerHTML = `<span class="name">${escapeHtml(c.title)}${hint}</span><button class="export-btn" title="Exporter en Markdown" style="margin-right:2px;">⬇</button><button class="rename-btn" style="margin-right:2px;">✏️</button><button>✕</button>`;
     el.onclick = ()=> switchConvo(c.id);
+    el.querySelector('.export-btn').onclick = (ev)=> exportConvo(c.id, ev);
     el.querySelector('.rename-btn').onclick = (ev)=> renameConvo(c.id, ev);
-    el.querySelectorAll('button')[1].onclick = (ev)=> deleteConvo(c.id, ev);
+    el.querySelectorAll('button')[2].onclick = (ev)=> deleteConvo(c.id, ev);
     list.appendChild(el);
   });
+}
+document.getElementById('convo-search').oninput = (e)=>{ convoFilter = e.target.value; renderConvoList(); };
+
+/* Export d'une conversation en Markdown lisible et réimportable ailleurs */
+function exportConvo(id, ev){
+  ev.stopPropagation();
+  const c = conversations.find(x=>x.id===id);
+  if(!c) return;
+  const lines = ['# ' + c.title, '', '_Exporté le ' + new Date().toLocaleString('fr-FR') + ' depuis Routeur IA_', ''];
+  c.messages.forEach(m=>{
+    if(m.role === 'user'){ lines.push('## 🧑 Moi', '', (m.fullText || m.text || ''), ''); }
+    else {
+      const who = m.tag ? m.tag : 'IA';
+      lines.push('## 🤖 ' + who, '');
+      if(m.thinking) lines.push('<details><summary>Raisonnement</summary>', '', m.thinking, '', '</details>', '');
+      lines.push(m.text || '', '');
+      if(m.versions && m.versions.length > 1) lines.push('_(' + m.versions.length + ' versions générées, celle-ci est la n°' + ((m.vIndex ?? 0)+1) + ')_', '');
+    }
+  });
+  const safe = c.title.replace(/[^\w\u00C0-\u017F -]/g,'').trim().slice(0,40) || 'conversation';
+  downloadBlob(safe + '.md', lines.join('\n'));
 }
 function renameConvo(id, ev){
   ev.stopPropagation();
@@ -515,6 +559,17 @@ document.getElementById('file-input').onchange = (e)=>{
       document.getElementById('preview-bar').classList.add('show');
     };
     reader.readAsDataURL(f);
+  } else if(f.type === 'application/pdf' || /\.pdf$/i.test(f.name)){
+    document.getElementById('preview-img').style.display = 'none';
+    document.getElementById('preview-name').textContent = '📕 ' + f.name + ' — extraction…';
+    document.getElementById('preview-bar').classList.add('show');
+    extractPdfText(f).then(txt=>{
+      attachedFile = { name:f.name, content: txt };
+      document.getElementById('preview-name').textContent = '📕 ' + f.name + ' · ' + txt.length + ' caractères';
+    }).catch(err=>{
+      attachedFile = null;
+      document.getElementById('preview-name').textContent = '📕 ' + f.name + ' — échec : ' + err.message;
+    });
   } else {
     const reader = new FileReader();
     reader.onload = ()=>{
@@ -526,6 +581,44 @@ document.getElementById('file-input').onchange = (e)=>{
     reader.readAsText(f);
   }
 };
+
+/* Extraction du texte d'un PDF via pdf.js (chargé à la demande depuis le CDN).
+   readAsText sur un PDF ne renvoyait que du binaire illisible. */
+let pdfjsReady = null;
+function loadPdfJs(){
+  if(pdfjsReady) return pdfjsReady;
+  pdfjsReady = new Promise((resolve, reject)=>{
+    if(window.pdfjsLib){ resolve(window.pdfjsLib); return; }
+    const sc = document.createElement('script');
+    sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    sc.onload = ()=>{
+      if(!window.pdfjsLib){ reject(new Error('pdf.js non chargé')); return; }
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      resolve(window.pdfjsLib);
+    };
+    sc.onerror = ()=> reject(new Error('pdf.js inaccessible (hors-ligne ?)'));
+    document.head.appendChild(sc);
+  });
+  return pdfjsReady;
+}
+async function extractPdfText(file){
+  const lib = await loadPdfJs();
+  const buf = await file.arrayBuffer();
+  // slice(0) : pdf.js consomme l'ArrayBuffer, on lui en donne une copie
+  const doc = await lib.getDocument({ data: buf.slice(0) }).promise;
+  const parts = [];
+  const maxPages = Math.min(doc.numPages, 60);
+  for(let i=1; i<=maxPages; i++){
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    const txt = content.items.map(it=>it.str).join(' ').replace(/\s+/g,' ').trim();
+    if(txt) parts.push('--- page ' + i + ' ---\n' + txt);
+  }
+  if(doc.numPages > maxPages) parts.push('\n(… ' + (doc.numPages - maxPages) + ' pages supplémentaires non extraites)');
+  const out = parts.join('\n\n');
+  if(!out.trim()) throw new Error('PDF sans texte (scan ?) — une OCR serait nécessaire');
+  return out;
+}
 document.getElementById('remove-attach').onclick = ()=>{
   attachedImage = null; attachedFile = null; pendingCodeScan = false;
   document.getElementById('preview-bar').classList.remove('show');
@@ -558,7 +651,46 @@ function renderMessage(m, index){
   if(m.role === 'bot' && !m.isError){ renderReplyContent(bubble, m.text || ''); }
   else { bubble.textContent = m.text || ''; }
   wrap.innerHTML = tagHtml;
+
+  // Raisonnement du modèle (DeepSeek, QwQ…) : repliable, fermé par défaut
+  if(m.role === 'bot' && m.thinking && m.thinking.trim()){
+    const det = document.createElement('details');
+    det.style.cssText = 'margin:2px 0 6px;border:1px solid var(--line);border-radius:8px;background:#0e1512;';
+    const sum = document.createElement('summary');
+    sum.textContent = '🧠 Raisonnement du modèle';
+    sum.style.cssText = 'cursor:pointer;padding:7px 10px;font-size:11.5px;color:var(--dim);user-select:none;';
+    const body = document.createElement('div');
+    body.textContent = m.thinking;
+    body.style.cssText = 'padding:0 10px 10px;font-size:12px;color:var(--dim);white-space:pre-wrap;max-height:280px;overflow:auto;';
+    det.appendChild(sum); det.appendChild(body);
+    wrap.appendChild(det);
+  }
+
   wrap.appendChild(bubble);
+
+  // Navigation entre versions quand on a régénéré ( ‹ 2/3 › )
+  if(m.role === 'bot' && m.versions && m.versions.length > 1){
+    const nav = document.createElement('div');
+    nav.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:4px;font-size:11px;color:var(--dim);';
+    const mk = (label, delta)=>{
+      const btn = document.createElement('button');
+      btn.textContent = label;
+      btn.style.cssText = 'background:none;border:1px solid var(--line);color:var(--dim);border-radius:6px;padding:2px 8px;font-size:12px;cursor:pointer;';
+      btn.onclick = ()=>{
+        const next = (m.vIndex ?? m.versions.length-1) + delta;
+        if(next < 0 || next >= m.versions.length) return;
+        m.vIndex = next;
+        const v = m.versions[next];
+        m.text = v.text; m.tag = v.tag; m.tagClass = v.tagClass; m.thinking = v.thinking || '';
+        persistConvos(); renderMessages();
+      };
+      return btn;
+    };
+    const pos = document.createElement('span');
+    pos.textContent = ((m.vIndex ?? m.versions.length-1) + 1) + ' / ' + m.versions.length;
+    nav.appendChild(mk('‹', -1)); nav.appendChild(pos); nav.appendChild(mk('›', +1));
+    wrap.appendChild(nav);
+  }
   if(m.imgSrc){ const img=document.createElement('img'); img.src=m.imgSrc; bubble.appendChild(img); }
   if(m.audioSrc){ const audio=document.createElement('audio'); audio.src=m.audioSrc; audio.controls=true; audio.style.cssText='width:100%;margin-top:6px;'; bubble.appendChild(audio); }
   if(m.role === 'bot'){
@@ -624,11 +756,40 @@ function pushMessage(m){
   const bubble = renderMessage(m, c.messages.length-1);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   if(c.title === 'Nouvelle conversation' && m.role==='user' && m.text){
-    c.title = m.text.slice(0,32) + (m.text.length>32 ? '…':'');
+    c.title = m.text.slice(0,32) + (m.text.length>32 ? '…':'');  // titre provisoire
     renderConvoList();
+  }
+  // Une fois la 1re réponse obtenue, on demande un vrai titre court à un moteur rapide
+  if(m.role === 'bot' && !m.isError && !c.autoTitled && c.messages.filter(x=>x.role==='bot' && !x.isError).length === 1){
+    c.autoTitled = true;
+    generateTitle(c);
   }
   persistConvos();
   return bubble;
+}
+
+/* Titre de conversation généré par un moteur rapide (Groq en tête), comme le fait
+   l'app Claude, au lieu de tronquer bêtement le premier message à 32 caractères. */
+async function generateTitle(c){
+  const firstUser = (c.messages.find(x=>x.role==='user') || {}).text || '';
+  const firstBot  = (c.messages.find(x=>x.role==='bot' && !x.isError) || {}).text || '';
+  if(!firstUser.trim()) return;
+  const prompt = `Donne un titre de 3 à 6 mots résumant cet échange. Réponds UNIQUEMENT par le titre, sans guillemets ni ponctuation finale.\n\nDemande : ${firstUser.slice(0,600)}\nRéponse : ${firstBot.slice(0,400)}`;
+  for(const p of ['groq','cerebras','zai','mistral','llm7','gemini']){
+    const need = p === 'gemini' ? 'gemini' : (OA_PROVIDERS[p] ? (OA_PROVIDERS[p].key || p) : p);
+    if(!hasKey(need) || providerBlockReason(need)) continue;
+    try{
+      const raw = await callAgent(p, 'Tu écris des titres de conversation très courts, en français.', prompt);
+      const clean = String(raw).split('\n')[0].replace(/["“”«»*#]/g,'').replace(/[.!?:;,\s]+$/,'').trim().slice(0,48);
+      if(clean.length >= 3){
+        c.title = clean;
+        renderConvoList();
+        if(c.id === currentId) document.getElementById('current-title').textContent = clean;
+        persistConvos();
+      }
+      return;
+    }catch(e){ /* moteur indisponible : on tente le suivant, le titre provisoire reste */ }
+  }
 }
 
 // --- Task classification & routing ---
@@ -1820,7 +1981,11 @@ function hasKey(id){ return !!KEYS[id] || proxyActive(); }
 function proxyTarget(providerKey){ return KEYS.proxy_url.replace(/\/$/,'') + '/proxy/' + providerKey; }
 function proxyHeaders(extra){ return { 'Content-Type':'application/json', 'X-App-Secret':KEYS.proxy_secret, ...(extra||{}) }; }
 
+let lastReasoning = '';  // raisonnement du dernier appel (DeepSeek/QwQ), affiché en bloc repliable
+let pendingVersions = []; // versions antérieures à rattacher à la prochaine réponse régénérée
+
 async function callOpenAICompatible(cfg, userText, history, onSkillUse, onChunk){
+  lastReasoning = '';
   const keyName = cfg.key || Object.keys(OA_PROVIDERS).find(k=>OA_PROVIDERS[k]===cfg);
   const providerKey = cfg.key || keyName.split('-')[0];
 
@@ -1889,6 +2054,7 @@ async function runOACall(cfg, providerKey, model, candidates, userText, history,
         }
         continue;
       }
+      lastReasoning = String(msg.reasoning_content || msg.reasoning || '').trim();
       if(!msg.content || !msg.content.trim()){ const e=new Error('Réponse vide reçue du modèle ['+model+'].'); e.__nextModel=true; throw e; }
       return msg.content;
     }
@@ -1896,6 +2062,7 @@ async function runOACall(cfg, providerKey, model, candidates, userText, history,
     const decoder = new TextDecoder();
     let buffer = '';
     let contentAccum = '';
+    let reasoningAccum = '';
     let toolCalls = []; // {id, name, arguments}
     let sawToolCalls = false;
     let streamStarted = false;
@@ -1920,10 +2087,16 @@ async function runOACall(cfg, providerKey, model, candidates, userText, history,
         let chunk; try{ chunk = JSON.parse(payload); }catch(e){ continue; }
         const delta = chunk.choices?.[0]?.delta;
         if(!delta) continue;
+        // DeepSeek, QwQ et consorts renvoient leur raisonnement dans un champ séparé
+        const think = delta.reasoning_content || delta.reasoning;
+        if(think){
+          reasoningAccum += think;
+          if(onChunk) onChunk(contentAccum, reasoningAccum);
+        }
         if(delta.content){
           contentAccum += delta.content;
           if(!streamStarted){ streamStarted = true; }
-          if(onChunk) onChunk(contentAccum);
+          if(onChunk) onChunk(contentAccum, reasoningAccum);
         }
         if(delta.tool_calls){
           sawToolCalls = true;
@@ -1948,6 +2121,7 @@ async function runOACall(cfg, providerKey, model, candidates, userText, history,
       continue;
     }
     if(!contentAccum || !contentAccum.trim()){ const e=new Error('Réponse vide reçue du modèle ['+model+'].'); e.__nextModel=true; throw e; }
+    lastReasoning = reasoningAccum.trim();
     return contentAccum;
   }
   return '(trop d\'appels d\'outils, réponse interrompue)';
@@ -1964,8 +2138,13 @@ async function callClaude(userText, history, opts){
   const messages = [...history, {role:'user', content:userText}];
   const systemText = (opts && opts.system) || currentSystemContext;
   const maxTokens = (opts && opts.maxTokens) || 8192;
-  const candidates = CLAUDE_MODELS.filter(m => !isModelDead('claude_sfr', m));
-  const tries = candidates.length ? candidates : CLAUDE_MODELS.slice(0,1);
+  // Le Worker interroge /v1/models chez Anthropic : on lui laisse choisir ("auto"),
+  // sinon on retombe sur la liste locale. C'est ce qui corrige le 400 [claude-sonnet-5].
+  const cat = await fetchProxyCatalog(false);
+  const fromProxy = (cat && cat.claude) ? cat.claude : null;
+  const base = fromProxy && fromProxy.length ? fromProxy : (proxyActive() ? ['auto'] : CLAUDE_MODELS);
+  const candidates = base.filter(m => !isModelDead('claude_sfr', m));
+  const tries = candidates.length ? candidates : base.slice(0,1);
 
   let lastErr = null;
   for(const model of tries){
@@ -2508,10 +2687,22 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
           const reply = await tryWithRetry(call);
           if(!streaming) think.stop();
           bumpUsage(key);
-          renderReplyContent(b, reply); c.messages[c.messages.length-1].text = reply;
+          const bm = c.messages[c.messages.length-1];
+          bm.text = reply;
+          if(lastReasoning) bm.thinking = lastReasoning;
+          // historique des versions : une régénération ajoutera ici au lieu d'écraser
+          bm.versions = [...pendingVersions, { text:reply, tag, tagClass:cls, thinking: bm.thinking || '' }];
+          bm.vIndex = bm.versions.length - 1;
+          pendingVersions = [];
+          renderMessages();
           if(category === 'code'){
             const extracted = extractCodeBlock(reply);
-            if(extracted && extracted.code.trim().length >= 40) c.lastArtifact = { code: extracted.code, lang: extracted.lang };
+            if(extracted && extracted.code.trim().length >= 40){
+              c.lastArtifact = { code: extracted.code, lang: extracted.lang };
+              c.artifacts = c.artifacts || [];
+              c.artifacts.push({ code: extracted.code, lang: extracted.lang, ts: Date.now(), tag });
+              if(c.artifacts.length > 12) c.artifacts.shift();
+            }
           }
           done = true; break;
         }catch(err){
@@ -2855,9 +3046,17 @@ async function regenerate(botIndex){
     const m = userMsg.imgSrc.match(/^data:([^;]+);base64,(.*)$/);
     if(m) pendingImage = { mimeType:m[1], base64:m[2] };
   }
-  // retire les messages bot qui suivent ce tour (jusqu'au prochain message user)
+  // On mémorise les versions déjà produites pour ce tour avant de relancer :
+  // Régénérer n'efface plus rien, ça empile une nouvelle version consultable.
+  const previous = [];
   let cut = botIndex;
-  while(cut < c.messages.length && c.messages[cut].role === 'bot') cut++;
+  while(cut < c.messages.length && c.messages[cut].role === 'bot'){
+    const om = c.messages[cut];
+    if(om.versions && om.versions.length) previous.push(...om.versions);
+    else if(!om.isError && om.text) previous.push({ text:om.text, tag:om.tag, tagClass:om.tagClass, thinking:om.thinking||'' });
+    cut++;
+  }
+  pendingVersions = previous;
   c.messages.splice(botIndex, cut - botIndex);
   renderMessages();
   setBusy(true); currentTurnController = new AbortController();
