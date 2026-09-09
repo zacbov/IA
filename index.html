@@ -311,6 +311,15 @@
     <div class="divider"></div>
     <div style="font-size:11px;color:var(--dim);margin-bottom:6px;" class="mono">ÉTAT ACTUEL DU DISJONCTEUR</div>
     <div id="health-panel" style="font-size:12px;"></div>
+    <div class="divider"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span class="mono" style="font-size:11px;color:var(--dim);">JOURNAL DES REQUÊTES</span>
+      <span>
+        <button id="log-refresh" style="background:none;border:1px solid var(--line);color:var(--dim);padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;">↻</button>
+        <button id="log-export" style="background:none;border:1px solid var(--cyan);color:var(--cyan);padding:4px 9px;border-radius:6px;font-size:11px;cursor:pointer;">⬇ JSON</button>
+      </span>
+    </div>
+    <div id="log-panel" style="font-size:11px;max-height:300px;overflow:auto;"></div>
     <button id="close-diag" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:16px;">Fermer</button>
   </div>
 </div>
@@ -504,27 +513,73 @@ document.getElementById('close-convos').onclick = closeConvos;
 document.getElementById('new-convo').onclick = ()=>{ newConversation(); closeConvos(); };
 document.getElementById('overlay-convos').onclick = (e)=>{ if(e.target.id==='overlay-convos') closeConvos(); };
 
+/* ── IndexedDB : pas de plafond à 5 Mo, contrairement à localStorage.
+      Les conversations ne sont donc plus tronquées en silence. ── */
+let idbPromise = null;
+function openIDB(){
+  if(idbPromise) return idbPromise;
+  idbPromise = new Promise((resolve, reject)=>{
+    if(!window.indexedDB){ reject(new Error('IndexedDB indisponible')); return; }
+    const req = indexedDB.open('routeur-ia', 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore('kv'); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error || new Error('IndexedDB refusée'));
+  });
+  return idbPromise;
+}
+function idbSet(key, value){
+  return openIDB().then(db => new Promise((resolve, reject)=>{
+    const tx = db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(value, key);
+    tx.oncomplete = ()=> resolve(true);
+    tx.onerror = ()=> reject(tx.error);
+  }));
+}
+function idbGet(key){
+  return openIDB().then(db => new Promise((resolve, reject)=>{
+    const tx = db.transaction('kv', 'readonly');
+    const r = tx.objectStore('kv').get(key);
+    r.onsuccess = ()=> resolve(r.result);
+    r.onerror = ()=> reject(r.error);
+  }));
+}
+
+let storageWarned = false;
+function warnStorage(msg){
+  if(storageWarned) return;
+  storageWarned = true;
+  const el = document.getElementById('offline-banner');
+  if(el){
+    el.textContent = '⚠ ' + msg;
+    el.style.display = 'block';
+    setTimeout(()=>{ el.style.display = 'none'; storageWarned = false; }, 12000);
+  } else { console.warn(msg); }
+}
+
 async function persistConvos(){
-  const trimmed = conversations.map(c => c.messages.length > 80 ? { ...c, messages: c.messages.slice(-80) } : c);
-  let payload = JSON.stringify({ conversations: trimmed, currentId });
-  try{
-    if(window.storage){
-      const ok = await window.storage.set('conversations', payload, false);
-      if(ok) return;
-    }
-  }catch(e){
-    // trop volumineux ou erreur de stockage : on retente avec un historique encore plus réduit
+  const payload = JSON.stringify({ conversations, currentId });
+  // 1) IndexedDB : intégralité de l'historique, aucune troncature
+  try{ await idbSet('conversations', payload); }
+  catch(e){ warnStorage('Sauvegarde IndexedDB impossible : ' + e.message); }
+  // 2) window.storage si l'hôte le fournit
+  try{ if(window.storage) await window.storage.set('conversations', payload, false); }catch(e){}
+  // 3) localStorage en dernier recours, forcément tronqué (plafond ~5 Mo)
+  try{ localStorage.setItem('routeur-ia-convos', payload); }
+  catch(e){
     try{
-      const reduced = conversations.map(c => ({ ...c, messages: c.messages.slice(-25) }));
-      payload = JSON.stringify({ conversations: reduced, currentId });
-      if(window.storage) await window.storage.set('conversations', payload, false);
-    }catch(e2){ /* on continue quand même, la conversation reste visible en mémoire pour cette session */ }
+      const reduced = conversations.map(c => c.messages.length > 60 ? { ...c, messages: c.messages.slice(-60) } : c);
+      localStorage.setItem('routeur-ia-convos', JSON.stringify({ conversations: reduced, currentId }));
+      warnStorage('Copie de secours réduite aux 60 derniers messages par conversation — l\'historique complet reste dans IndexedDB.');
+    }catch(e2){
+      warnStorage('Stockage local saturé : exporte tes conversations importantes (☰ puis ⬇).');
+    }
   }
-  try{ localStorage.setItem('routeur-ia-convos', payload); }catch(e){}
 }
 async function loadConvos(){
   let raw = null;
-  try{ if(window.storage){ const r = await window.storage.get('conversations', false); if(r) raw = r.value; } }catch(e){}
+  // IndexedDB en premier : c'est la copie complète
+  try{ const v = await idbGet('conversations'); if(v) raw = v; }catch(e){}
+  if(!raw){ try{ if(window.storage){ const r = await window.storage.get('conversations', false); if(r) raw = r.value; } }catch(e){} }
   if(!raw){ try{ raw = localStorage.getItem('routeur-ia-convos'); }catch(e){} }
   if(raw){
     try{
@@ -1020,6 +1075,75 @@ function loadCatalogs(){
   try{ const raw = localStorage.getItem('routeur-ia-catalogs'); if(raw) MODEL_CACHE = JSON.parse(raw); }catch(e){}
 }
 
+/* Réordonne une cascade : on garde l'intention (le 1er reste privilégié) mais
+   un moteur qui vient d'échouer ou qui est au bord de sa limite recule. */
+function healthKeyOf(key){
+  if(key === 'claude') return 'claude_sfr';
+  if(key === 'gemini' || key === 'cloudflare') return key;
+  return OA_PROVIDERS[key] ? (OA_PROVIDERS[key].key || key) : key;
+}
+function orderRoute(route){
+  if(route.length < 2) return route;
+  return route.map((key, i)=>{
+    const p = healthKeyOf(key);
+    const sc = providerScore(p);
+    let penalty = i * 0.6;                       // l'ordre d'origine reste un a priori fort
+    penalty += (1 - sc.ok) * 4;                  // taux d'échec récent
+    if(sc.ok === 1 && sc.ms > 6000) penalty += 1; // fiable mais lent
+    if(throttleDelay(p) > 0) penalty += 3;        // à sa limite de débit : on le laisse respirer
+    if(providerBlockReason(p)) penalty += 20;     // en pause : tout au fond
+    return { key, penalty };
+  }).sort((a,b)=> a.penalty - b.penalty).map(x=>x.key);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   BUDGET DE CONTEXTE
+   Certains modèles gratuits plafonnent à 8K tokens. On mesure ce qu'on
+   s'apprête à envoyer et on rogne l'historique AVANT le refus.
+   ══════════════════════════════════════════════════════════════════════ */
+// ~3,6 caractères par token en français ; on majore volontairement pour garder une marge
+function estimateTokens(text){ return Math.ceil(String(text||'').length / 3.2); }
+function messagesTokens(msgs){
+  return msgs.reduce((n,m)=> n + estimateTokens(typeof m.content === 'string' ? m.content : JSON.stringify(m.content||'')) + 4, 0);
+}
+// Fenêtre connue du modèle, via les catalogues ; valeur prudente par défaut
+function contextWindowOf(providerKey, model){
+  const cat = MODEL_CACHE[providerKey];
+  if(cat && cat.list){
+    const hit = cat.list.find(m => m.id === model);
+    if(hit && hit.ctx) return hit.ctx;
+  }
+  if(/8b|9b|mini|nano|small/i.test(model||'')) return 16000;
+  return 32000; // hypothèse basse : mieux vaut rogner pour rien que se faire refuser
+}
+/* Rogne l'historique du plus ancien au plus récent jusqu'à tenir dans la fenêtre.
+   Renvoie {messages, trimmed} pour pouvoir le signaler dans le journal. */
+function fitToContext(messages, providerKey, model, reserveOutput){
+  const win = contextWindowOf(providerKey, model);
+  const budget = Math.max(2000, win - (reserveOutput || 2000));
+  let msgs = messages.slice();
+  let trimmed = 0;
+  while(messagesTokens(msgs) > budget && msgs.length > 2){
+    // on garde toujours le système (index 0 si présent) et le dernier message utilisateur
+    const start = msgs[0] && msgs[0].role === 'system' ? 1 : 0;
+    if(start >= msgs.length - 1) break;
+    msgs.splice(start, 1);
+    trimmed++;
+  }
+  // dernier recours : le message courant dépasse à lui seul la fenêtre
+  const last = msgs[msgs.length-1];
+  if(last && typeof last.content === 'string' && messagesTokens(msgs) > budget){
+    const over = messagesTokens(msgs) - budget;
+    const cut = Math.min(last.content.length - 500, over * 3.2);
+    if(cut > 0){
+      last.content = last.content.slice(0, last.content.length - Math.ceil(cut)) +
+        '\n\n[… contenu tronqué pour tenir dans la fenêtre de ' + win.toLocaleString('fr-FR') + ' tokens de ce modèle]';
+      trimmed++;
+    }
+  }
+  return { messages: msgs, trimmed };
+}
+
 /* Liste ordonnée des modèles à essayer pour un moteur donné :
    1) catalogue live du fournisseur si disponible (trié par préférence)
    2) sinon la liste de secours codée en dur
@@ -1224,7 +1348,31 @@ function renderHealthPanel(){
     (cats.length ? `<div style="margin-top:8px;color:var(--dim);font-size:11px;">Catalogues live : ${cats.map(escapeHtml).join(' · ')}</div>` : '');
 }
 
-document.getElementById('diag-btn').onclick = ()=>{ renderHealthPanel(); document.getElementById('overlay-diag').classList.add('show'); };
+function renderRequestLog(){
+  const el = document.getElementById('log-panel');
+  if(!el) return;
+  if(!REQ_LOG.length){ el.innerHTML = '<div style="color:var(--dim);">Aucun appel enregistré pour l\'instant.</div>'; return; }
+  el.innerHTML = REQ_LOG.slice(0, 60).map(e=>{
+    const time = new Date(e.t).toLocaleTimeString('fr-FR');
+    const col = e.ok ? 'var(--cyan)' : 'var(--danger)';
+    const badge = e.ok ? '✅ ' + e.status : '❌ ' + (e.status || 'réseau');
+    const model = e.resolved || e.model || '';
+    const detail = e.error ? `<div class="mono" style="margin-top:3px;padding:5px 7px;background:#0e1512;border-radius:5px;color:var(--danger);font-size:10px;white-space:pre-wrap;word-break:break-word;">${escapeHtml(e.error)}</div>` : '';
+    return `<div style="padding:5px 0;border-bottom:1px solid var(--line);">
+      <div style="display:flex;justify-content:space-between;gap:8px;">
+        <span class="mono" style="color:${col};">${badge}</span>
+        <span class="mono" style="color:var(--dim);font-size:10px;">${time} · ${e.ms||0} ms</span>
+      </div>
+      <div class="mono" style="font-size:10px;color:var(--dim);word-break:break-all;">${escapeHtml(e.provider||'')} → ${escapeHtml(model)}</div>
+      ${detail}
+    </div>`;
+  }).join('');
+}
+document.getElementById('log-refresh').onclick = renderRequestLog;
+document.getElementById('log-export').onclick = ()=>{
+  downloadBlob('journal-routeur-ia-' + Date.now() + '.json', JSON.stringify(REQ_LOG, null, 2));
+};
+document.getElementById('diag-btn').onclick = ()=>{ renderHealthPanel(); renderRequestLog(); document.getElementById('overlay-diag').classList.add('show'); };
 document.getElementById('reset-health-btn').onclick = ()=>{ resetHealth(); renderHealthPanel(); };
 document.getElementById('refresh-models-btn').onclick = async ()=>{
   const btn = document.getElementById('refresh-models-btn');
@@ -1295,7 +1443,7 @@ document.getElementById('run-diag-btn').onclick = async ()=>{
     }
   }
   btn.disabled = false; btn.textContent = '▶ Relancer le diagnostic';
-  renderHealthPanel();
+  renderHealthPanel(); renderRequestLog();
 };
 
 // --- Zone de dépôt du projet (propre à chaque conversation) ---
@@ -1976,6 +2124,63 @@ async function runSkill(name, args){
   }catch(e){ return 'Erreur pendant l\'exécution de la compétence : ' + e.message; }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   JOURNAL DES REQUÊTES
+   Chaque appel sortant est tracé : moteur, modèle, code HTTP, durée et
+   corps d'erreur COMPLET. C'est ce qui permet de diagnostiquer une panne
+   en lisant, au lieu de la reproduire puis de deviner.
+   ══════════════════════════════════════════════════════════════════════ */
+const REQ_LOG = [];
+const REQ_LOG_MAX = 200;
+function logRequest(entry){
+  REQ_LOG.unshift({ t: Date.now(), ...entry });
+  if(REQ_LOG.length > REQ_LOG_MAX) REQ_LOG.length = REQ_LOG_MAX;
+  try{ sessionStorage.setItem('routeur-ia-log', JSON.stringify(REQ_LOG.slice(0,80))); }catch(e){}
+}
+function loadRequestLog(){
+  try{
+    const raw = sessionStorage.getItem('routeur-ia-log');
+    if(raw) REQ_LOG.push(...JSON.parse(raw));
+  }catch(e){}
+}
+
+/* ── Compteurs glissants : combien de requêtes envoyées récemment, par moteur ──
+   Mistral plafonne à ~2 req/min sur le palier gratuit. Plutôt que d'encaisser
+   un 429, on espace nous-mêmes les appels. */
+const RATE_HITS = {};                 // provider -> [timestamps]
+const RPM_LIMITS = { mistral:2, cerebras:25, groq:28, openrouter:18, hf:8, zai:20, llm7:25, nvidia:36, gemini:12, claude_sfr:5 };
+function noteCall(p){ (RATE_HITS[p] = RATE_HITS[p] || []).push(Date.now()); }
+function recentCalls(p, windowMs){
+  const arr = RATE_HITS[p] || [];
+  const since = Date.now() - (windowMs || 60000);
+  const kept = arr.filter(t => t > since);
+  RATE_HITS[p] = kept;
+  return kept.length;
+}
+/* Délai à respecter avant de solliciter à nouveau ce moteur (0 = libre) */
+function throttleDelay(p){
+  const limit = RPM_LIMITS[p];
+  if(!limit) return 0;
+  const used = recentCalls(p, 60000);
+  if(used < limit) return 0;
+  const oldest = (RATE_HITS[p] || [])[0] || Date.now();
+  return Math.max(0, 60000 - (Date.now() - oldest)) + 250;
+}
+async function respectRate(p){
+  const wait = throttleDelay(p);
+  if(wait > 0 && wait < 20000) await new Promise(r => setTimeout(r, wait));
+}
+
+/* ── Score de fiabilité récent, pour trier la cascade dynamiquement ── */
+function providerScore(p){
+  const recent = REQ_LOG.filter(e => e.provider === p).slice(0, 12);
+  if(!recent.length) return { ok:1, ms:1500, n:0 };
+  const ok = recent.filter(e => e.ok).length / recent.length;
+  const times = recent.filter(e => e.ok && e.ms).map(e => e.ms);
+  const ms = times.length ? times.reduce((a,b)=>a+b,0) / times.length : 3000;
+  return { ok, ms, n: recent.length };
+}
+
 let currentTurnController = null;
 async function fetchWithTimeout(url, options, ms){
   const timeoutController = new AbortController();
@@ -2078,10 +2283,24 @@ async function runOACall(cfg, providerKey, model, candidates, userText, history,
       if(others.length) body.models = [model, ...others];
     }
     if(toolsEnabled){ body.tools = getSkills(); body.tool_choice = 'auto'; }
+    const fit = fitToContext(body.messages, providerKey, model, 2500);
+    body.messages = fit.messages;
+    if(fit.trimmed) messages = fit.messages;   // l'historique rogné devient la référence
     const timeout = cfg.timeout || 30000;
-    const res = await fetchWithTimeout(targetUrl, { method:'POST', headers, body: JSON.stringify(body) }, timeout);
+    await respectRate(providerKey);               // évite le 429 au lieu de l'encaisser
+    noteCall(providerKey);
+    const t0 = Date.now();
+    let res;
+    try{
+      res = await fetchWithTimeout(targetUrl, { method:'POST', headers, body: JSON.stringify(body) }, timeout);
+    }catch(netErr){
+      logRequest({ provider:providerKey, model, ok:false, status:0, ms:Date.now()-t0, error:String(netErr.message||netErr) });
+      throw netErr;
+    }
     if(!res.ok){
       const t = await res.text().catch(()=> '');
+      logRequest({ provider:providerKey, model, ok:false, status:res.status, ms:Date.now()-t0,
+        resolved: res.headers.get('x-resolved-model') || '', error:t.slice(0,1500) });
       let kind = classifyHttpError(res.status, t);
       // "no endpoints support tool use", "tools not supported"… : c'est la requête
       // qui ne convient pas, pas le modèle. On retente sans outils avant de le juger.
@@ -2179,6 +2398,8 @@ async function runOACall(cfg, providerKey, model, candidates, userText, history,
     }
     if(!contentAccum || !contentAccum.trim()){ const e=new Error('Réponse vide reçue du modèle ['+model+'].'); e.__nextModel=true; throw e; }
     lastReasoning = reasoningAccum.trim();
+    logRequest({ provider:providerKey, model, ok:true, status:200, ms:Date.now()-t0,
+      resolved: res.headers.get('x-resolved-model') || '', chars: contentAccum.length });
     return contentAccum;
   }
   return '(trop d\'appels d\'outils, réponse interrompue)';
@@ -2534,6 +2755,12 @@ function renderReplyContent(bubble, text){
     previewBtn.onclick = ()=> openPreview(block.code);
     card.appendChild(previewBtn);
   }
+  // Itération : renvoyer CE fichier au moteur avec une consigne, et obtenir une v2
+  const iterBtn = document.createElement('button');
+  iterBtn.textContent = '✏️ Modifier ce fichier';
+  iterBtn.style.cssText = 'background:none;border:1px solid var(--amber);color:var(--amber);font-weight:700;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;margin-bottom:6px;';
+  iterBtn.onclick = ()=> iterateArtifact(block);
+  card.appendChild(iterBtn);
   bubble.appendChild(card);
   if(block.after){ const p=document.createElement('div'); p.innerHTML=renderMarkdown(block.after); p.style.marginTop='8px'; bubble.appendChild(p); }
 }
@@ -2542,6 +2769,25 @@ const SKILL_LABELS = { get_weather:'météo', convert_currency:'conversion devis
 function skillLabel(name){
   if(name.startsWith('connector_')){ const c = CUSTOM_CONNECTORS[name.slice('connector_'.length)]; return c ? c.name : name; }
   return SKILL_LABELS[name] || name;
+}
+
+/* Reprend un fichier déjà généré et demande une modification ciblée.
+   Le code courant part comme base : le moteur doit renvoyer le fichier ENTIER
+   modifié, pas un extrait, sinon on ne peut pas le rejouer. */
+function iterateArtifact(block){
+  if(isBusy){ alert('Une génération est déjà en cours.'); return; }
+  const instruction = prompt('Que faut-il changer dans ce fichier ?\n(ex : « bouton en vert et police plus grande »)');
+  if(!instruction || !instruction.trim()) return;
+  const c = getCurrent();
+  c.lastArtifact = { code: block.code, lang: block.lang };
+  const lang = block.lang || 'html';
+  const prompt2 = `Voici un fichier ${lang} existant. Applique EXACTEMENT cette modification : ${instruction.trim()}\n\n`
+    + `Contraintes : ne change rien d'autre, garde le fichier autonome et fonctionnel, `
+    + `et réponds uniquement avec le fichier COMPLET modifié dans un seul bloc \`\`\`${lang}.\n\n`
+    + '```' + lang + '\n' + block.code + '\n```';
+  pushMessage({ role:'user', text:'✏️ Modifier le fichier : ' + instruction.trim(), fullText: prompt2 });
+  setBusy(true); currentTurnController = new AbortController();
+  runRequest(prompt2, null, c, null, 'code').finally(()=> setBusy(false));
 }
 
 function injectThreeIfNeeded(code){
@@ -2708,6 +2954,7 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
     } else {
       let done = false;
       const skipped = [];
+      route = orderRoute(route);   // les moteurs récemment fiables et non saturés d'abord
       for(const key of route){
         let tag, cls, needKey, call;
         if(key === 'gemini'){
@@ -2725,12 +2972,19 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
           needKey = cfg.key || key; tag = cfg.tag; cls = cfg.cls;
           call = ()=> callOpenAICompatible(cfg, text, history,
             (skillName)=>{ think.setLabel('🔧 ' + skillLabel(skillName) + '…'); streaming = false; },
-            (partial)=>{
+            (partial, reasoning)=>{
               if(!streaming){ streaming = true; think.stop(); }
-              if(partial.includes('```')){
-                b.textContent = '✍️ Rédaction du fichier… ' + partial.length.toLocaleString('fr-FR') + ' caractères';
+              partialAccum = partial;                       // conservé si l'utilisateur arrête
+              if(reasoning) partialReasoning = reasoning;
+              const fence = (partial.match(/```/g) || []).length;
+              if(fence % 2 === 1){
+                // bloc de code en cours d'écriture : le rendre au fil de l'eau serait illisible
+                const before = partial.slice(0, partial.indexOf('```'));
+                b.innerHTML = (before.trim() ? renderMarkdown(before) : '') +
+                  '<div style="color:var(--dim);font-size:12px;margin-top:4px;">✍️ Rédaction du fichier… ' +
+                  partial.length.toLocaleString('fr-FR') + ' caractères</div>';
               } else {
-                b.textContent = partial;
+                b.innerHTML = renderMarkdown(partial);      // rendu progressif, comme l'app Claude
               }
               messagesEl.scrollTop = messagesEl.scrollHeight;
             }
@@ -2741,6 +2995,7 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
         const pauseReason = needKey ? providerBlockReason(needKey) : null;
         if(pauseReason && route.length > 1){ skipped.push(tag + ' (' + pauseReason + ')'); continue; }
         let streaming = false;
+        let partialAccum = '', partialReasoning = '';
         const b = pushMessage({ role:'bot', cat:CAT_LABEL[category], tag, tagClass:cls, text:'…' });
         const think = startThinking(b, 'Réflexion…');
         try{
@@ -2767,8 +3022,20 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
           done = true; break;
         }catch(err){
           think.stop();
+          const bm = c.messages[c.messages.length-1];
+          const stopped = /Génération arrêtée/.test(String(err && err.message || ''));
+          if(stopped && partialAccum.trim()){
+            // arrêt volontaire : on garde ce qui était déjà écrit au lieu de tout jeter
+            bm.text = partialAccum + '\n\n_(génération interrompue)_';
+            if(partialReasoning) bm.thinking = partialReasoning;
+            bm.versions = [{ text:bm.text, tag, tagClass:cls, thinking: bm.thinking || '' }];
+            bm.vIndex = 0;
+            renderMessages();
+            done = true; break;
+          }
           const msg = '⚠ indisponible — ' + friendlyError(err);
-          b.textContent = msg; c.messages[c.messages.length-1].text = msg; c.messages[c.messages.length-1].tagClass = 'err'; c.messages[c.messages.length-1].isError = true;
+          b.textContent = msg; bm.text = msg; bm.tagClass = 'err'; bm.isError = true;
+          if(stopped){ done = true; break; }   // l'utilisateur a arrêté : ne pas enchaîner sur un autre moteur
         }
       }
       if(!done){
@@ -3163,6 +3430,7 @@ if('serviceWorker' in navigator){
   await loadKeysFromStorage();
   loadHealth();
   loadCatalogs();
+  loadRequestLog();
   // pré-charge en tâche de fond les catalogues de modèles gratuits (OpenRouter, LLM7)
   fetchProxyCatalog(false).catch(()=>{});
   Object.keys(MODEL_DISCOVERY).forEach(p => { fetchCatalog(p).catch(()=>{}); });
