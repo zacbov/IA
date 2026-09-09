@@ -42,7 +42,7 @@
   .tag.engine-groq{color:var(--amber);} .tag.engine-gemini{color:var(--cyan);}
   .tag.engine-mistral{color:#f08a5d;} .tag.engine-cerebras{color:#8a9de0;}
   .tag.engine-openrouter{color:#d0a0e0;} .tag.engine-nvidia{color:#76b900;}
-  .tag.engine-hf{color:#ffcc4d;} .tag.err{color:var(--danger);}
+  .tag.engine-hf{color:#ffcc4d;} .tag.engine-claude{color:#d4a27f;} .tag.err{color:var(--danger);}
   .tag.cat{color:#5a6b62; border:1px solid #2a3a32; padding:1px 5px; border-radius:4px; margin-right:4px;}
   #empty{margin:auto; text-align:center; color:var(--dim); padding:20px; font-family:monospace; font-size:12px; line-height:1.8;}
   #empty b{color:var(--text); display:block; font-size:15px; margin-bottom:8px; font-family:'Segoe UI',sans-serif;}
@@ -175,6 +175,7 @@
     </div>
     <div class="field"><label>GitHub</label><input type="password" id="key-github"><p>github.com/settings/tokens — GitHub Models (chat) a définitivement fermé le 30 juillet 2026. Cette clé sert désormais uniquement aux compétences GitHub (dépôts, commits, issues).</p></div>
     <div class="field"><label>Brave Search</label><input type="password" id="key-brave"><p>api.search.brave.com → gratuit 2000 requêtes/mois — pour une vraie recherche web.</p></div>
+    <div class="field"><label>Claude (finisseur)</label><input type="password" id="key-claude_sfr"><p>Laisse vide si ton Worker contient déjà le secret <span class="mono">CLAUDE_SFR_KEY</span> et la route <span class="mono">/proxy/claude</span>. Claude ferme la cascade : il reprend l'ébauche des autres IA et livre l'outil fini.</p></div>
     <div class="divider"></div>
     <div style="font-size:11px;color:var(--dim);margin-bottom:6px;" class="mono">PROXY CLOUDFLARE (optionnel — cache tes clés côté serveur)</div>
     <div class="field"><label>URL du Worker</label><input type="text" id="key-proxy_url" placeholder="https://routeur-ia-proxy.xxx.workers.dev"></div>
@@ -302,8 +303,13 @@
   <div id="sheet">
     <h2>🩺 Diagnostic des modèles</h2>
     <div style="font-size:11px;color:var(--dim);margin-bottom:14px;">Envoie un petit message test à chaque moteur configuré pour vérifier lesquels répondent vraiment aujourd'hui.</div>
-    <button id="run-diag-btn" style="width:100%;background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-bottom:14px;">▶ Lancer le diagnostic</button>
+    <button id="run-diag-btn" style="width:100%;background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-bottom:8px;">▶ Lancer le diagnostic</button>
+    <button id="refresh-models-btn" style="width:100%;background:none;border:1px solid var(--cyan);color:var(--cyan);padding:10px;border-radius:8px;font-size:12.5px;cursor:pointer;margin-bottom:8px;">🔄 Rafraîchir la liste des modèles gratuits</button>
+    <button id="reset-health-btn" style="width:100%;background:none;border:1px solid var(--amber);color:var(--amber);padding:10px;border-radius:8px;font-size:12.5px;cursor:pointer;margin-bottom:14px;">♻️ Réinitialiser la santé des moteurs</button>
     <div id="diag-results"></div>
+    <div class="divider"></div>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:6px;" class="mono">ÉTAT ACTUEL DU DISJONCTEUR</div>
+    <div id="health-panel" style="font-size:12px;"></div>
     <button id="close-diag" style="width:100%;background:none;border:1px solid var(--line);color:var(--dim);padding:11px;border-radius:8px;font-size:13px;cursor:pointer;margin-top:16px;">Fermer</button>
   </div>
 </div>
@@ -349,6 +355,7 @@ let KEYS = {
   proxy_url:'https://routeur-ia-proxy.zacharybov.workers.dev',
   proxy_secret:'',
   brave:'',
+  claude_sfr:'',
   hume:''
 };
 
@@ -362,8 +369,8 @@ async function loadKeysFromStorage(){
   }catch(e){}
   try{ const raw = localStorage.getItem('routeur-ia-keys'); if(raw) KEYS = JSON.parse(raw); }catch(e){}
 }
-const ALL_KEY_IDS = ['groq','gemini','mistral','cerebras','openrouter','nvidia','hf','github','cloudflare','cf_account','zai','tripo','proxy_url','proxy_secret','brave','hume'];
-const PROXIED_IDS = ['groq','mistral','cerebras','openrouter','nvidia','hf','zai','gemini','tripo'];
+const ALL_KEY_IDS = ['groq','gemini','mistral','cerebras','openrouter','nvidia','hf','github','cloudflare','cf_account','zai','tripo','proxy_url','proxy_secret','brave','hume','claude_sfr'];
+const PROXIED_IDS = ['groq','mistral','cerebras','openrouter','nvidia','hf','zai','gemini','tripo','claude_sfr'];
 function reflectStatus(){
   ALL_KEY_IDS.forEach(id=>{
     const dot = document.getElementById('dot-'+id);
@@ -643,23 +650,233 @@ function classifyTask(text, hasAttachment){
   return 'chat';
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   SANTÉ DES MOTEURS (disjoncteur) + DÉCOUVERTE DYNAMIQUE DES MODÈLES
+   ──────────────────────────────────────────────────────────────────────
+   Objectif : ne plus jamais envoyer une requête vers un moteur ou un
+   modèle dont on SAIT déjà qu'il est mort. Trois mémoires :
+     • HEALTH      : un moteur (= un compte/une clé) mis en pause après
+                     un 401/402/403/429/5xx, avec une durée adaptée.
+     • DEAD_MODELS : un modèle précis retiré du catalogue (404/410/400),
+                     mis en quarantaine 12 h — le moteur reste utilisable
+                     avec ses autres modèles.
+     • MODEL_CACHE : catalogue LIVE récupéré chez le fournisseur, pour
+                     coller aux modèles gratuits réellement disponibles.
+   ══════════════════════════════════════════════════════════════════════ */
+const HEALTH = {};       // providerKey -> { until:timestamp, reason:'' }
+const DEAD_MODELS = {};  // "provider::model" -> timestamp de mise au rebut
+const MODEL_QUARANTINE_MS = 12 * 3600 * 1000;
+
+const COOLDOWNS = {
+  key:    24 * 3600 * 1000, // 401/403 : clé refusée, inutile d'insister aujourd'hui
+  credit:  6 * 3600 * 1000, // 402 : crédit/quota épuisé, ça se recharge plus tard
+  rate:        90 * 1000,   // 429 : limite par minute, ça se libère vite
+  server:      45 * 1000,   // 5xx : surcharge passagère
+};
+
+function healthOf(p){ return HEALTH[p] || (HEALTH[p] = { until:0, reason:'' }); }
+function providerBlockReason(p){
+  const h = healthOf(p);
+  const left = h.until - Date.now();
+  if(left <= 0) return null;
+  const txt = left > 3600000 ? Math.round(left/3600000)+' h'
+            : left > 60000   ? Math.round(left/60000)+' min'
+            : Math.ceil(left/1000)+' s';
+  return (h.reason || 'en pause') + ' — nouvelle tentative dans ' + txt;
+}
+function providerAvailable(p){ return !providerBlockReason(p); }
+function coolDown(p, ms, reason){
+  const h = healthOf(p);
+  h.until = Math.max(h.until, Date.now() + ms);
+  h.reason = reason;
+  persistHealth();
+}
+function markModelDead(p, model){ DEAD_MODELS[p+'::'+model] = Date.now(); persistHealth(); }
+function isModelDead(p, model){
+  const t = DEAD_MODELS[p+'::'+model];
+  if(!t) return false;
+  if(Date.now() - t > MODEL_QUARANTINE_MS){ delete DEAD_MODELS[p+'::'+model]; return false; }
+  return true;
+}
+function resetHealth(){
+  Object.keys(HEALTH).forEach(k=>delete HEALTH[k]);
+  Object.keys(DEAD_MODELS).forEach(k=>delete DEAD_MODELS[k]);
+  MODEL_CACHE = {};
+  persistHealth();
+}
+function persistHealth(){
+  try{ localStorage.setItem('routeur-ia-health', JSON.stringify({ HEALTH, DEAD_MODELS })); }catch(e){}
+}
+function loadHealth(){
+  try{
+    const raw = localStorage.getItem('routeur-ia-health');
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    Object.assign(HEALTH, d.HEALTH||{});
+    Object.assign(DEAD_MODELS, d.DEAD_MODELS||{});
+  }catch(e){}
+}
+
+// Traduit un code HTTP + le corps de la réponse en décision de routage
+function classifyHttpError(status, bodyText){
+  const b = (bodyText || '').toLowerCase();
+  if(status === 401 || status === 403) return 'key';
+  if(status === 402) return 'credit';
+  if(status === 429) return 'rate';
+  if(status === 404 || status === 410) return 'model';
+  if(status === 400 || status === 422 || status === 413){
+    if(/model|not found|unknown|unsupported|does not exist|no endpoints|no allowed providers|deprecat|invalid_request/.test(b)) return 'model';
+    return 'bad'; // ex : function calling refusé par ce modèle
+  }
+  if(status >= 500) return 'server';
+  return 'other';
+}
+// Applique la sanction correspondante et marque l'erreur pour la cascade
+function registerFailure(providerKey, model, status, bodyText, err){
+  const kind = classifyHttpError(status, bodyText);
+  if(kind === 'key'){        coolDown(providerKey, COOLDOWNS.key, 'clé refusée ('+status+')'); err.__fatal = true; }
+  else if(kind === 'credit'){coolDown(providerKey, COOLDOWNS.credit, 'crédit/quota épuisé (402)'); err.__fatal = true; }
+  else if(kind === 'rate'){  coolDown(providerKey, COOLDOWNS.rate, 'limite de débit atteinte (429)'); err.__fatal = true; }
+  else if(kind === 'model'){ markModelDead(providerKey, model); err.__nextModel = true; }
+  else if(kind === 'server'){coolDown(providerKey, COOLDOWNS.server, 'serveur en surcharge ('+status+')'); err.__nextModel = true; }
+  else if(kind === 'bad'){   markModelDead(providerKey, model); err.__nextModel = true; }
+  return kind;
+}
+
+/* ── Catalogues LIVE : on demande au fournisseur la liste réelle de ses
+      modèles gratuits au lieu de la coder en dur (elle change sans cesse). ── */
+let MODEL_CACHE = {};            // providerKey -> { list:[], ts:timestamp }
+let PROXY_CATALOG = null;        // catalogue servi par le Worker : { provider:[modèles] }
+
+/* Le Worker interroge chaque fournisseur avec les clés qu'il détient et renvoie
+   la liste réelle de leurs modèles. Si cette route répond, l'app n'a plus
+   besoin d'aucun nom de modèle codé en dur — plus jamais de réencodage. */
+async function fetchProxyCatalog(force){
+  if(!proxyActive()) return null;
+  if(!force){
+    if(PROXY_CATALOG) return PROXY_CATALOG;
+    try{
+      const raw = localStorage.getItem('routeur-ia-proxy-catalog');
+      if(raw){
+        const d = JSON.parse(raw);
+        if(Date.now() - d.ts < CATALOG_TTL){ PROXY_CATALOG = d.providers; return PROXY_CATALOG; }
+      }
+    }catch(e){}
+  }
+  try{
+    const url = KEYS.proxy_url.replace(/\/$/,'') + '/models' + (force ? '?refresh=1' : '');
+    const res = await fetchWithTimeout(url, { method:'GET', headers: proxyHeaders() }, 20000);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const d = await res.json();
+    if(!d.providers || !Object.keys(d.providers).length) throw new Error('catalogue vide');
+    PROXY_CATALOG = d.providers;
+    try{ localStorage.setItem('routeur-ia-proxy-catalog', JSON.stringify({ ts:Date.now(), providers:PROXY_CATALOG })); }catch(e){}
+    return PROXY_CATALOG;
+  }catch(e){
+    return PROXY_CATALOG; // Worker ancienne version : on retombe sur la découverte locale
+  }
+}
+const CATALOG_TTL = 6 * 3600 * 1000;
+const MODEL_DISCOVERY = {
+  openrouter: { url:'https://openrouter.ai/api/v1/models', freeOnly:true },
+  llm7:       { url:'https://api.llm7.io/v1/models',       freeOnly:false },
+};
+// Familles jugées fiables, dans l'ordre de préférence (pour trier le catalogue live)
+const PREFER_GENERAL = [/gpt-oss/i, /deepseek/i, /llama-3\.3/i, /qwen.*(3|2\.5)/i, /mistral|ministral|devstral/i, /glm-4/i, /gemma-3/i, /nemotron/i];
+const PREFER_CODE    = [/coder|codestral|devstral/i, /deepseek/i, /gpt-oss/i, /qwen.*(3|2\.5)/i, /glm-4/i];
+const EXCLUDE_MODEL  = /(embed|rerank|whisper|tts|stable-diffusion|flux|image|vision-only|guard|moderation)/i;
+
+function scoreModel(id, prefer){
+  for(let i=0;i<prefer.length;i++){ if(prefer[i].test(id)) return i; }
+  return prefer.length + 1;
+}
+function orderModels(list, prefer){
+  return list.slice().sort((a,b)=>{
+    const d = scoreModel(a.id, prefer) - scoreModel(b.id, prefer);
+    if(d !== 0) return d;
+    return (b.ctx||0) - (a.ctx||0);
+  }).map(m=>m.id);
+}
+async function fetchCatalog(providerKey){
+  const disc = MODEL_DISCOVERY[providerKey];
+  if(!disc) return null;
+  const cached = MODEL_CACHE[providerKey];
+  if(cached && (Date.now() - cached.ts) < CATALOG_TTL) return cached.list;
+  try{
+    const res = await fetchWithTimeout(disc.url, { method:'GET', headers:{ 'Accept':'application/json' } }, 12000);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const raw = Array.isArray(data) ? data : (data.data || data.models || []);
+    const list = raw.map(m=>({
+      id: m.id || m.name,
+      ctx: m.context_length || m.context_window || m.max_context_length || 0,
+      free: disc.freeOnly
+        ? (String(m.id||'').endsWith(':free') || (Number(m.pricing?.prompt||0) === 0 && Number(m.pricing?.completion||0) === 0))
+        : true,
+      tools: m.supported_parameters ? m.supported_parameters.includes('tools') : null,
+    })).filter(m => m.id && m.free && !EXCLUDE_MODEL.test(m.id));
+    if(!list.length) throw new Error('catalogue vide');
+    MODEL_CACHE[providerKey] = { list, ts: Date.now() };
+    try{ localStorage.setItem('routeur-ia-catalogs', JSON.stringify(MODEL_CACHE)); }catch(e){}
+    return list;
+  }catch(e){
+    return cached ? cached.list : null; // on garde le vieux catalogue plutôt que rien
+  }
+}
+function loadCatalogs(){
+  try{ const raw = localStorage.getItem('routeur-ia-catalogs'); if(raw) MODEL_CACHE = JSON.parse(raw); }catch(e){}
+}
+
+/* Liste ordonnée des modèles à essayer pour un moteur donné :
+   1) catalogue live du fournisseur si disponible (trié par préférence)
+   2) sinon la liste de secours codée en dur
+   3) dans tous les cas, on retire les modèles en quarantaine */
+async function resolveModels(providerKey, cfg, viewKey){
+  let list = (cfg.models ? cfg.models.slice() : [cfg.model]).filter(Boolean);
+
+  // 1) priorité au catalogue tenu par le Worker (couvre TOUS les fournisseurs)
+  const cat = await fetchProxyCatalog(false);
+  if(cat){
+    const fromProxy = cat[viewKey || providerKey] || cat[providerKey];
+    if(fromProxy && fromProxy.length){
+      const usable = fromProxy.filter(m => !isModelDead(providerKey, m));
+      if(usable.length) return usable;
+    }
+  }
+
+  // 2) sinon, découverte locale sur les catalogues publics
+  if(MODEL_DISCOVERY[providerKey]){
+    const catalog = await fetchCatalog(providerKey);
+    if(catalog && catalog.length){
+      const ids = catalog.map(m=>m.id);
+      const live = orderModels(catalog, cfg.prefer || PREFER_GENERAL);
+      const stillThere = list.filter(m => ids.includes(m)); // nos favoris, seulement s'ils existent encore
+      list = [...new Set([...stillThere, ...live])];
+    }
+  }
+  const usable = list.filter(m => !isModelDead(providerKey, m));
+  return usable.length ? usable : list.slice(0, 1); // jamais vide : on retente au pire le 1er
+}
+
 const OA_PROVIDERS = {
-  groq: { url:'https://api.groq.com/openai/v1/chat/completions', model:'openai/gpt-oss-120b', tag:'GROQ', cls:'engine-groq' },
-  cerebras: { url:'https://api.cerebras.ai/v1/chat/completions', model:'gpt-oss-120b', tag:'CEREBRAS', cls:'engine-cerebras' },
-  mistral: { url:'https://api.mistral.ai/v1/chat/completions', model:'mistral-small-latest', tag:'MISTRAL', cls:'engine-mistral' },
-  'mistral-code': { key:'mistral', url:'https://api.mistral.ai/v1/chat/completions', model:'codestral-latest', tag:'MISTRAL·CODE', cls:'engine-mistral' },
-  openrouter: { url:'https://openrouter.ai/api/v1/chat/completions', models:['openai/gpt-oss-120b:free','openai/gpt-oss-20b:free','meta-llama/llama-3.2-3b-instruct:free','google/gemma-2-9b-it:free','qwen/qwen-2.5-72b-instruct:free'], tag:'OPENROUTER', cls:'engine-openrouter' },
-  'openrouter-code': { key:'openrouter', url:'https://openrouter.ai/api/v1/chat/completions', models:['openai/gpt-oss-120b:free','qwen/qwen-2.5-72b-instruct:free','openai/gpt-oss-20b:free','google/gemma-2-9b-it:free'], tag:'OPENROUTER·CODE', cls:'engine-openrouter' },
-  nvidia: { url:'https://integrate.api.nvidia.com/v1/chat/completions', model:'nvidia/llama-3.3-nemotron-super-49b-v1.5', tag:'NVIDIA', cls:'engine-nvidia' },
-  hf: { url:'https://router.huggingface.co/v1/chat/completions', model:'meta-llama/Llama-3.3-70B-Instruct', tag:'HF', cls:'engine-hf' },
-  zai: { url:'https://api.z.ai/api/paas/v4/chat/completions', model:'glm-5.2-flash', tag:'Z.AI · GLM', cls:'engine-cerebras' },
-  llm7: { url:'https://api.llm7.io/v1/chat/completions', model:'default', tag:'LLM7', cls:'engine-hf' },
+  groq: { url:'https://api.groq.com/openai/v1/chat/completions', models:['openai/gpt-oss-120b','llama-3.3-70b-versatile','openai/gpt-oss-20b','llama-3.1-8b-instant'], tag:'GROQ', cls:'engine-groq' },
+  cerebras: { url:'https://api.cerebras.ai/v1/chat/completions', models:['gpt-oss-120b','llama-3.3-70b','qwen-3-32b','llama3.1-8b'], tag:'CEREBRAS', cls:'engine-cerebras' },
+  mistral: { url:'https://api.mistral.ai/v1/chat/completions', models:['mistral-small-latest','open-mistral-nemo','ministral-8b-latest','mistral-medium-latest'], tag:'MISTRAL', cls:'engine-mistral' },
+  'mistral-code': { key:'mistral', url:'https://api.mistral.ai/v1/chat/completions', models:['codestral-latest','devstral-small-latest','mistral-small-latest'], tag:'MISTRAL·CODE', cls:'engine-mistral' },
+  openrouter: { url:'https://openrouter.ai/api/v1/chat/completions', routerFallback:true, prefer:PREFER_GENERAL,
+    models:['openai/gpt-oss-120b:free','deepseek/deepseek-chat-v3.1:free','meta-llama/llama-3.3-70b-instruct:free','qwen/qwen3-235b-a22b:free','google/gemma-3-27b-it:free'], tag:'OPENROUTER', cls:'engine-openrouter' },
+  'openrouter-code': { key:'openrouter', url:'https://openrouter.ai/api/v1/chat/completions', routerFallback:true, prefer:PREFER_CODE,
+    models:['qwen/qwen3-coder:free','deepseek/deepseek-chat-v3.1:free','openai/gpt-oss-120b:free','qwen/qwen-2.5-coder-32b-instruct:free'], tag:'OPENROUTER·CODE', cls:'engine-openrouter' },
+  nvidia: { url:'https://integrate.api.nvidia.com/v1/chat/completions', models:['meta/llama-3.3-70b-instruct','nvidia/llama-3.3-nemotron-super-49b-v1.5','qwen/qwen2.5-coder-32b-instruct','mistralai/mistral-small-24b-instruct','meta/llama-3.1-8b-instruct'], tag:'NVIDIA', cls:'engine-nvidia' },
+  hf: { url:'https://router.huggingface.co/v1/chat/completions', models:['meta-llama/Llama-3.3-70B-Instruct','Qwen/Qwen2.5-72B-Instruct','meta-llama/Llama-3.1-8B-Instruct','mistralai/Mistral-7B-Instruct-v0.3'], tag:'HF', cls:'engine-hf' },
+  zai: { url:'https://api.z.ai/api/paas/v4/chat/completions', models:['glm-4.5-flash','glm-4-flash','glm-4.5-air','glm-4.6'], tag:'Z.AI · GLM', cls:'engine-cerebras' },
+  llm7: { url:'https://api.llm7.io/v1/chat/completions', models:['gpt-5-nano','gpt-4o-mini-2024-07-18','deepseek-v3','mistral-small-2503'], tag:'LLM7', cls:'engine-hf' },
 };
 
 const ROUTES = {
-  chat:      ['groq','zai','mistral','openrouter','nvidia','hf','llm7'],
-  code:      ['mistral-code','zai','openrouter-code','groq','hf','llm7'],
-  reasoning: ['gemini','nvidia','mistral','zai'],
+  chat:      ['groq','zai','mistral','openrouter','nvidia','hf','llm7','claude'],
+  code:      ['mistral-code','zai','openrouter-code','groq','hf','llm7','claude'],
+  reasoning: ['gemini','nvidia','mistral','zai','claude'],
   image:     ['pollinations','gemini'],
   vision:    ['gemini'],
 };
@@ -676,6 +893,7 @@ const SELECTABLE_ENGINES = [
   { key:'hf', label:'Hugging Face', type:'text', needKey:'hf' },
   { key:'zai', label:'Z.ai GLM', type:'text', needKey:'zai' },
   { key:'gemini', label:'Gemini', type:'text', needKey:'gemini' },
+  { key:'claude', label:'Claude (finisseur)', type:'text', needKey:'claude_sfr' },
   { key:'llm7', label:'LLM7 (sans clé)', type:'text', needKey:null },
   { key:'gemini', label:'Gemini (image)', type:'image', needKey:'gemini' },
   { key:'pollinations', label:'Pollinations (image)', type:'image', needKey:null },
@@ -688,9 +906,12 @@ function renderEngineList(){
   list.innerHTML = rows.map((e,i) => {
     const configured = !e.needKey || hasKey(e.needKey);
     const active = forcedEngine ? (forcedEngine.key===e.key && forcedEngine.type===e.type) : (e.key===null);
-    return `<button data-i="${i}" ${configured?'':'disabled'} style="display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;background:${active?'#1b2b24':'none'};border:1px solid ${active?'var(--cyan)':'var(--line)'};color:${configured?'var(--text)':'var(--dim)'};padding:10px 12px;border-radius:8px;margin-bottom:6px;font-size:13px;${configured?'cursor:pointer;':'opacity:0.4;'}">
+    const hKey = !e.key ? null : e.key === 'claude' ? 'claude_sfr' : (OA_PROVIDERS[e.key] ? (OA_PROVIDERS[e.key].key || e.key) : e.key);
+    const paused = hKey ? providerBlockReason(hKey) : null;
+    const note = !configured ? 'clé manquante' : (paused ? '⏸ ' + paused : (e.type ? e.type.toUpperCase() : ''));
+    return `<button data-i="${i}" ${configured?'':'disabled'} style="display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;background:${active?'#1b2b24':'none'};border:1px solid ${active?'var(--cyan)':'var(--line)'};color:${configured?'var(--text)':'var(--dim)'};padding:10px 12px;border-radius:8px;margin-bottom:6px;font-size:13px;${configured?'cursor:pointer;':'opacity:0.4;'}">
       <span>${e.label}</span>
-      <span class="mono" style="font-size:10px;color:var(--dim);">${configured ? (e.type ? e.type.toUpperCase() : '') : 'clé manquante'}</span>
+      <span class="mono" style="font-size:10px;color:${paused?'var(--amber)':'var(--dim)'};text-align:right;">${note}</span>
     </button>`;
   }).join('');
   list.querySelectorAll('button[data-i]').forEach(btn=>{
@@ -783,7 +1004,38 @@ document.getElementById('current-title').onclick = ()=>{
 document.getElementById('close-context').onclick = ()=> document.getElementById('overlay-context').classList.remove('show');
 document.getElementById('overlay-context').onclick = (e)=>{ if(e.target.id==='overlay-context') document.getElementById('overlay-context').classList.remove('show'); };
 
-document.getElementById('diag-btn').onclick = ()=>{ document.getElementById('overlay-diag').classList.add('show'); };
+function renderHealthPanel(){
+  const el = document.getElementById('health-panel');
+  if(!el) return;
+  const paused = Object.keys(HEALTH).map(p=>({ p, r:providerBlockReason(p) })).filter(x=>x.r);
+  const dead = Object.keys(DEAD_MODELS).filter(k => isModelDead(k.split('::')[0], k.split('::').slice(1).join('::')));
+  const cats = Object.entries(MODEL_CACHE).map(([p,c])=>`${p} : ${c.list.length} modèles (catalogue du ${new Date(c.ts).toLocaleString('fr-FR')})`);
+  el.innerHTML =
+    (paused.length
+      ? paused.map(x=>`<div style="padding:3px 0;color:var(--amber);">⏸ <b>${escapeHtml(x.p)}</b> — ${escapeHtml(x.r)}</div>`).join('')
+      : '<div style="color:var(--dim);">✅ Aucun moteur en pause.</div>') +
+    (dead.length ? `<div style="margin-top:8px;color:var(--dim);font-size:11px;">Modèles en quarantaine (12 h) : ${dead.map(k=>escapeHtml(k.replace('::',' → '))).join(', ')}</div>` : '') +
+    (cats.length ? `<div style="margin-top:8px;color:var(--dim);font-size:11px;">Catalogues live : ${cats.map(escapeHtml).join(' · ')}</div>` : '');
+}
+
+document.getElementById('diag-btn').onclick = ()=>{ renderHealthPanel(); document.getElementById('overlay-diag').classList.add('show'); };
+document.getElementById('reset-health-btn').onclick = ()=>{ resetHealth(); renderHealthPanel(); };
+document.getElementById('refresh-models-btn').onclick = async ()=>{
+  const btn = document.getElementById('refresh-models-btn');
+  btn.disabled = true; btn.textContent = 'Interrogation des catalogues…';
+  MODEL_CACHE = {}; PROXY_CATALOG = null; // force une vraie relecture chez les fournisseurs
+  const out = [];
+  const cat = await fetchProxyCatalog(true);
+  if(cat) Object.entries(cat).forEach(([p,l]) => out.push('Worker · ' + p + ' : ' + l.length + ' modèles'));
+  else out.push('Worker : pas de route /models (ancienne version) — découverte locale utilisée');
+  for(const p of Object.keys(MODEL_DISCOVERY)){
+    const list = await fetchCatalog(p);
+    out.push(p + ' : ' + (list && list.length ? list.length + ' modèles gratuits' : 'échec (liste de secours utilisée)'));
+  }
+  btn.disabled = false; btn.textContent = '🔄 Rafraîchir la liste des modèles gratuits';
+  document.getElementById('diag-results').innerHTML = out.map(l=>`<div style="padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px;">${escapeHtml(l)}</div>`).join('');
+  renderHealthPanel();
+};
 document.getElementById('close-diag').onclick = ()=> document.getElementById('overlay-diag').classList.remove('show');
 document.getElementById('overlay-diag').onclick = (e)=>{ if(e.target.id==='overlay-diag') document.getElementById('overlay-diag').classList.remove('show'); };
 
@@ -793,6 +1045,7 @@ const DIAG_TARGETS = [
   { id:'openrouter-code', label:'OpenRouter Qwen Coder' }, { id:'nvidia', label:'NVIDIA' },
   { id:'hf', label:'Hugging Face' }, { id:'zai', label:'Z.ai' },
   { id:'gemini-text', label:'Gemini (texte)' }, { id:'llm7', label:'LLM7' },
+  { id:'claude', label:'Claude (finisseur)' },
 ];
 
 document.getElementById('run-diag-btn').onclick = async ()=>{
@@ -805,9 +1058,15 @@ document.getElementById('run-diag-btn').onclick = async ()=>{
     const row = document.getElementById('diag-row-'+t.id);
     const statusSpan = row.querySelector('span:last-child');
     try{
+      // le diagnostic doit dire la VÉRITÉ du moment : on lève la pause du disjoncteur pour ce test
+      const hKey = t.id === 'gemini-text' ? 'gemini' : t.id === 'claude' ? 'claude_sfr' : (OA_PROVIDERS[t.id] ? (OA_PROVIDERS[t.id].key || t.id) : t.id);
+      healthOf(hKey).until = 0;
       if(t.id === 'gemini-text'){
         if(!hasKey('gemini')) throw new Error('non configuré');
         await callGeminiText('Réponds juste "ok".', null, []);
+      } else if(t.id === 'claude'){
+        if(!hasKey('claude_sfr')) throw new Error('non configuré');
+        await callClaude('Réponds juste "ok".', [], { system:'', maxTokens:64 });
       } else if(t.id === 'llm7'){
         await callOpenAICompatible(OA_PROVIDERS.llm7, 'Réponds juste "ok".', []);
       } else {
@@ -822,6 +1081,7 @@ document.getElementById('run-diag-btn').onclick = async ()=>{
     }
   }
   btn.disabled = false; btn.textContent = '▶ Relancer le diagnostic';
+  renderHealthPanel();
 };
 
 // --- Zone de dépôt du projet (propre à chaque conversation) ---
@@ -1563,33 +1823,63 @@ function proxyHeaders(extra){ return { 'Content-Type':'application/json', 'X-App
 async function callOpenAICompatible(cfg, userText, history, onSkillUse, onChunk){
   const keyName = cfg.key || Object.keys(OA_PROVIDERS).find(k=>OA_PROVIDERS[k]===cfg);
   const providerKey = cfg.key || keyName.split('-')[0];
+
+  // Disjoncteur : si ce moteur vient de renvoyer 402/429/401, on n'y touche pas
+  const blocked = providerBlockReason(providerKey);
+  if(blocked) throw new Error('Moteur en pause : ' + blocked);
+
+  const viewKey = Object.keys(OA_PROVIDERS).find(k => OA_PROVIDERS[k] === cfg) || providerKey;
+  const candidates = await resolveModels(providerKey, cfg, viewKey);
+  let lastErr = null;
+  for(const model of candidates.slice(0, cfg.maxTries || 4)){
+    try{
+      return await runOACall(cfg, providerKey, model, candidates, userText, history, onSkillUse, onChunk);
+    }catch(err){
+      lastErr = err;
+      if(err.__fatal) throw err;        // clé/quota mort : changer de modèle ne servirait à rien
+      if(err.__nextModel) continue;     // ce modèle précis est retiré -> on essaie le suivant
+      throw err;                        // réseau, timeout, abandon utilisateur…
+    }
+  }
+  throw lastErr || new Error('Aucun modèle disponible pour ce moteur.');
+}
+
+async function runOACall(cfg, providerKey, model, candidates, userText, history, onSkillUse, onChunk){
   const useProxy = proxyActive();
-  const apiKey = useProxy ? null : KEYS[providerKey];
+  const apiKey = useProxy ? null : (KEYS[providerKey] || (providerKey === 'llm7' ? 'unused' : ''));
   const targetUrl = useProxy ? proxyTarget(providerKey) : cfg.url;
   const headers = useProxy ? proxyHeaders() : { 'Content-Type':'application/json', 'Authorization':'Bearer ' + apiKey };
   const sysCtx = currentSystemContext;
   let messages = sysCtx ? [{role:'system', content:sysCtx}, ...history, {role:'user', content:userText}] : [...history, {role:'user', content:userText}];
   let toolsEnabled = true;
   for(let round=0; round<3; round++){
-    const res = await fetchWithTimeout(targetUrl, {
-      method:'POST',
-      headers,
-      body: JSON.stringify(toolsEnabled ? { model:cfg.model, messages, tools:getSkills(), tool_choice:'auto', stream:true } : { model:cfg.model, messages, stream:true })
-    }, 30000);
+    const body = { model, messages, stream:true };
+    // OpenRouter sait basculer tout seul si le 1er modèle est saturé : on lui donne nos remplaçants
+    if(cfg.routerFallback){
+      const others = candidates.filter(m => m !== model).slice(0, 3);
+      if(others.length) body.models = [model, ...others];
+    }
+    if(toolsEnabled){ body.tools = getSkills(); body.tool_choice = 'auto'; }
+    const res = await fetchWithTimeout(targetUrl, { method:'POST', headers, body: JSON.stringify(body) }, 30000);
     if(!res.ok){
       const t = await res.text().catch(()=> '');
-      if(res.status === 400 && toolsEnabled){
+      const kind = classifyHttpError(res.status, t);
+      if(kind === 'bad' && toolsEnabled){
         // certains moteurs (ex: Z.ai sur modèle gratuit) refusent le function calling -> on retente sans
         toolsEnabled = false;
         round--; continue;
       }
-      throw new Error('HTTP ' + res.status + ' ' + t.slice(0,180));
+      const err = new Error('HTTP ' + res.status + ' [' + model + '] ' + t.slice(0,150));
+      const ra = parseInt(res.headers.get('retry-after') || '', 10);
+      registerFailure(providerKey, model, res.status, t, err);
+      if(kind === 'rate' && isFinite(ra) && ra > 0) coolDown(providerKey, ra * 1000, 'limite de débit atteinte (429)');
+      throw err;
     }
     if(!res.body){ // fournisseur sans support de streaming : repli non-streamé
       const data = await safeJson(res);
       if(data.error) throw new Error(typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error)).slice(0,180));
       const msg = data.choices?.[0]?.message;
-      if(!msg) throw new Error('Réponse vide reçue du modèle.');
+      if(!msg){ const e=new Error('Réponse vide reçue du modèle ['+model+'].'); e.__nextModel=true; throw e; }
       if(msg.tool_calls && msg.tool_calls.length){
         messages.push(msg);
         for(const call of msg.tool_calls){
@@ -1599,7 +1889,7 @@ async function callOpenAICompatible(cfg, userText, history, onSkillUse, onChunk)
         }
         continue;
       }
-      if(!msg.content || !msg.content.trim()) throw new Error('Réponse vide reçue du modèle.');
+      if(!msg.content || !msg.content.trim()){ const e=new Error('Réponse vide reçue du modèle ['+model+'].'); e.__nextModel=true; throw e; }
       return msg.content;
     }
     const reader = res.body.getReader();
@@ -1657,12 +1947,51 @@ async function callOpenAICompatible(cfg, userText, history, onSkillUse, onChunk)
       }
       continue;
     }
-    if(!contentAccum || !contentAccum.trim()) throw new Error('Réponse vide reçue du modèle.');
+    if(!contentAccum || !contentAccum.trim()){ const e=new Error('Réponse vide reçue du modèle ['+model+'].'); e.__nextModel=true; throw e; }
     return contentAccum;
   }
   return '(trop d\'appels d\'outils, réponse interrompue)';
 }
-const GEMINI_TEXT_CASCADE = ['gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-3-flash-preview', 'gemma-3-27b-it'];
+const GEMINI_TEXT_CASCADE = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash-lite', 'gemini-3-flash-preview', 'gemma-3-27b-it'];
+const CLAUDE_MODELS = ['claude-sonnet-5', 'claude-sonnet-4-6', 'claude-haiku-4-5-20251001'];
+
+async function callClaude(userText, history, opts){
+  const useProxy = proxyActive();
+  if(!useProxy && !KEYS.claude_sfr) throw new Error('Clé Claude non configurée.');
+  const blocked = providerBlockReason('claude_sfr');
+  if(blocked) throw new Error('Moteur en pause : ' + blocked);
+
+  const messages = [...history, {role:'user', content:userText}];
+  const systemText = (opts && opts.system) || currentSystemContext;
+  const maxTokens = (opts && opts.maxTokens) || 8192;
+  const candidates = CLAUDE_MODELS.filter(m => !isModelDead('claude_sfr', m));
+  const tries = candidates.length ? candidates : CLAUDE_MODELS.slice(0,1);
+
+  let lastErr = null;
+  for(const model of tries){
+    const body = { model, max_tokens:maxTokens, messages };
+    if(systemText) body.system = systemText;
+    const res = await fetchWithTimeout(
+      useProxy ? proxyTarget('claude') : 'https://api.anthropic.com/v1/messages',
+      { method:'POST',
+        headers: useProxy ? proxyHeaders() : { 'Content-Type':'application/json', 'x-api-key':KEYS.claude_sfr, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+        body: JSON.stringify(body) },
+      90000);
+    if(!res.ok){
+      const t = await res.text().catch(()=>'');
+      const err = new Error('HTTP '+res.status+' ['+model+'] '+t.slice(0,150));
+      const kind = registerFailure('claude_sfr', model, res.status, t, err);
+      lastErr = err;
+      if(err.__nextModel && kind === 'model') continue; // nom de modèle périmé -> on tente le suivant
+      throw err;
+    }
+    const data = await safeJson(res);
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    if(!text){ lastErr = new Error('Réponse vide de Claude ['+model+'].'); continue; }
+    return text;
+  }
+  throw lastErr || new Error('Claude indisponible.');
+}
 
 async function callGeminiText(userText, imagePart, history){
   const parts = [];
@@ -1673,8 +2002,13 @@ async function callGeminiText(userText, imagePart, history){
   const useProxy = proxyActive();
   const baseBody = currentSystemContext ? { contents, systemInstruction:{ parts:[{text:currentSystemContext}] } } : { contents };
 
+  const blocked = providerBlockReason('gemini');
+  if(blocked) throw new Error('Moteur en pause : ' + blocked);
+
+  const cascade = GEMINI_TEXT_CASCADE.filter(m => !isModelDead('gemini', m));
+  const tries = cascade.length ? cascade : GEMINI_TEXT_CASCADE.slice(0, 2);
   let lastErr = null;
-  for(const model of GEMINI_TEXT_CASCADE){
+  for(const model of tries){
     try{
       const res = await fetchWithTimeout(
         useProxy ? proxyTarget('gemini-text') : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -1685,20 +2019,21 @@ async function callGeminiText(userText, imagePart, history){
         }, 45000);
       if(!res.ok){
         const t = await res.text().catch(()=> '');
-        const err = new Error('HTTP ' + res.status + ' ' + t.slice(0,180));
-        // 429 = rafale, 400/404 = modèle inexistant/retiré pour ce compte -> on tente le suivant
-        if(res.status === 429 || res.status === 400 || res.status === 404){ lastErr = err; continue; }
+        const err = new Error('HTTP ' + res.status + ' [' + model + '] ' + t.slice(0,150));
+        // 404/400 = modèle retiré pour ce compte, 429 = rafale, 5xx = surcharge -> on tente le suivant
+        registerFailure('gemini', model, res.status, t, err);
+        if(err.__nextModel || res.status === 429){ lastErr = err; continue; }
         throw err;
       }
       const data = await safeJson(res);
       if(data.promptFeedback?.blockReason) throw new Error('Contenu bloqué par les filtres Gemini (' + data.promptFeedback.blockReason + ').');
       const cand = data.candidates?.[0];
       if(cand?.finishReason === 'SAFETY' || cand?.finishReason === 'RECITATION') throw new Error('Réponse bloquée par Gemini (' + cand.finishReason + ').');
-      const text = cand?.content?.parts?.[0]?.text;
-      if(!text || !text.trim()) throw new Error('Réponse vide reçue de Gemini.');
+      const text = (cand?.content?.parts || []).map(p => p.text || '').join('').trim();
+      if(!text){ lastErr = new Error('Réponse vide reçue de Gemini [' + model + '].'); continue; }
       return text;
     }catch(e){
-      if(e.message && /\b(429|400|404)\b/.test(e.message)){ lastErr = e; continue; }
+      if(e.__nextModel || (e.message && /\b(429|400|404|410|500|502|503|504)\b/.test(e.message))){ lastErr = e; continue; }
       throw e;
     }
   }
@@ -1731,9 +2066,12 @@ async function callGeminiImage(userText, imagePart){
 
 function friendlyError(err){
   const msg = String(err && err.message || err || '');
+  if(msg.startsWith('Moteur en pause')) return msg;
+  if(msg.includes('402')) return "Crédit épuisé chez ce fournisseur (402) — mis en pause 6 h, le routeur passera directement au suivant.";
   if(msg.includes('429')) return "Trop de requêtes envoyées d'un coup à ce moteur (limite par minute) — pas forcément épuisé pour la journée, ça se libère en général en quelques secondes/minutes.";
   if(msg.includes('401') || msg.includes('403')) return "Clé refusée par ce moteur — vérifie qu'elle est correcte dans ⚙.";
-  if(msg.includes('404')) return "Ce modèle n'existe plus chez ce fournisseur.";
+  if(msg.includes('410')) return "Ce modèle a été retiré définitivement par le fournisseur — mis en quarantaine, un autre sera utilisé.";
+  if(msg.includes('404')) return "Ce modèle n'existe plus chez ce fournisseur — mis en quarantaine, un autre sera utilisé.";
   if(/reduce the length|maximum context|tokens_limit_reached|too large|context_length_exceeded/i.test(msg)) return "Message trop volumineux pour ce moteur (dépasse sa limite de contexte).";
   return msg.slice(0,160);
 }
@@ -2029,6 +2367,9 @@ async function tryWithRetry(fn){
   try{ return await fn(); }
   catch(err){
     const m = String(err && err.message || err || '');
+    // diagnostic déjà posé par le disjoncteur : réessayer ici ne ferait que perdre du temps
+    if(err && (err.__fatal || err.__nextModel)) throw err;
+    if(m.startsWith('Moteur en pause') || m.includes('402') || m.includes('410')) throw err;
     if(m.includes('401') || m.includes('403') || m.includes('404')) throw err;
     if(/reduce the length|maximum context|tokens_limit_reached|too large|context_length_exceeded/i.test(m)) throw err;
     if(m.includes('429')){
@@ -2083,6 +2424,11 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
   if(forcedEngine){
     if(forcedEngine.type === 'image' && category === 'image') route = [forcedEngine.key];
     else if(forcedEngine.type === 'text' && ['chat','code','reasoning'].includes(category)) route = [forcedEngine.key];
+    // choix explicite de l'utilisateur : on lève la pause du disjoncteur pour lui obéir
+    if(route.length === 1){
+      const k = route[0] === 'claude' ? 'claude_sfr' : (OA_PROVIDERS[route[0]] ? (OA_PROVIDERS[route[0]].key || route[0]) : route[0]);
+      healthOf(k).until = 0;
+    }
   }
   const history = chatHistoryFor(c);
 
@@ -2122,11 +2468,15 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
       }catch(err){ think.stop(); c.messages.pop(); if(b.parentElement) b.parentElement.remove(); throw new Error(friendlyError(err)); }
     } else {
       let done = false;
+      const skipped = [];
       for(const key of route){
         let tag, cls, needKey, call;
         if(key === 'gemini'){
           needKey = 'gemini'; tag = 'GEMINI'; cls = 'engine-gemini';
           call = ()=> callGeminiText(text, null, history);
+        } else if(key === 'claude'){
+          needKey = 'claude_sfr'; tag = 'CLAUDE'; cls = 'engine-claude';
+          call = ()=> callClaude(text, history);
         } else if(key === 'cloudflare'){
           needKey = null; tag = 'CLOUDFLARE'; cls = 'engine-nvidia';
           if(!proxyActive() && (!KEYS.cloudflare || !KEYS.cf_account)) continue;
@@ -2148,6 +2498,9 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
           );
         }
         if(needKey && !hasKey(needKey)) continue;
+        // Disjoncteur : un moteur en pause est sauté immédiatement, sans bulle ni attente
+        const pauseReason = needKey ? providerBlockReason(needKey) : null;
+        if(pauseReason && route.length > 1){ skipped.push(tag + ' (' + pauseReason + ')'); continue; }
         let streaming = false;
         const b = pushMessage({ role:'bot', cat:CAT_LABEL[category], tag, tagClass:cls, text:'…' });
         const think = startThinking(b, 'Réflexion…');
@@ -2167,7 +2520,10 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
           b.textContent = msg; c.messages[c.messages.length-1].text = msg; c.messages[c.messages.length-1].tagClass = 'err'; c.messages[c.messages.length-1].isError = true;
         }
       }
-      if(!done) throw new Error('Tous les moteurs de la catégorie "'+category+'" ont échoué (quota atteint) ou aucun n\'est configuré.');
+      if(!done){
+        const detail = skipped.length ? '\n\nMoteurs sautés car en pause :\n• ' + skipped.join('\n• ') + '\n\n(🩺 Diagnostic → « Réinitialiser la santé » si tu veux forcer une nouvelle tentative.)' : '';
+        throw new Error('Tous les moteurs de la catégorie "'+category+'" ont échoué ou sont en pause.' + detail);
+      }
     }
   } catch(err){
     pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:friendlyError(err), isError:true });
@@ -2263,29 +2619,52 @@ document.getElementById('project-mode-btn').onclick = ()=>{
 
 // Un rôle = un appel à un moteur précis (texte simple, pas de streaming/outils pour rester robuste au JSON)
 const PROJECT_ROLES = {
-  content: [ { p:'groq', label:'GROQ' }, { p:'mistral', label:'MISTRAL' }, { p:'openrouter', label:'OPENROUTER' }, { p:'gemini', label:'GEMINI' } ],
-  design:  [ { p:'zai', label:'Z.AI GLM' }, { p:'openrouter', label:'OPENROUTER' }, { p:'groq', label:'GROQ' }, { p:'cerebras', label:'CEREBRAS' }, { p:'mistral', label:'MISTRAL' } ],
-  code:    [ { p:'mistral-code', label:'MISTRAL CODESTRAL' }, { p:'zai', label:'Z.AI GLM' }, { p:'openrouter-code', label:'OPENROUTER QWEN CODER' }, { p:'gemini', label:'GEMINI' } ],
+  content: [ { p:'groq', label:'GROQ' }, { p:'mistral', label:'MISTRAL' }, { p:'openrouter', label:'OPENROUTER' }, { p:'gemini', label:'GEMINI' }, { p:'claude', label:'CLAUDE' } ],
+  design:  [ { p:'zai', label:'Z.AI GLM' }, { p:'openrouter', label:'OPENROUTER' }, { p:'groq', label:'GROQ' }, { p:'cerebras', label:'CEREBRAS' }, { p:'mistral', label:'MISTRAL' }, { p:'claude', label:'CLAUDE' } ],
+  code:    [ { p:'mistral-code', label:'MISTRAL CODESTRAL' }, { p:'zai', label:'Z.AI GLM' }, { p:'openrouter-code', label:'OPENROUTER QWEN CODER' }, { p:'gemini', label:'GEMINI' }, { p:'claude', label:'CLAUDE' } ],
+  finish:  [ { p:'claude', label:'CLAUDE' } ],
 };
 
 async function callAgent(providerKey, systemPrompt, userPrompt){
   const sysCtx = currentSystemContext;
   const fullSystem = sysCtx ? systemPrompt + '\n\nÀ respecter aussi : ' + sysCtx : systemPrompt;
   if(providerKey === 'gemini') return await callGeminiText(fullSystem + '\n\n' + userPrompt, null, []);
+  if(providerKey === 'claude') return await callClaude(userPrompt, [], { system: fullSystem, maxTokens: 16000 });
+
   const cfg = OA_PROVIDERS[providerKey];
   const needKey = cfg.key || providerKey;
   if(!hasKey(needKey)) throw new Error(`Clé manquante pour l'agent ${providerKey}.`);
+  const blocked = providerBlockReason(needKey);
+  if(blocked) throw new Error('Moteur en pause : ' + blocked);
+
   const useProxyAgent = proxyActive();
-  const res = await fetchWithTimeout(useProxyAgent ? proxyTarget(needKey) : cfg.url, {
-    method:'POST',
-    headers: useProxyAgent ? proxyHeaders() : { 'Content-Type':'application/json', 'Authorization':'Bearer '+KEYS[needKey] },
-    body: JSON.stringify({ model:cfg.model, messages:[ {role:'system',content:fullSystem}, {role:'user',content:userPrompt} ], temperature:0.4 })
-  }, 45000);
-  if(!res.ok){ const t = await res.text().catch(()=>''); throw new Error('HTTP '+res.status+' '+t.slice(0,150)); }
-  const data = await safeJson(res);
-  const content = data.choices?.[0]?.message?.content;
-  if(!content || !content.trim()) throw new Error('Réponse vide de l\'agent '+providerKey+'.');
-  return content;
+  const candidates = await resolveModels(needKey, cfg, providerKey);
+  let lastErr = null;
+  for(const model of candidates.slice(0, cfg.maxTries || 4)){
+    const body = { model, messages:[ {role:'system',content:fullSystem}, {role:'user',content:userPrompt} ], temperature:0.4 };
+    if(cfg.routerFallback){
+      const others = candidates.filter(m => m !== model).slice(0, 3);
+      if(others.length) body.models = [model, ...others];
+    }
+    const res = await fetchWithTimeout(useProxyAgent ? proxyTarget(needKey) : cfg.url, {
+      method:'POST',
+      headers: useProxyAgent ? proxyHeaders() : { 'Content-Type':'application/json', 'Authorization':'Bearer '+(KEYS[needKey] || (needKey==='llm7'?'unused':'')) },
+      body: JSON.stringify(body)
+    }, 60000);
+    if(!res.ok){
+      const t = await res.text().catch(()=>'');
+      const err = new Error('HTTP '+res.status+' ['+model+'] '+t.slice(0,150));
+      registerFailure(needKey, model, res.status, t, err);
+      lastErr = err;
+      if(err.__nextModel) continue;
+      throw err;
+    }
+    const data = await safeJson(res);
+    const content = data.choices?.[0]?.message?.content;
+    if(!content || !content.trim()){ lastErr = new Error('Réponse vide de l\'agent '+providerKey+' ['+model+'].'); continue; }
+    return content;
+  }
+  throw lastErr || new Error('Aucun modèle disponible pour l\'agent '+providerKey+'.');
 }
 
 // Essaie chaque moteur du rôle dans l'ordre jusqu'à ce qu'un réussisse ; met à jour le statut en direct
@@ -2293,8 +2672,12 @@ async function callAgentCascade(roleKey, systemPrompt, userPrompt, step, card, s
   const candidates = PROJECT_ROLES[roleKey];
   let lastErr = null;
   for(const cand of candidates){
-    const needKey = cand.p === 'gemini' ? 'gemini' : (OA_PROVIDERS[cand.p].key || cand.p);
+    const needKey = cand.p === 'gemini' ? 'gemini'
+                  : cand.p === 'claude' ? 'claude_sfr'
+                  : (OA_PROVIDERS[cand.p].key || cand.p);
     if(!hasKey(needKey)) continue;
+    // moteur en pause : on ne perd pas 45 s dessus, on passe au suivant
+    if(providerBlockReason(needKey) && candidates.length > 1) continue;
     step.engine = cand.label; step.status = 'running'; renderProjectStatus(card, steps);
     try{
       const result = await callAgent(cand.p, systemPrompt, userPrompt);
@@ -2364,9 +2747,37 @@ async function runProjectPipeline(prompt, c){
       `Demande initiale (priorité absolue) : ${prompt}\n\nBrief de contenu proposé :\n${contentBrief}\n\nCSS proposé :\n${cssBlock}`,
       steps[2], card, steps);
 
-    steps.push({ id:'critique', label:'Relecture critique & polish', engine:'…', status:'running' });
+    // ── Étape finale : Claude reprend l'ébauche des autres IA et livre l'outil demandé ──
+    const canFinish = hasKey('claude_sfr') && !providerBlockReason('claude_sfr');
+    steps.push({ id:'finish', label: canFinish ? 'Claude — finition & livraison' : 'Relecture critique & polish', engine: canFinish ? 'CLAUDE' : '…', status:'running' });
     renderProjectStatus(card, steps);
     let finalCode = draftCode;
+
+    let finisherOk = false;
+    if(canFinish){
+      try{
+        const extracted = extractCodeBlock(draftCode);
+        const draftHtml = extracted ? extracted.code : draftCode;
+        const finished = await callAgent('claude',
+          "Tu es le développeur qui LIVRE le produit fini. Les agents précédents t'ont préparé une ébauche : traite-la comme un point de départ, pas comme une contrainte. Ta seule obligation est que le fichier livré fasse exactement ce que demande la DEMANDE INITIALE, complètement et sans placeholder. Corrige les bugs, complète les fonctions laissées vides, supprime ce qui ne sert pas la demande, et vérifie que le tout tourne réellement dans un navigateur.\n\n" + DESIGN_PRINCIPLES + "\n\nRéponds uniquement avec le fichier HTML autonome complet (HTML+CSS+JS dans un seul fichier) dans un seul bloc de code ```html, sans aucun commentaire avant ou après.",
+          `Demande initiale (priorité absolue) : ${prompt}\n\nÉbauche produite par les autres IA :\n\`\`\`html\n${draftHtml}\n\`\`\`\n\nBrief de contenu :\n${String(contentBrief).slice(0,4000)}`);
+        const fin = extractCodeBlock(finished);
+        if(fin && fin.code.trim().length > 200){ finalCode = finished; finisherOk = true; }
+        if(finisherOk){ steps[3].status = 'done'; renderProjectStatus(card, steps); }
+      }catch(err){
+        steps[3].error = 'Claude indisponible (' + friendlyError(err) + ') — repli sur les moteurs gratuits.';
+        steps[3].status = 'retry'; renderProjectStatus(card, steps);
+      }
+      if(finisherOk){
+        pushMessage({ role:'bot', cat:'PROJET', tag:'RÉSULTAT FINAL', tagClass:'engine-claude', text: finalCode });
+        persistConvos();
+        return;
+      }
+      // Claude indisponible (pas de crédit API, clé absente…) : on bascule sur la relecture gratuite
+      steps[3].label = 'Relecture critique & polish (repli gratuit)';
+      steps[3].status = 'running'; renderProjectStatus(card, steps);
+    }
+
     try{
       const extracted = extractCodeBlock(draftCode);
       const draftHtml = extracted ? extracted.code : draftCode;
@@ -2491,6 +2902,11 @@ if('serviceWorker' in navigator){
 
 (async function init(){
   await loadKeysFromStorage();
+  loadHealth();
+  loadCatalogs();
+  // pré-charge en tâche de fond les catalogues de modèles gratuits (OpenRouter, LLM7)
+  fetchProxyCatalog(false).catch(()=>{});
+  Object.keys(MODEL_DISCOVERY).forEach(p => { fetchCatalog(p).catch(()=>{}); });
   if(!KEYS.groq) { /* garde les clés intégrées par défaut si rien en storage */ }
   reflectStatus();
   await loadConvos();
