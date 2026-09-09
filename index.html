@@ -852,11 +852,13 @@ function coolDown(p, ms, reason){
   h.reason = reason;
   persistHealth();
 }
-function markModelDead(p, model){ DEAD_MODELS[p+'::'+model] = Date.now(); persistHealth(); }
+function markModelDead(p, model, ms){ DEAD_MODELS[p+'::'+model] = { ts:Date.now(), ms: ms || MODEL_QUARANTINE_MS }; persistHealth(); }
 function isModelDead(p, model){
-  const t = DEAD_MODELS[p+'::'+model];
-  if(!t) return false;
-  if(Date.now() - t > MODEL_QUARANTINE_MS){ delete DEAD_MODELS[p+'::'+model]; return false; }
+  const e = DEAD_MODELS[p+'::'+model];
+  if(!e) return false;
+  const ts = typeof e === 'number' ? e : e.ts;   // tolère l'ancien format
+  const ms = typeof e === 'number' ? MODEL_QUARANTINE_MS : (e.ms || MODEL_QUARANTINE_MS);
+  if(Date.now() - ts > ms){ delete DEAD_MODELS[p+'::'+model]; return false; }
   return true;
 }
 function resetHealth(){
@@ -866,15 +868,19 @@ function resetHealth(){
   persistHealth();
 }
 function persistHealth(){
-  try{ localStorage.setItem('routeur-ia-health', JSON.stringify({ HEALTH, DEAD_MODELS })); }catch(e){}
+  try{ localStorage.setItem('routeur-ia-health', JSON.stringify({ version:QUARANTINE_VERSION, HEALTH, DEAD_MODELS })); }catch(e){}
 }
+// Incrémenté quand une correction rend les anciennes quarantaines caduques :
+// évite d'avoir à cliquer « Réinitialiser » à la main après une mise à jour.
+const QUARANTINE_VERSION = 2;
 function loadHealth(){
   try{
     const raw = localStorage.getItem('routeur-ia-health');
     if(!raw) return;
     const d = JSON.parse(raw);
     Object.assign(HEALTH, d.HEALTH||{});
-    Object.assign(DEAD_MODELS, d.DEAD_MODELS||{});
+    if(d.version === QUARANTINE_VERSION) Object.assign(DEAD_MODELS, d.DEAD_MODELS||{});
+    else persistHealth(); // modèles blacklistés à tort : ardoise propre
   }catch(e){}
 }
 
@@ -902,7 +908,13 @@ function registerFailure(providerKey, model, status, bodyText, err){
   if(kind === 'key'){        coolDown(providerKey, COOLDOWNS.key, 'clé refusée ('+status+')'); err.__fatal = true; }
   else if(kind === 'credit'){coolDown(providerKey, COOLDOWNS.credit, 'crédit/quota épuisé (402)'); err.__fatal = true; }
   else if(kind === 'rate'){  coolDown(providerKey, COOLDOWNS.rate, 'limite de débit atteinte (429)'); err.__fatal = true; }
-  else if(kind === 'model'){ markModelDead(providerKey, model); err.__nextModel = true; }
+  else if(kind === 'model'){
+    // "currently unavailable" = le modèle existe mais est en panne : quarantaine
+    // courte, sinon on perd 12 h un modèle parfaitement valide.
+    const temporary = /unavailable|overloaded|temporar|try again|busy|capacity/i.test(bodyText || '');
+    markModelDead(providerKey, model, temporary ? 45*60*1000 : MODEL_QUARANTINE_MS);
+    err.__nextModel = true;
+  }
   else if(kind === 'server'){coolDown(providerKey, COOLDOWNS.server, 'serveur en surcharge ('+status+')'); err.__nextModel = true; }
   else if(kind === 'bad'){   markModelDead(providerKey, model); err.__nextModel = true; }
   return kind;
@@ -1056,13 +1068,15 @@ const OA_PROVIDERS = {
     models:['openai/gpt-oss-120b:free','deepseek/deepseek-chat-v3.1:free','meta-llama/llama-3.3-70b-instruct:free','qwen/qwen3-235b-a22b:free','google/gemma-3-27b-it:free'], tag:'OPENROUTER', cls:'engine-openrouter' },
   'openrouter-code': { key:'openrouter', url:'https://openrouter.ai/api/v1/chat/completions', routerFallback:true, prefer:PREFER_CODE,
     models:['qwen/qwen3-coder:free','deepseek/deepseek-chat-v3.1:free','openai/gpt-oss-120b:free','qwen/qwen-2.5-coder-32b-instruct:free'], tag:'OPENROUTER·CODE', cls:'engine-openrouter' },
-  nvidia: { url:'https://integrate.api.nvidia.com/v1/chat/completions', timeout:60000, models:['meta/llama-3.3-70b-instruct','nvidia/llama-3.3-nemotron-super-49b-v1.5','qwen/qwen2.5-coder-32b-instruct','mistralai/mistral-small-24b-instruct','meta/llama-3.1-8b-instruct'], tag:'NVIDIA', cls:'engine-nvidia' },
+  nvidia: { url:'https://integrate.api.nvidia.com/v1/chat/completions', timeout:90000, models:['meta/llama-3.3-70b-instruct','nvidia/llama-3.3-nemotron-super-49b-v1.5','qwen/qwen2.5-coder-32b-instruct','mistralai/mistral-small-24b-instruct','meta/llama-3.1-8b-instruct'], tag:'NVIDIA', cls:'engine-nvidia' },
   hf: { url:'https://router.huggingface.co/v1/chat/completions', models:['meta-llama/Llama-3.3-70B-Instruct','Qwen/Qwen2.5-72B-Instruct','meta-llama/Llama-3.1-8B-Instruct','mistralai/Mistral-7B-Instruct-v0.3'], tag:'HF', cls:'engine-hf' },
   zai: { url:'https://api.z.ai/api/paas/v4/chat/completions', models:['glm-4.5-flash','glm-4-flash','glm-4.5-air','glm-4.6'], tag:'Z.AI · GLM', cls:'engine-cerebras' },
   // LLM7 liste ~43 modèles mais n'en offre qu'une poignée en gratuit : les autres
   // renvoient 402. On garde donc nos favoris connus gratuits en priorité.
-  llm7: { url:'https://api.llm7.io/v1/chat/completions', preferKnown:true,
-    models:['deepseek-v3-0324','gpt-4o-mini','qwen2.5-coder-32b','mistral-small-3.1-24b','deepseek-r1-0528'], tag:'LLM7', cls:'engine-hf' },
+  // LLM7 met régulièrement des modèles hors ligne ("model_unavailable") : on
+  // pioche dans son catalogue live et on autorise plus d'essais avant d'abandonner.
+  llm7: { url:'https://api.llm7.io/v1/chat/completions', maxTries:6,
+    models:['deepseek-v3-0324','gpt-4o-mini','qwen2.5-coder-32b','deepseek-r1-0528'], tag:'LLM7', cls:'engine-hf' },
 };
 
 const ROUTES = {
@@ -2060,7 +2074,7 @@ async function runOACall(cfg, providerKey, model, candidates, userText, history,
     const body = { model, messages, stream:true };
     // OpenRouter sait basculer tout seul si le 1er modèle est saturé : on lui donne nos remplaçants
     if(cfg.routerFallback){
-      const others = candidates.filter(m => m !== model).slice(0, 3);
+      const others = candidates.filter(m => m !== model).slice(0, 2); // OpenRouter : 3 entrées max AU TOTAL
       if(others.length) body.models = [model, ...others];
     }
     if(toolsEnabled){ body.tools = getSkills(); body.tool_choice = 'auto'; }
@@ -2880,7 +2894,7 @@ async function callAgent(providerKey, systemPrompt, userPrompt){
   for(const model of candidates.slice(0, cfg.maxTries || 4)){
     const body = { model, messages:[ {role:'system',content:fullSystem}, {role:'user',content:userPrompt} ], temperature:0.4 };
     if(cfg.routerFallback){
-      const others = candidates.filter(m => m !== model).slice(0, 3);
+      const others = candidates.filter(m => m !== model).slice(0, 2); // OpenRouter : 3 entrées max AU TOTAL
       if(others.length) body.models = [model, ...others];
     }
     const res = await fetchWithTimeout(useProxyAgent ? proxyTarget(needKey) : cfg.url, {
