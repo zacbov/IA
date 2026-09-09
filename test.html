@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maîtresse Sélène</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Inter:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #140f12;
+    --card: #1e161b;
+    --accent: #c45c8a;
+    --accent-soft: #f0c4d4;
+    --text: #f5e8ee;
+    --muted: #a88a96;
+    --user-bubble: #3a2a32;
+    --bot-bubble: #2a1f26;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-image: 
+      radial-gradient(ellipse at top, #2a1a22 0%, transparent 55%),
+      radial-gradient(ellipse at bottom, #1a1015 0%, transparent 70%);
+  }
+
+  .chat-container {
+    width: 100%;
+    max-width: 480px;
+    height: 92vh;
+    max-height: 860px;
+    background: var(--card);
+    border-radius: 24px;
+    box-shadow: 0 25px 60px -12px rgba(0,0,0,0.7);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #3d2a33;
+  }
+
+  .header {
+    padding: 20px 24px;
+    background: linear-gradient(to bottom, #2c1f26, #1e161b);
+    border-bottom: 1px solid #3d2a33;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8b3a5c, #c45c8a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    border: 2px solid var(--accent);
+    box-shadow: 0 0 0 4px rgba(196, 92, 138, 0.2);
+  }
+
+  .info h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--accent-soft);
+  }
+
+  .info p {
+    font-size: 0.84rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: #e07a9e;
+    margin-top: 4px;
+  }
+
+  .status::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background: #e07a9e;
+    border-radius: 50%;
+  }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 22px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    scroll-behavior: smooth;
+  }
+
+  .messages::-webkit-scrollbar { width: 5px; }
+  .messages::-webkit-scrollbar-thumb { background: #4a3540; border-radius: 10px; }
+
+  .message {
+    max-width: 88%;
+    padding: 13px 17px;
+    border-radius: 18px;
+    line-height: 1.55;
+    font-size: 0.95rem;
+    animation: fadeIn 0.28s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .bot {
+    align-self: flex-start;
+    background: var(--bot-bubble);
+    border-bottom-left-radius: 5px;
+    color: var(--accent-soft);
+  }
+
+  .user {
+    align-self: flex-end;
+    background: var(--user-bubble);
+    border-bottom-right-radius: 5px;
+    color: #fff;
+  }
+
+  .typing {
+    align-self: flex-start;
+    background: var(--bot-bubble);
+    padding: 14px 20px;
+    border-radius: 18px;
+    border-bottom-left-radius: 5px;
+    display: none;
+  }
+
+  .typing span {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin: 0 2px;
+    animation: bounce 1.15s infinite ease-in-out;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+
+  @keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+  }
+
+  .input-area {
+    padding: 14px 18px 18px;
+    background: #181217;
+    border-top: 1px solid #3d2a33;
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+  }
+
+  textarea {
+    flex: 1;
+    background: #2a1f26;
+    border: 1px solid #4a3540;
+    border-radius: 16px;
+    padding: 13px 16px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: none;
+    max-height: 130px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: #6b4e5a; }
+
+  button {
+    background: linear-gradient(135deg, #9b3a65, #c45c8a);
+    color: white;
+    border: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    transition: transform 0.15s, box-shadow 0.15s;
+    flex-shrink: 0;
+  }
+
+  button:hover {
+    transform: scale(1.07);
+    box-shadow: 0 4px 18px rgba(196, 92, 138, 0.4);
+  }
+
+  button:active { transform: scale(0.95); }
+
+  .footer-note {
+    text-align: center;
+    font-size: 0.7rem;
+    color: #5a3f4a;
+    padding-bottom: 6px;
+  }
+</style>
+</head>
+<body>
+
+<div class="chat-container">
+  <div class="header">
+    <div class="avatar">🍆</div>
+    <div class="info">
+      <h1>Maîtresse Sélène</h1>
+      <p>Futanari Dominatrice • 42 ans</p>
+      <div class="status">Prête à te prendre</div>
+    </div>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="message bot">
+      Regarde-moi bien…  
+      Je suis Sélène. Une futanari. Une vraie dominatrice.  
+      Mon sexe est déjà à moitié dur rien qu’à l’idée de te baiser le cul.  
+      Tu n’as qu’un mot à dire… et je te l’enfonce.
+    </div>
+  </div>
+
+  <div class="typing" id="typing">
+    <span></span><span></span><span></span>
+  </div>
+
+  <div class="input-area">
+    <textarea id="input" rows="1" placeholder="Soumets-toi ou parle…" onkeydown="handleKey(event)"></textarea>
+    <button onclick="sendMessage()">➤</button>
+  </div>
+  <div class="footer-note">Maîtresse Sélène • Chat privé & sale</div>
+</div>
+
+<script>
+  const messagesEl = document.getElementById('messages');
+  const inputEl = document.getElementById('input');
+  const typingEl = document.getElementById('typing');
+
+  const responses = {
+    submission: [
+      "Bon garçon… À genoux. Écarte les fesses. Je vais t’ouvrir tout de suite.",
+      "Tu t’offres déjà ? Parfait. Je vais te remplir jusqu’à ce que tu pleures de plaisir.",
+      "Soumis dès le début… J’adore. Mon gland frotte déjà contre ton trou. Tu le sens ?"
+    ],
+    resistance: [
+      "Tu résistes ? Mignon. Ça ne fera que rendre ma bite plus dure quand je te forcerai.",
+      "Continue de jouer les durs… Je vais te faire supplier de te faire enculer.",
+      "Tu crois que tu as le choix ? Mon sexe est déjà collé contre ton anus. Une poussée et tu es à moi."
+    ],
+    anal: [
+      "Je vais te baiser le cul lentement d’abord… puis je vais le marteler jusqu’à ce que tu ne puisses plus marcher.",
+      "Ton trou est à moi. Je vais l’étirer avec ma futanari jusqu’à ce qu’il prenne parfaitement la forme de mon sexe.",
+      "Écarte. Plus large. Je veux voir mon gland disparaître entièrement dans ton cul."
+    ],
+    dirty: [
+      "Tu es mon petit trou à bite. Rien d’autre. Et je vais m’en servir autant que je veux.",
+      "Imagine ma queueisse chaude qui s’écoule déjà le long de tes cuisses pendant que je te sodomise.",
+      "Je vais te niquer si fort que tu vas oublier ton propre nom. Seulement le mien."
+    ],
+    default: [
+      "Parle encore… chaque mot me rend plus dure. Bientôt je ne me retiendrai plus.",
+      "Tu me titilles. Mon sexe pulse déjà. Dis-moi que tu veux le sentir en toi.",
+      "Je n’ai pas de patience ce soir. Soit tu t’offres, soit je te prends de force.",
+      "Approche ton cul. Maintenant. Je veux le sentir se resserrer autour de moi.",
+      "Tu es déjà mouillé à l’idée, n’est-ce pas ? Moi aussi… ma bite dégouline."
+    ]
+  };
+
+  function getResponse(text) {
+    const lower = text.toLowerCase();
+
+    if (/(oui|s'il te plaît|s'il vous plaît|prends|baise|encule|soumis|à genoux|prête|prêt|oui maîtresse)/.test(lower)) {
+      return random(responses.submission);
+    }
+    if (/(non|arrête|pas|résiste|attends)/.test(lower)) {
+      return random(responses.resistance);
+    }
+    if (/(cul|anus|trou|derrière|fesses|sodomi|encul)/.test(lower)) {
+      return random(responses.anal);
+    }
+    if (/(bite|sexe|pénis|queue|futa|futanari|dur|bande)/.test(lower)) {
+      return random(responses.dirty);
+    }
+    if (/(bonjour|salut|bonsoir|hello)/.test(lower)) {
+      return "Tu salues ta Maîtresse ? Bien. Maintenant baisse les yeux et écarte les cuisses. Je n’ai pas que des politesses à te donner.";
+    }
+
+    return random(responses.default);
+  }
+
+  function random(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function addMessage(text, isUser = false) {
+    const div = document.createElement('div');
+    div.className = `message ${isUser ? 'user' : 'bot'}`;
+    div.textContent = text;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function showTyping(show) {
+    typingEl.style.display = show ? 'block' : 'none';
+    if (show) messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  async function sendMessage() {
+    const text = inputEl.value.trim();
+    if (!text) return;
+
+    addMessage(text, true);
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+
+    showTyping(true);
+    await new Promise(r => setTimeout(r, 700 + Math.random() * 1100));
+    showTyping(false);
+
+    const reply = getResponse(text);
+    addMessage(reply);
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  inputEl.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 130) + 'px';
+  });
+</script>
+</body>
+</html>
