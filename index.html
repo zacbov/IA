@@ -189,6 +189,17 @@
       <textarea id="custom-instructions" rows="4" style="width:100%;background:#0e1512;border:1px solid var(--line);color:var(--text);padding:10px 11px;border-radius:8px;font-size:13px;font-family:inherit;" placeholder="Ex: réponds toujours en français familier, sois concis."></textarea>
       <p>S'applique à toutes tes conversations et à tous les moteurs (y compris les agents du mode Projet).</p>
     </div>
+    <div class="field"><label>Comportement du routeur</label>
+      <label style="display:flex;align-items:center;gap:9px;font-size:13px;font-weight:400;margin-bottom:7px;cursor:pointer;">
+        <input type="checkbox" id="opt-imgpipe" checked style="width:17px;height:17px;">
+        <span>Pipeline image en 3 étages (prompt enrichi → génération → relecture visuelle)</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:9px;font-size:13px;font-weight:400;cursor:pointer;">
+        <input type="checkbox" id="opt-race" style="width:17px;height:17px;">
+        <span>Course : lancer 2 moteurs en parallèle et garder le plus rapide</span>
+      </label>
+      <p>La course consomme une requête de plus par message, mais supprime l'attente d'un échec avant de basculer. Sans effet sur les paliers gratuits illimités.</p>
+    </div>
     <div class="field"><label>Feuilles de style CSS de référence</label>
       <div id="css-list" style="margin-bottom:8px;"></div>
       <button id="sync-css-github-btn" style="width:100%;background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:10px;border-radius:8px;font-size:12.5px;cursor:pointer;margin-bottom:8px;">🔄 Synchroniser depuis mon dépôt GitHub (zacbov/IA/css)</button>
@@ -723,6 +734,22 @@ function renderMessage(m, index){
 
   wrap.appendChild(bubble);
 
+  // Verdict de la vérification croisée
+  if(m.role === 'bot' && m.check){
+    const col = m.check.agree ? 'var(--cyan)' : 'var(--amber)';
+    const box = document.createElement('div');
+    box.style.cssText = `margin-top:6px;border-left:3px solid ${col};background:#0e1512;border-radius:0 8px 8px 0;padding:8px 10px;font-size:12px;`;
+    const head = document.createElement('div');
+    head.className = 'mono';
+    head.style.cssText = `font-size:10px;color:${col};margin-bottom:4px;`;
+    head.textContent = '🔍 RELU PAR ' + m.check.by;
+    const body = document.createElement('div');
+    body.style.cssText = 'color:var(--text);white-space:pre-wrap;';
+    body.textContent = m.check.verdict;
+    box.appendChild(head); box.appendChild(body);
+    wrap.appendChild(box);
+  }
+
   // Navigation entre versions quand on a régénéré ( ‹ 2/3 › )
   if(m.role === 'bot' && m.versions && m.versions.length > 1){
     const nav = document.createElement('div');
@@ -758,6 +785,10 @@ function renderMessage(m, index){
     const regenBtn = document.createElement('button');
     regenBtn.textContent = '🔄 Régénérer'; regenBtn.style.cssText = btnStyle;
     regenBtn.onclick = ()=> regenerate(index);
+    const checkBtn = document.createElement('button');
+    checkBtn.textContent = '🔍 Vérifier'; checkBtn.title = 'Faire relire cette réponse par un autre moteur';
+    checkBtn.style.cssText = btnStyle;
+    checkBtn.onclick = ()=> crossCheck(index, checkBtn);
     const speakBtn = document.createElement('button');
     speakBtn.textContent = '🔊'; speakBtn.title = 'Lire à voix haute'; speakBtn.style.cssText = btnStyle;
     speakBtn.onclick = async ()=>{
@@ -776,7 +807,9 @@ function renderMessage(m, index){
       }
       speakBtn.disabled = false; speakBtn.textContent = orig;
     };
-    actions.appendChild(copyBtn); actions.appendChild(regenBtn); actions.appendChild(speakBtn);
+    actions.appendChild(copyBtn); actions.appendChild(regenBtn);
+    if(!m.isError) actions.appendChild(checkBtn);
+    actions.appendChild(speakBtn);
     wrap.appendChild(actions);
   }
   if(m.role === 'user'){
@@ -791,6 +824,52 @@ function renderMessage(m, index){
   messagesEl.appendChild(wrap);
   return bubble;
 }
+/* ══════════════════════════════════════════════════════════════════════
+   TES MOTEURS NE SONT PAS QUE DES ROUES DE SECOURS
+   Sept moteurs gratuits qui fonctionnent, utilisés uniquement en cas de
+   panne, c'est du gâchis. Deux usages qui ne coûtent rien de plus :
+     • la vérification croisée : un autre moteur relit la réponse
+     • la course : deux moteurs lancés en même temps, on garde le 1er arrivé
+   ══════════════════════════════════════════════════════════════════════ */
+async function crossCheck(botIndex, btn){
+  const c = getCurrent();
+  const bot = c.messages[botIndex];
+  if(!bot || !bot.text) return;
+  let userIdx = botIndex - 1;
+  while(userIdx >= 0 && c.messages[userIdx].role !== 'user') userIdx--;
+  const question = userIdx >= 0 ? (c.messages[userIdx].fullText || c.messages[userIdx].text) : '(question inconnue)';
+  const origin = bot.tag || '';
+
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ Relecture…';
+  const sys = "Tu es relecteur critique. On te donne une question et la réponse d'un autre modèle. "
+    + "Vérifie l'exactitude factuelle et la logique. Réponds en français, en 4 lignes maximum :\n"
+    + "Commence par ACCORD, NUANCE ou DÉSACCORD, puis explique brièvement. "
+    + "Si tu repères une erreur, donne la correction. Ne réécris pas toute la réponse.";
+  const prompt = `Question posée :\n${String(question).slice(0,2000)}\n\nRéponse à vérifier :\n${String(bot.text).slice(0,4000)}`;
+
+  // on choisit un moteur DIFFÉRENT de celui qui a produit la réponse
+  const candidates = ['groq','zai','mistral','openrouter','gemini','cerebras','llm7']
+    .filter(p => !origin || !(OA_PROVIDERS[p] && OA_PROVIDERS[p].tag === origin));
+  for(const p of orderRoute(candidates)){
+    const need = p === 'gemini' ? 'gemini' : (OA_PROVIDERS[p] ? (OA_PROVIDERS[p].key || p) : p);
+    if(!hasKey(need) || providerBlockReason(need)) continue;
+    try{
+      const verdict = p === 'gemini'
+        ? await callGeminiText(sys + '\n\n' + prompt, null, [])
+        : await callAgent(p, sys, prompt);
+      const v = String(verdict).trim();
+      const agree = /^accord/i.test(v);
+      const label = p === 'gemini' ? 'GEMINI' : (OA_PROVIDERS[p] ? OA_PROVIDERS[p].tag : p.toUpperCase());
+      bot.check = { by: label, verdict: v, agree };
+      persistConvos(); renderMessages();
+      return;
+    }catch(e){ /* moteur suivant */ }
+  }
+  btn.disabled = false; btn.textContent = orig;
+  alert('Aucun autre moteur disponible pour la vérification.');
+}
+
 function editMessage(index){
   if(isBusy) return;
   const c = getCurrent();
@@ -1075,6 +1154,30 @@ function loadCatalogs(){
   try{ const raw = localStorage.getItem('routeur-ia-catalogs'); if(raw) MODEL_CACHE = JSON.parse(raw); }catch(e){}
 }
 
+/* Course entre deux moteurs : on lance les deux, on garde celui qui répond
+   en premier et on abandonne l'autre. Gratuit chez tous les fournisseurs
+   à palier libre, et ça supprime l'attente d'un échec avant de basculer. */
+let raceMode = false;
+async function raceCalls(calls){
+  if(!calls.length) throw new Error('Aucun moteur disponible.');
+  let settled = false;
+  const errors = [];
+  return await new Promise((resolve, reject)=>{
+    calls.forEach(({ key, run })=>{
+      run().then(result=>{
+        if(settled) return;
+        settled = true;
+        resolve({ key, result });
+      }).catch(err=>{
+        errors.push(key + ' : ' + friendlyError(err));
+        if(!settled && errors.length === calls.length){
+          reject(new Error('Les deux moteurs ont échoué.\n' + errors.join('\n')));
+        }
+      });
+    });
+  });
+}
+
 /* Réordonne une cascade : on garde l'intention (le 1er reste privilégié) mais
    un moteur qui vient d'échouer ou qui est au bord de sa limite recule. */
 function healthKeyOf(key){
@@ -1207,7 +1310,7 @@ const ROUTES = {
   chat:      ['groq','zai','mistral','openrouter','nvidia','hf','llm7','claude'],
   code:      ['mistral-code','zai','openrouter-code','groq','hf','llm7','claude'],
   reasoning: ['gemini','nvidia','mistral','zai','claude'],
-  image:     ['pollinations','gemini'],
+  image:     ['gemini','cloudflare','pollinations','fal','flux'],
   vision:    ['gemini'],
 };
 const CAT_LABEL = { chat:'CHAT', code:'CODE', reasoning:'ANALYSE', image:'IMAGE', vision:'VISION' };
@@ -1368,6 +1471,17 @@ function renderRequestLog(){
     </div>`;
   }).join('');
 }
+(function wireRouterOptions(){
+  const ip = document.getElementById('opt-imgpipe'), rc = document.getElementById('opt-race');
+  try{
+    imagePipelineOn = localStorage.getItem('opt-imgpipe') !== '0';
+    raceMode = localStorage.getItem('opt-race') === '1';
+  }catch(e){}
+  ip.checked = imagePipelineOn; rc.checked = raceMode;
+  ip.onchange = ()=>{ imagePipelineOn = ip.checked; try{ localStorage.setItem('opt-imgpipe', ip.checked?'1':'0'); }catch(e){} };
+  rc.onchange = ()=>{ raceMode = rc.checked; try{ localStorage.setItem('opt-race', rc.checked?'1':'0'); }catch(e){} };
+})();
+
 document.getElementById('log-refresh').onclick = renderRequestLog;
 document.getElementById('log-export').onclick = ()=>{
   downloadBlob('journal-routeur-ia-' + Date.now() + '.json', JSON.stringify(REQ_LOG, null, 2));
@@ -2559,6 +2673,173 @@ async function callCloudflareImage(prompt){
   return { text:'', imgSrc:`data:image/jpeg;base64,${data.result.image}` };
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   MOTEURS D'IMAGE
+   Ordre voulu : les GRATUITS d'abord (Gemini, Cloudflare, Pollinations),
+   puis les clés à crédit (fal.ai, FLUX) en dernier recours. Un 402 les met
+   automatiquement en pause 6 h, exactement comme pour le texte.
+   ══════════════════════════════════════════════════════════════════════ */
+const IMG_PROVIDERS = {
+  gemini:      { tag:'GEMINI · IMAGE',     cls:'engine-gemini',   needKey:'gemini',     free:true, edit:true },
+  cloudflare:  { tag:'CLOUDFLARE · FLUX',  cls:'engine-nvidia',   needKey:null,         free:true, edit:false },
+  pollinations:{ tag:'POLLINATIONS',       cls:'engine-cerebras', needKey:null,         free:true, edit:false },
+  fal:         { tag:'FAL · FLUX',         cls:'engine-openrouter', needKey:'fal',      free:false, edit:false,
+                 models:['fal-ai/flux/schnell','fal-ai/flux/dev','fal-ai/flux-pro/v1.1'] },
+  flux:        { tag:'BFL · FLUX',         cls:'engine-mistral',  needKey:'flux',       free:false, edit:true,
+                 models:['flux-2-flex','flux-pro-1.1','flux-2-pro'] },
+};
+const IMAGE_ROUTE = ['gemini','cloudflare','pollinations','fal','flux'];
+
+/* fal.ai : réponse synchrone, l'image revient en URL */
+async function callFalImage(prompt, model){
+  const m = model || 'fal-ai/flux/schnell';
+  const t0 = Date.now();
+  const res = await fetchWithTimeout(proxyTarget('fal'), {
+    method:'POST', headers: proxyHeaders(),
+    body: JSON.stringify({ __model:m, prompt, image_size:'square_hd', num_images:1 })
+  }, 90000);
+  if(!res.ok){
+    const t = await res.text().catch(()=>'');
+    const err = new Error('HTTP '+res.status+' ['+m+'] '+t.slice(0,400));
+    registerFailure('fal', m, res.status, t, err);
+    logRequest({ provider:'fal', model:m, ok:false, status:res.status, ms:Date.now()-t0, error:t.slice(0,1200) });
+    throw err;
+  }
+  const data = await safeJson(res);
+  const url = data.images?.[0]?.url || data.image?.url;
+  if(!url) throw new Error('fal.ai n\'a renvoyé aucune image.');
+  logRequest({ provider:'fal', model:m, ok:true, status:200, ms:Date.now()-t0 });
+  return { text:'', imgSrc:url };
+}
+
+/* Black Forest Labs : asynchrone, même schéma que Tripo3D */
+async function callFluxImage(prompt, model, inputImageB64){
+  const m = model || 'flux-2-flex';
+  const t0 = Date.now();
+  const payload = { __model:m, prompt, output_format:'jpeg' };
+  if(inputImageB64) payload.input_image = inputImageB64;   // édition d'une image existante
+  const res = await fetchWithTimeout(proxyTarget('flux-submit'), {
+    method:'POST', headers: proxyHeaders(), body: JSON.stringify(payload)
+  }, 45000);
+  if(!res.ok){
+    const t = await res.text().catch(()=>'');
+    const err = new Error('HTTP '+res.status+' ['+m+'] '+t.slice(0,400));
+    registerFailure('flux', m, res.status, t, err);
+    logRequest({ provider:'flux', model:m, ok:false, status:res.status, ms:Date.now()-t0, error:t.slice(0,1200) });
+    throw err;
+  }
+  const sub = await safeJson(res);
+  const polling = sub.polling_url;
+  if(!polling) throw new Error('BFL n\'a pas renvoyé d\'URL de sondage.');
+  // sondage : BFL répond Ready/Pending/Error
+  for(let i=0; i<40; i++){
+    await new Promise(r=>setTimeout(r, 1500));
+    const pr = await fetchWithTimeout(proxyTarget('flux-status') + '?url=' + encodeURIComponent(polling),
+      { method:'GET', headers: proxyHeaders() }, 20000);
+    if(!pr.ok) continue;
+    const st = await safeJson(pr);
+    if(st.status === 'Ready'){
+      const sample = st.result?.sample;
+      if(!sample) throw new Error('BFL : résultat prêt mais sans image.');
+      logRequest({ provider:'flux', model:m, ok:true, status:200, ms:Date.now()-t0 });
+      return { text:'', imgSrc: sample };
+    }
+    if(st.status && /error|fail|moderat/i.test(st.status)){
+      throw new Error('BFL : ' + st.status + ' ' + JSON.stringify(st.details||{}).slice(0,200));
+    }
+  }
+  throw new Error('BFL : délai dépassé pendant le sondage.');
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   PIPELINE IMAGE EN TROIS ÉTAGES
+   1. un modèle TEXTE transforme la demande en vrai prompt d'image
+   2. un moteur IMAGE génère (cascade gratuite d'abord)
+   3. GEMINI VISION compare le résultat à la demande initiale et, si besoin,
+      rédige une consigne de correction appliquée en édition.
+   Les trois briques existaient déjà séparément, elles sont ici reliées.
+   ══════════════════════════════════════════════════════════════════════ */
+let imagePipelineOn = true;   // basculable dans ⚙
+
+/* Étape 1 — enrichissement du prompt par un moteur texte gratuit */
+async function expandImagePrompt(userText){
+  const sys = "Tu es directeur artistique. Transforme la demande en UN prompt d'image en anglais, "
+    + "précis et visuel : sujet, cadrage, lumière, style, palette, niveau de détail. "
+    + "Pas de préambule, pas de guillemets, pas de liste. Maximum 60 mots.";
+  for(const p of ['groq','cerebras','zai','mistral','llm7']){
+    const need = OA_PROVIDERS[p] ? (OA_PROVIDERS[p].key || p) : p;
+    if(!hasKey(need) || providerBlockReason(need)) continue;
+    try{
+      const out = await callAgent(p, sys, userText);
+      const clean = String(out).replace(/^["'`\s]+|["'`\s]+$/g,'').split('\n')[0].trim();
+      if(clean.length > 10) return clean;
+    }catch(e){ /* moteur suivant */ }
+  }
+  return userText;   // aucun moteur libre : on garde la demande telle quelle
+}
+
+/* Convertit une image (URL ou data:) en base64, nécessaire pour l'étape 3 */
+async function imageToBase64(src){
+  if(src.startsWith('data:')){
+    const m = src.match(/^data:([^;]+);base64,(.*)$/);
+    return m ? { mimeType:m[1], base64:m[2] } : null;
+  }
+  try{
+    const res = await fetchWithTimeout(src, { method:'GET' }, 20000);
+    if(!res.ok) return null;
+    const blob = await res.blob();
+    const dataUrl = await new Promise((resolve,reject)=>{
+      const fr = new FileReader();
+      fr.onload = ()=> resolve(fr.result);
+      fr.onerror = ()=> reject(new Error('lecture impossible'));
+      fr.readAsDataURL(blob);
+    });
+    const m = String(dataUrl).match(/^data:([^;]+);base64,(.*)$/);
+    return m ? { mimeType:m[1], base64:m[2] } : null;
+  }catch(e){ return null; }   // CORS ou réseau : on saute simplement l'étape 3
+}
+
+/* Étape 3 — critique visuelle puis correction éventuelle */
+async function critiqueImage(imgSrc, originalRequest){
+  const part = await imageToBase64(imgSrc);
+  if(!part) return null;
+  const question = "Voici une image générée pour cette demande : « " + originalRequest + " ».\n"
+    + "Si l'image répond correctement à la demande, réponds exactement OK.\n"
+    + "Sinon, réponds uniquement par une consigne de correction en anglais, en une phrase, "
+    + "décrivant ce qu'il faut changer (rien d'autre).";
+  const verdict = await callGeminiText(question, part, []);
+  const v = String(verdict).trim();
+  if(/^ok\b/i.test(v) || v.length < 8) return null;
+  return v.replace(/^["'`\s]+|["'`\s]+$/g,'').slice(0,300);
+}
+
+/* Appelle le bon moteur d'image selon la clé du registre */
+async function callImageEngine(key, prompt, pendingImage){
+  const cfg = IMG_PROVIDERS[key];
+  if(key === 'gemini')       return await callGeminiImage(prompt, pendingImage);
+  if(key === 'cloudflare')   return await callCloudflareImage(prompt);
+  if(key === 'pollinations') return await callPollinationsImage(prompt);
+  if(key === 'fal'){
+    const models = (cfg.models||[]).filter(m => !isModelDead('fal', m));
+    let last = null;
+    for(const m of (models.length?models:cfg.models.slice(0,1))){
+      try{ return await callFalImage(prompt, m); }
+      catch(e){ last = e; if(e.__fatal) throw e; }
+    }
+    throw last || new Error('fal.ai indisponible.');
+  }
+  if(key === 'flux'){
+    const models = (cfg.models||[]).filter(m => !isModelDead('flux', m));
+    let last = null;
+    for(const m of (models.length?models:cfg.models.slice(0,1))){
+      try{ return await callFluxImage(prompt, m, pendingImage ? pendingImage.base64 : null); }
+      catch(e){ last = e; if(e.__fatal) throw e; }
+    }
+    throw last || new Error('FLUX indisponible.');
+  }
+  throw new Error('Moteur image inconnu : ' + key);
+}
+
 async function callPollinationsImage(prompt){
   const seed = Math.floor(Math.random()*1000000);
   const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1024&height=1024&seed=${seed}&nologo=true`;
@@ -2756,6 +3037,28 @@ function renderReplyContent(bubble, text){
     card.appendChild(previewBtn);
   }
   // Itération : renvoyer CE fichier au moteur avec une consigne, et obtenir une v2
+  if(block.lang === 'html' || /<html|<!DOCTYPE|<body/i.test(block.code)){
+    const fixBtn = document.createElement('button');
+    fixBtn.textContent = '🔧 Tester & réparer';
+    fixBtn.style.cssText = 'background:none;border:1px solid var(--amber);color:var(--amber);font-weight:700;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;margin-right:6px;margin-bottom:6px;';
+    fixBtn.onclick = async ()=>{
+      fixBtn.disabled = true; fixBtn.textContent = '⏳ Exécution…';
+      const errors = await runAndCollectErrors(block.code, 6000);
+      if(!errors.length){ fixBtn.textContent = '✅ Aucune erreur'; return; }
+      fixBtn.textContent = '🔧 Correction de ' + errors.length + ' erreur' + (errors.length>1?'s':'') + '…';
+      const res = await autoRepair(block.code, block.lang || 'html', 'fichier généré précédemment', 2);
+      if(res.code !== block.code){
+        pushMessage({ role:'bot', cat:'CODE', tag:'RÉPARÉ', tagClass:'engine-mistral',
+          text: 'Erreurs corrigées :\n' + errors.map(e=>'• '+e).join('\n') + '\n\n```' + (block.lang||'html') + '\n' + res.code + '\n```' });
+        persistConvos();
+        fixBtn.textContent = '✅ Réparé';
+      } else {
+        fixBtn.textContent = '⚠ Non corrigé';
+        fixBtn.disabled = false;
+      }
+    };
+    card.appendChild(fixBtn);
+  }
   const iterBtn = document.createElement('button');
   iterBtn.textContent = '✏️ Modifier ce fichier';
   iterBtn.style.cssText = 'background:none;border:1px solid var(--amber);color:var(--amber);font-weight:700;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;margin-bottom:6px;';
@@ -2788,6 +3091,96 @@ function iterateArtifact(block){
   pushMessage({ role:'user', text:'✏️ Modifier le fichier : ' + instruction.trim(), fullText: prompt2 });
   setBusy(true); currentTurnController = new AbortController();
   runRequest(prompt2, null, c, null, 'code').finally(()=> setBusy(false));
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   AUTO-RÉPARATION
+   L'aperçu tourne déjà dans une iframe sandboxée. On y injecte un mouchard
+   qui capte les erreurs JS et les renvoie au parent par postMessage.
+   Le pipeline peut alors EXÉCUTER le fichier généré, lire ce qui casse,
+   et renvoyer code + erreurs au moteur. Générer, tester, corriger.
+   ══════════════════════════════════════════════════════════════════════ */
+const ERROR_PROBE = `<script>(function(){
+  var send=function(kind,msg,extra){try{parent.postMessage({__probe:1,id:'__PROBE_ID__',kind:kind,msg:String(msg).slice(0,600),extra:extra||''},'*');}catch(e){}};
+  window.addEventListener('error',function(e){
+    if(e.target&&e.target!==window&&e.target.src){send('resource','Ressource introuvable : '+e.target.src);return;}
+    send('error',(e.message||'erreur')+' @'+(e.filename||'')+':'+(e.lineno||0));
+  },true);
+  window.addEventListener('unhandledrejection',function(e){send('promise',(e.reason&&e.reason.message)||e.reason||'promesse rejetée');});
+  var ce=console.error;console.error=function(){send('console',Array.prototype.slice.call(arguments).join(' '));ce.apply(console,arguments);};
+  setTimeout(function(){send('ready','ok');},1200);
+})();<\/script>`;
+
+function instrument(code, probeId){
+  const probe = ERROR_PROBE.replace('__PROBE_ID__', probeId);
+  if(/<head[^>]*>/i.test(code)) return code.replace(/<head[^>]*>/i, m => m + '\n' + probe);
+  if(/<html[^>]*>/i.test(code)) return code.replace(/<html[^>]*>/i, m => m + '\n' + probe);
+  return probe + code;
+}
+
+/* Exécute le code dans une iframe invisible et renvoie les erreurs observées */
+function runAndCollectErrors(code, ms){
+  return new Promise((resolve)=>{
+    const probeId = 'p' + Date.now() + Math.random().toString(36).slice(2,7);
+    const errors = [];
+    let settled = false;
+    const finish = ()=>{
+      if(settled) return; settled = true;
+      window.removeEventListener('message', onMsg);
+      try{ frame.remove(); }catch(e){}
+      // dédoublonne : une même erreur en boucle ne compte qu'une fois
+      const seen = new Set(); const uniq = [];
+      for(const e of errors){ if(!seen.has(e)){ seen.add(e); uniq.push(e); } }
+      resolve(uniq.slice(0, 8));
+    };
+    const onMsg = (ev)=>{
+      const d = ev.data;
+      if(!d || !d.__probe || d.id !== probeId) return;
+      if(d.kind === 'ready'){ setTimeout(finish, 400); return; }
+      errors.push('[' + d.kind + '] ' + d.msg);
+    };
+    window.addEventListener('message', onMsg);
+    const frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:1024px;height:768px;border:0;';
+    frame.setAttribute('sandbox', 'allow-scripts');
+    document.body.appendChild(frame);
+    frame.srcdoc = instrument(injectThreeIfNeeded(code), probeId);
+    setTimeout(finish, ms || 6000);
+  });
+}
+
+/* Boucle : tant que le fichier plante, on renvoie code + erreurs au moteur */
+async function autoRepair(code, lang, originalRequest, maxRounds, onStep){
+  let current = code;
+  const rounds = [];
+  for(let i=0; i<(maxRounds||2); i++){
+    if(onStep) onStep('test', i+1, null);
+    const errors = await runAndCollectErrors(current, 6000);
+    if(!errors.length){ rounds.push({ round:i+1, errors:[], fixed:true }); break; }
+    rounds.push({ round:i+1, errors });
+    if(onStep) onStep('repair', i+1, errors);
+    const prompt = `Ce fichier ${lang||'html'} plante à l'exécution. Voici les erreurs relevées dans le navigateur :\n\n`
+      + errors.map(e=>'• '+e).join('\n')
+      + `\n\nCorrige UNIQUEMENT ces erreurs, sans changer le reste ni les fonctionnalités. `
+      + `La demande d'origine était : ${originalRequest}\n\n`
+      + `Réponds uniquement avec le fichier COMPLET corrigé dans un seul bloc \`\`\`${lang||'html'}.\n\n`
+      + '```' + (lang||'html') + '\n' + current + '\n```';
+    let fixed = null;
+    for(const p of ['mistral-code','zai','openrouter-code','groq','gemini']){
+      const need = p === 'gemini' ? 'gemini' : (OA_PROVIDERS[p] ? (OA_PROVIDERS[p].key || p) : p);
+      if(!hasKey(need) || providerBlockReason(need)) continue;
+      try{
+        const out = p === 'gemini'
+          ? await callGeminiText(prompt, null, [])
+          : await callAgent(p, 'Tu corriges des bugs. Tu renvoies toujours le fichier entier.', prompt);
+        const ex = extractCodeBlock(out);
+        if(ex && ex.code.trim().length > 200){ fixed = ex.code; break; }
+      }catch(e){ /* moteur suivant */ }
+    }
+    if(!fixed) break;      // aucun moteur libre n'a pu corriger
+    current = fixed;
+  }
+  return { code: current, rounds };
 }
 
 function injectThreeIfNeeded(code){
@@ -2920,29 +3313,75 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
   try{
     if(category === 'image'){
       let done = false;
-      for(const key of route){
-        if(key === 'gemini' && !hasKey('gemini')) continue;
-        if(key === 'cloudflare' && (pendingImage || (!proxyActive() && (!KEYS.cloudflare || !KEYS.cf_account)))) continue;
-        if(key === 'pollinations' && pendingImage) continue; // pas d'édition d'image existante possible
-        const tag = key==='gemini' ? 'GEMINI · IMAGE' : key==='pollinations' ? 'POLLINATIONS · FLUX' : 'CLOUDFLARE · FLUX';
-        const cls = key==='gemini' ? 'engine-gemini' : key==='pollinations' ? 'engine-cerebras' : 'engine-nvidia';
-        const b = pushMessage({ role:'bot', cat:CAT_LABEL[category], tag, tagClass:cls, text:'…' });
-        const think = startThinking(b, 'Génération…');
+      const b = pushMessage({ role:'bot', cat:CAT_LABEL[category], tag:'IMAGE', tagClass:'engine-gemini', text:'…' });
+      const think = startThinking(b, 'Préparation…');
+      const journal = [];
+
+      // ── Étape 1 : un moteur texte gratuit écrit le vrai prompt d'image ──
+      let imgPrompt = text;
+      if(imagePipelineOn && !pendingImage){
+        think.setLabel('🎨 Écriture du prompt…');
         try{
-          const r = await tryWithRetry(()=> key==='gemini' ? callGeminiImage(text, pendingImage) : key==='pollinations' ? callPollinationsImage(text) : callCloudflareImage(text));
-          think.stop();
+          imgPrompt = await expandImagePrompt(text);
+          if(imgPrompt !== text) journal.push('**Prompt enrichi :** ' + imgPrompt);
+        }catch(e){ /* on garde la demande brute */ }
+      }
+
+      // ── Étape 2 : cascade de génération, gratuits d'abord ──
+      let result = null, usedKey = null;
+      for(const key of orderRoute(route)){
+        const cfg = IMG_PROVIDERS[key];
+        if(!cfg) continue;
+        if(cfg.needKey && !hasKey(cfg.needKey)) continue;
+        if(key === 'cloudflare' && !proxyActive() && (!KEYS.cloudflare || !KEYS.cf_account)) continue;
+        if(pendingImage && !cfg.edit) continue;          // ce moteur ne sait pas éditer une image existante
+        if(providerBlockReason(key) && route.length > 1) continue;
+        think.setLabel('🖼 ' + cfg.tag + '…');
+        try{
+          const r = await tryWithRetry(()=> callImageEngine(key, imgPrompt, pendingImage));
           bumpUsage(key);
-          b.textContent = r.text || '';
-          if(r.imgSrc){ const img=document.createElement('img'); img.src=r.imgSrc; b.appendChild(img); }
-          c.messages[c.messages.length-1].text = r.text || ''; c.messages[c.messages.length-1].imgSrc = r.imgSrc;
-          done = true; break;
+          result = r; usedKey = key;
+          break;
         }catch(err){
-          think.stop();
-          const msg = '⚠ indisponible — ' + friendlyError(err);
-          b.textContent = msg; c.messages[c.messages.length-1].text = msg; c.messages[c.messages.length-1].tagClass = 'err'; c.messages[c.messages.length-1].isError = true;
+          journal.push('_' + cfg.tag + ' : ' + friendlyError(err) + '_');
         }
       }
-      if(!done) throw new Error(route.some(k=>k==='gemini'?hasKey('gemini'):(hasKey('cloudflare')&&KEYS.cf_account)) ? "Tous les moteurs d'image ont échoué (quota atteint partout)." : "Aucune clé d'image configurée (Gemini ou Cloudflare).");
+
+      if(result){
+        // ── Étape 3 : Gemini Vision compare le résultat à la demande ──
+        if(imagePipelineOn && hasKey('gemini') && !providerBlockReason('gemini') && !pendingImage){
+          think.setLabel('🔍 Relecture visuelle…');
+          try{
+            const fix = await critiqueImage(result.imgSrc, text);
+            if(fix){
+              journal.push('**Correction demandée :** ' + fix);
+              const part = await imageToBase64(result.imgSrc);
+              if(part){
+                think.setLabel('🎯 Correction…');
+                const corrected = await callGeminiImage(fix, part);
+                if(corrected && corrected.imgSrc){ result = corrected; usedKey = 'gemini'; }
+              }
+            } else {
+              journal.push('_Relecture visuelle : conforme à la demande._');
+            }
+          }catch(e){ journal.push('_Relecture visuelle impossible : ' + friendlyError(e) + '_'); }
+        }
+        think.stop();
+        const bm = c.messages[c.messages.length-1];
+        const cfg = IMG_PROVIDERS[usedKey] || { tag:'IMAGE', cls:'engine-gemini' };
+        bm.tag = cfg.tag; bm.tagClass = cfg.cls;
+        bm.text = [result.text || '', journal.join('\n\n')].filter(Boolean).join('\n\n');
+        bm.imgSrc = result.imgSrc;
+        renderMessages();
+        done = true;
+      } else {
+        think.stop();
+        const bm = c.messages[c.messages.length-1];
+        bm.text = "Tous les moteurs d'image ont échoué.\n\n" + journal.join('\n\n');
+        bm.tagClass = 'err'; bm.isError = true;
+        renderMessages();
+      }
+      if(!done) throw new Error("Aucun moteur d'image n'a abouti.");
     } else if(category === 'vision'){
       if(!hasKey('gemini')) throw new Error('Clé Gemini requise pour analyser une photo.');
       const b = pushMessage({ role:'bot', cat:CAT_LABEL[category], tag:'GEMINI · VISION', tagClass:'engine-gemini', text:'…' });
@@ -2955,6 +3394,46 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
       let done = false;
       const skipped = [];
       route = orderRoute(route);   // les moteurs récemment fiables et non saturés d'abord
+
+      // ── Course : les 2 premiers moteurs partent ensemble, le plus rapide gagne ──
+      if(raceMode && route.length > 1 && !pendingImage){
+        const runners = route.slice(0, 2)
+          .filter(k => { const nk = healthKeyOf(k); return hasKey(nk) && !providerBlockReason(nk); })
+          .filter(k => OA_PROVIDERS[k] || k === 'gemini');
+        if(runners.length === 2){
+          const b = pushMessage({ role:'bot', cat:CAT_LABEL[category], tag:'COURSE', tagClass:'engine-groq', text:'…' });
+          const think = startThinking(b, '🏁 ' + runners.map(k=>OA_PROVIDERS[k]?OA_PROVIDERS[k].tag:'GEMINI').join(' vs ') + '…');
+          try{
+            const won = await raceCalls(runners.map(k=>({
+              key: k,
+              run: ()=> k === 'gemini'
+                ? callGeminiText(text, null, history)
+                : callOpenAICompatible(OA_PROVIDERS[k], text, history)
+            })));
+            think.stop();
+            const cfgW = OA_PROVIDERS[won.key];
+            const bm = c.messages[c.messages.length-1];
+            bm.tag = (cfgW ? cfgW.tag : 'GEMINI') + ' 🏁';
+            bm.tagClass = cfgW ? cfgW.cls : 'engine-gemini';
+            bm.text = won.result;
+            bm.versions = [{ text:won.result, tag:bm.tag, tagClass:bm.tagClass, thinking:'' }];
+            bm.vIndex = 0;
+            bumpUsage(won.key);
+            renderMessages();
+            persistConvos();
+            updateHistorySummary(c);
+            return;
+          }catch(err){
+            think.stop();
+            const bm = c.messages[c.messages.length-1];
+            bm.text = 'Course perdue des deux côtés, reprise en cascade classique…';
+            bm.tagClass = 'err';
+            renderMessages();
+            // on continue en cascade normale ci-dessous
+          }
+        }
+      }
+
       for(const key of route){
         let tag, cls, needKey, call;
         if(key === 'gemini'){
@@ -3136,6 +3615,47 @@ document.getElementById('project-mode-btn').onclick = ()=>{
 };
 
 // Un rôle = un appel à un moteur précis (texte simple, pas de streaming/outils pour rester robuste au JSON)
+/* Étape finale du pipeline : on EXÉCUTE réellement le fichier produit,
+   on lit ce qui casse, et on renvoie code + erreurs au moteur. */
+async function repairStage(codeBlob, originalRequest, card, steps){
+  const ex = extractCodeBlock(codeBlob);
+  if(!ex || ex.code.trim().length < 200) return codeBlob;
+  const isHtml = /html/i.test(ex.lang || '') || /<html|<!DOCTYPE|<body/i.test(ex.code);
+  if(!isHtml) return codeBlob;   // on ne sait exécuter que du HTML autonome
+
+  steps.push({ id:'repair', label:'Test d\'exécution & réparation', engine:'SANDBOX', status:'running' });
+  renderProjectStatus(card, steps);
+  const idx = steps.length - 1;
+  try{
+    const res = await autoRepair(ex.code, ex.lang || 'html', originalRequest, 2, (phase, round, errors)=>{
+      steps[idx].label = phase === 'test'
+        ? `Test d'exécution (passe ${round})`
+        : `Réparation de ${errors.length} erreur${errors.length>1?'s':''} (passe ${round})`;
+      renderProjectStatus(card, steps);
+    });
+    const failed = res.rounds.filter(r => r.errors.length);
+    if(!failed.length){
+      steps[idx].label = '✅ Aucune erreur à l\'exécution';
+      steps[idx].status = 'done';
+    } else if(res.code !== ex.code){
+      const total = failed.reduce((n,r)=>n+r.errors.length, 0);
+      steps[idx].label = `Réparé — ${total} erreur${total>1?'s':''} corrigée${total>1?'s':''}`;
+      steps[idx].status = 'done';
+    } else {
+      steps[idx].label = 'Erreurs détectées, correction impossible';
+      steps[idx].status = 'error';
+      steps[idx].error = failed[0].errors.slice(0,3).join(' · ');
+    }
+    renderProjectStatus(card, steps);
+    if(res.code !== ex.code) return '```' + (ex.lang || 'html') + '\n' + res.code + '\n```';
+    return codeBlob;
+  }catch(e){
+    steps[idx].status = 'error'; steps[idx].error = friendlyError(e);
+    renderProjectStatus(card, steps);
+    return codeBlob;
+  }
+}
+
 const PROJECT_ROLES = {
   content: [ { p:'groq', label:'GROQ' }, { p:'mistral', label:'MISTRAL' }, { p:'openrouter', label:'OPENROUTER' }, { p:'gemini', label:'GEMINI' }, { p:'claude', label:'CLAUDE' } ],
   design:  [ { p:'zai', label:'Z.AI GLM' }, { p:'openrouter', label:'OPENROUTER' }, { p:'groq', label:'GROQ' }, { p:'cerebras', label:'CEREBRAS' }, { p:'mistral', label:'MISTRAL' }, { p:'claude', label:'CLAUDE' } ],
@@ -3287,6 +3807,7 @@ async function runProjectPipeline(prompt, c){
         steps[3].status = 'retry'; renderProjectStatus(card, steps);
       }
       if(finisherOk){
+        finalCode = await repairStage(finalCode, prompt, card, steps);
         pushMessage({ role:'bot', cat:'PROJET', tag:'RÉSULTAT FINAL', tagClass:'engine-claude', text: finalCode });
         persistConvos();
         return;
@@ -3310,6 +3831,7 @@ async function runProjectPipeline(prompt, c){
       steps[3].status = 'error'; steps[3].error = 'Relecture ignorée (' + friendlyError(err) + '), fichier initial conservé.'; renderProjectStatus(card, steps);
     }
 
+    finalCode = await repairStage(finalCode, prompt, card, steps);
     pushMessage({ role:'bot', cat:'PROJET', tag:'RÉSULTAT FINAL', tagClass:'engine-mistral', text: finalCode });
   }catch(err){
     pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:'Le pipeline a échoué : '+friendlyError(err), isError:true });
