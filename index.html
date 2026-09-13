@@ -189,6 +189,9 @@
       <textarea id="custom-instructions" rows="4" style="width:100%;background:#0e1512;border:1px solid var(--line);color:var(--text);padding:10px 11px;border-radius:8px;font-size:13px;font-family:inherit;" placeholder="Ex: réponds toujours en français familier, sois concis."></textarea>
       <p>S'applique à toutes tes conversations et à tous les moteurs (y compris les agents du mode Projet).</p>
     </div>
+    <div class="field"><label>Version</label>
+      <p class="mono" id="version-line" style="color:var(--dim);">—</p>
+    </div>
     <div class="field"><label>Comportement du routeur</label>
       <label style="display:flex;align-items:center;gap:9px;font-size:13px;font-weight:400;margin-bottom:7px;cursor:pointer;">
         <input type="checkbox" id="opt-imgpipe" checked style="width:17px;height:17px;">
@@ -358,6 +361,78 @@
 </div>
 
 <script>
+/* ══════════════════════════════════════════════════════════════════════
+   FILET DE SÉCURITÉ — installé AVANT tout le reste
+   Si une erreur interrompt le chargement du script, l'app devient un écran
+   mort sans issue et les conversations sont inaccessibles. Ce garde-fou
+   affiche à la place un panneau de secours avec de quoi exporter ses
+   données et repartir.
+   ══════════════════════════════════════════════════════════════════════ */
+(function safetyNet(){
+  let bootOk = false;
+  window.__bootDone = ()=>{ bootOk = true; };
+
+  function showPanel(detail){
+    if(document.getElementById('crash-panel')) return;
+    const d = document.createElement('div');
+    d.id = 'crash-panel';
+    d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0b0f0d;color:#e6efe9;'
+      + 'font-family:system-ui,-apple-system,sans-serif;padding:22px;overflow:auto;';
+    d.innerHTML = '<h2 style="margin:0 0 6px;font-size:17px;">L\'application n\'a pas pu démarrer</h2>'
+      + '<p style="color:#7d8f87;font-size:13px;margin:0 0 14px;">Tes conversations ne sont pas perdues. '
+      + 'Exporte-les avant toute autre manipulation.</p>'
+      + '<pre id="crash-detail" style="background:#0e1512;border:1px solid #1e2b25;border-radius:8px;'
+      + 'padding:10px;font-size:11px;white-space:pre-wrap;word-break:break-word;color:#ff6b6b;max-height:190px;overflow:auto;"></pre>'
+      + '<button id="crash-export" style="width:100%;margin-top:12px;background:#4fd1c5;border:none;color:#08211c;'
+      + 'font-weight:700;padding:12px;border-radius:8px;font-size:14px;">⬇ Exporter mes données</button>'
+      + '<button id="crash-reload" style="width:100%;margin-top:8px;background:none;border:1px solid #1e2b25;'
+      + 'color:#e6efe9;padding:12px;border-radius:8px;font-size:14px;">↻ Recharger</button>'
+      + '<button id="crash-reset" style="width:100%;margin-top:8px;background:none;border:1px solid #d9822b;'
+      + 'color:#d9822b;padding:12px;border-radius:8px;font-size:14px;">⚠ Réinitialiser l\'affichage (garde les clés)</button>';
+    document.body.appendChild(d);
+    document.getElementById('crash-detail').textContent = detail;
+
+    document.getElementById('crash-export').onclick = async ()=>{
+      const dump = { exportedAt:new Date().toISOString(), error:detail, stores:{} };
+      try{ dump.stores.localStorage = Object.fromEntries(Object.entries(localStorage)); }catch(e){}
+      try{
+        const db = await new Promise((res,rej)=>{ const r=indexedDB.open('routeur-ia',1); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); });
+        dump.stores.indexedDB = await new Promise((res)=>{
+          const tx=db.transaction('kv','readonly'); const g=tx.objectStore('kv').get('conversations');
+          g.onsuccess=()=>res(g.result||null); g.onerror=()=>res(null);
+        });
+      }catch(e){}
+      const blob = new Blob([JSON.stringify(dump,null,2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'sauvegarde-routeur-ia-' + Date.now() + '.json';
+      a.click();
+    };
+    document.getElementById('crash-reload').onclick = ()=> location.reload();
+    document.getElementById('crash-reset').onclick = ()=>{
+      if(!confirm('Vider les conversations et les réglages d\'affichage ? Les clés API sont conservées.')) return;
+      try{
+        ['routeur-ia-convos','routeur-ia-health','routeur-ia-catalogs','routeur-ia-proxy-catalog']
+          .forEach(k=> localStorage.removeItem(k));
+      }catch(e){}
+      location.reload();
+    };
+  }
+
+  window.addEventListener('error', (e)=>{
+    if(bootOk) return;   // une erreur après démarrage est gérée normalement ailleurs
+    const src = e.filename ? ' @' + e.filename.split('/').pop() + ':' + e.lineno : '';
+    showPanel((e.message || 'Erreur inconnue') + src);
+  });
+  // si init() n'a pas signalé sa fin au bout de 8 s, c'est que le script est mort en route
+  setTimeout(()=>{ if(!bootOk && !document.getElementById('crash-panel')){
+    showPanel('Le démarrage ne s\'est pas terminé (script interrompu).');
+  } }, 8000);
+})();
+
+const APP_VERSION = 'v12';
+const APP_BUILD = '2026-09-12 07:45';
+
 // --- Clés intégrées directement (à usage personnel uniquement) ---
 let KEYS = {
   groq:'',
@@ -1158,6 +1233,7 @@ function loadCatalogs(){
    en premier et on abandonne l'autre. Gratuit chez tous les fournisseurs
    à palier libre, et ça supprime l'attente d'un échec avant de basculer. */
 let raceMode = false;
+let imagePipelineOn = true;   // pipeline image en 3 étages, basculable dans ⚙
 async function raceCalls(calls){
   if(!calls.length) throw new Error('Aucun moteur disponible.');
   let settled = false;
@@ -1471,8 +1547,9 @@ function renderRequestLog(){
     </div>`;
   }).join('');
 }
-(function wireRouterOptions(){
+function wireRouterOptions(){
   const ip = document.getElementById('opt-imgpipe'), rc = document.getElementById('opt-race');
+  if(!ip || !rc) return;
   try{
     imagePipelineOn = localStorage.getItem('opt-imgpipe') !== '0';
     raceMode = localStorage.getItem('opt-race') === '1';
@@ -1480,11 +1557,12 @@ function renderRequestLog(){
   ip.checked = imagePipelineOn; rc.checked = raceMode;
   ip.onchange = ()=>{ imagePipelineOn = ip.checked; try{ localStorage.setItem('opt-imgpipe', ip.checked?'1':'0'); }catch(e){} };
   rc.onchange = ()=>{ raceMode = rc.checked; try{ localStorage.setItem('opt-race', rc.checked?'1':'0'); }catch(e){} };
-})();
+}
 
 document.getElementById('log-refresh').onclick = renderRequestLog;
 document.getElementById('log-export').onclick = ()=>{
-  downloadBlob('journal-routeur-ia-' + Date.now() + '.json', JSON.stringify(REQ_LOG, null, 2));
+  downloadBlob('journal-routeur-ia-' + Date.now() + '.json',
+    JSON.stringify({ version:APP_VERSION, build:APP_BUILD, exported:new Date().toISOString(), log:REQ_LOG }, null, 2));
 };
 document.getElementById('diag-btn').onclick = ()=>{ renderHealthPanel(); renderRequestLog(); document.getElementById('overlay-diag').classList.add('show'); };
 document.getElementById('reset-health-btn').onclick = ()=>{ resetHealth(); renderHealthPanel(); };
@@ -2759,7 +2837,6 @@ async function callFluxImage(prompt, model, inputImageB64){
       rédige une consigne de correction appliquée en édition.
    Les trois briques existaient déjà séparément, elles sont ici reliées.
    ══════════════════════════════════════════════════════════════════════ */
-let imagePipelineOn = true;   // basculable dans ⚙
 
 /* Étape 1 — enrichissement du prompt par un moteur texte gratuit */
 async function expandImagePrompt(userText){
@@ -3953,6 +4030,10 @@ if('serviceWorker' in navigator){
   loadHealth();
   loadCatalogs();
   loadRequestLog();
+  wireRouterOptions();
+  const vl = document.getElementById('version-line');
+  if(vl) vl.textContent = APP_VERSION + ' · compilé le ' + APP_BUILD;
+  if(window.__bootDone) window.__bootDone();   // désarme le filet de sécurité
   // pré-charge en tâche de fond les catalogues de modèles gratuits (OpenRouter, LLM7)
   fetchProxyCatalog(false).catch(()=>{});
   Object.keys(MODEL_DISCOVERY).forEach(p => { fetchCatalog(p).catch(()=>{}); });
