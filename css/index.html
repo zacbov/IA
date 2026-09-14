@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualiseur de palettes &amp; polices</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Karla:wght@400;500;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Cormorant:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500&family=Archivo+Black&family=Archivo:wght@400;500;700&family=Orbitron:wght@600;800&family=Rajdhani:wght@400;500;600;700&family=Baloo+2:wght@600;700;800&family=Nunito+Sans:wght@400;600;700&family=Libre+Franklin:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&family=Lora:ital,wght@0,500;0,600;1,500&family=Mulish:wght@400;500;600&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Zilla+Slab:wght@500;600;700&family=Bebas+Neue&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;700&family=Cinzel:wght@500;600;700&family=Newsreader:ital,wght@0,400;0,500;1,400&family=Space+Mono:wght@400;700&family=Press+Start+2P&family=VT323&family=Bodoni+Moda:ital,wght@0,500;0,700;1,500&family=Antic&family=Oswald:wght@500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+/* ===== Chrome de l'outil (indépendant des palettes testées) ===== */
+:root{
+  --tool-bg:#111213;
+  --tool-panel:#1a1b1d;
+  --tool-line:#2b2c2f;
+  --tool-text:#e7e7e5;
+  --tool-dim:#8b8c8f;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--tool-bg);
+  color:var(--tool-text);
+  font:400 14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+
+/* ---- barre de contrôle ---- */
+#controls{
+  position:sticky; top:0; z-index:50;
+  background:var(--tool-panel);
+  border-bottom:1px solid var(--tool-line);
+  padding:14px 20px;
+  display:flex; flex-wrap:wrap; gap:16px 28px; align-items:flex-end;
+}
+.ctrl-group{ display:flex; flex-direction:column; gap:6px; min-width:220px; flex:1; }
+.ctrl-group label{
+  font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--tool-dim);
+}
+.swatch-select{
+  display:flex; flex-wrap:wrap; gap:6px;
+}
+.swatch-btn{
+  border:1px solid var(--tool-line);
+  background:#000;
+  border-radius:8px;
+  padding:6px 10px 6px 6px;
+  display:flex; align-items:center; gap:8px;
+  cursor:pointer;
+  color:var(--tool-text);
+  font-size:12px;
+  transition:border-color .15s, transform .1s;
+}
+.swatch-btn:hover{ transform:translateY(-1px); }
+.swatch-btn.active{ border-color:#fff; }
+.swatch-dots{ display:flex; }
+.swatch-dots span{ width:14px; height:14px; border-radius:50%; display:block; margin-left:-5px; border:1.5px solid #111; }
+.swatch-dots span:first-child{ margin-left:0; }
+.font-preview-tag{
+  font-size:13px;
+}
+
+#tool-title{
+  font-weight:600; font-size:14px; margin-right:6px; color:var(--tool-text);
+  display:flex; align-items:center; gap:8px; white-space:nowrap;
+}
+#tool-title .sub{ font-weight:400; color:var(--tool-dim); font-size:11.5px; }
+
+#code-box{
+  max-width:1100px; margin:18px auto 60px; padding:0 20px;
+}
+#code-box h3{ font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--tool-dim); margin:0 0 8px; font-weight:600; }
+#code-out{
+  background:#0c0d0e; border:1px solid var(--tool-line); border-radius:10px;
+  padding:16px 18px; font:12px/1.6 'JetBrains Mono',monospace; color:#c8f0d8;
+  white-space:pre; overflow-x:auto;
+}
+#copy-btn{
+  margin-top:10px; background:#2b2c2f; border:1px solid var(--tool-line); color:var(--tool-text);
+  padding:8px 14px; border-radius:7px; font-size:12.5px; cursor:pointer;
+}
+#copy-btn:hover{ background:#34363a; }
+
+/* ---- import ---- */
+.import-btn{
+  background:#2b2c2f; border:1px solid var(--tool-line); color:var(--tool-text);
+  padding:8px 12px; border-radius:7px; font-size:12.5px; cursor:pointer; white-space:nowrap;
+}
+.import-btn:hover{ background:#34363a; }
+.import-btn.primary{ background:#3D5CFF; border-color:#3D5CFF; color:#fff; }
+.import-btn.primary:hover{ background:#2a3fcc; }
+#import-status{ font-size:11.5px; color:var(--tool-dim); min-height:16px; }
+#import-status.err{ color:#ff8a8a; }
+#import-status.ok{ color:#8fe0ab; }
+
+.modal-overlay{
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.6);
+  z-index:100; align-items:center; justify-content:center; padding:20px;
+}
+.modal-overlay.show{ display:flex; }
+.modal-box{
+  background:var(--tool-panel); border:1px solid var(--tool-line); border-radius:12px;
+  padding:22px; max-width:520px; width:100%;
+}
+.modal-box h3{ margin:0 0 8px; font-size:15px; }
+.modal-hint{ font-size:12px; color:var(--tool-dim); line-height:1.5; margin:0 0 14px; }
+.modal-hint code{ background:#000; padding:1px 5px; border-radius:4px; }
+#paste-textarea{
+  width:100%; min-height:160px; background:#0c0d0e; border:1px solid var(--tool-line);
+  border-radius:8px; color:var(--tool-text); font:12px/1.5 'JetBrains Mono',monospace;
+  padding:12px; resize:vertical;
+}
+.modal-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
+
+/* badge "importé" sur les swatches ajoutés dynamiquement */
+.swatch-btn.imported{ border-style:dashed; }
+.swatch-btn .pname{ white-space:nowrap; }
+.swatch-btn .remove-x{
+  margin-left:6px; opacity:.5; font-weight:700;
+}
+.swatch-btn .remove-x:hover{ opacity:1; color:#ff8a8a; }
+
+/* ===== Zone de prévisualisation (le mock utilise UNIQUEMENT les variables --*) ===== */
+#stage{
+  background:var(--bg);
+  color:var(--text);
+  transition:background .25s, color .25s;
+}
+.mock{
+  max-width:1040px;
+  margin:0 auto;
+  padding:56px 24px 90px;
+}
+
+.mock-nav{
+  display:flex; align-items:center; justify-content:space-between;
+  padding-bottom:44px;
+}
+.mock-logo{
+  font-family:var(--font-display);
+  font-weight:700; font-size:20px; color:var(--text);
+}
+.mock-links{ display:flex; gap:28px; font-family:var(--font-body); font-size:14px; }
+.mock-links a{ color:var(--text-muted); text-decoration:none; }
+.mock-links a.current{ color:var(--text); }
+.mock-cta-nav{
+  font-family:var(--font-body); font-weight:600; font-size:13.5px;
+  background:var(--primary); color:var(--text-on-primary);
+  padding:9px 18px; border-radius:8px; border:none; cursor:pointer;
+}
+
+.mock-hero{
+  padding:20px 0 56px;
+  border-bottom:1px solid var(--border);
+}
+.mock-eyebrow{
+  font-family:var(--font-body); font-size:13px; color:var(--accent-dark); font-weight:600; margin-bottom:14px;
+}
+.mock-h1{
+  font-family:var(--font-display);
+  font-size:clamp(32px,5vw,52px);
+  line-height:1.08;
+  max-width:14ch;
+  margin:0 0 20px;
+  color:var(--text);
+}
+.mock-lede{
+  font-family:var(--font-body);
+  font-size:17px; line-height:1.6; max-width:52ch;
+  color:var(--text-muted);
+  margin:0 0 28px;
+}
+.mock-actions{ display:flex; gap:14px; align-items:center; }
+.btn-primary{
+  font-family:var(--font-body); font-weight:600; font-size:14.5px;
+  background:var(--accent); color:var(--text-on-accent);
+  border:none; padding:13px 24px; border-radius:9px; cursor:pointer;
+}
+.btn-secondary{
+  font-family:var(--font-body); font-weight:600; font-size:14.5px;
+  background:transparent; color:var(--text);
+  border:1px solid var(--border); padding:12px 22px; border-radius:9px; cursor:pointer;
+}
+
+.mock-section{ padding:56px 0; border-bottom:1px solid var(--border); }
+.mock-section:last-of-type{ border-bottom:none; }
+.mock-section-head{ margin-bottom:28px; }
+.mock-h2{ font-family:var(--font-display); font-size:26px; margin:0 0 8px; color:var(--text); }
+.mock-section-sub{ font-family:var(--font-body); color:var(--text-muted); font-size:14.5px; margin:0; }
+
+.mock-grid{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:18px;
+}
+.mock-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:22px;
+}
+.mock-card-tag{
+  display:inline-block; font-family:var(--font-body); font-size:11.5px; font-weight:600;
+  color:var(--primary); background:var(--surface-alt); padding:4px 10px; border-radius:20px; margin-bottom:14px;
+}
+.mock-card h3{ font-family:var(--font-display); font-size:18px; margin:0 0 8px; color:var(--text); }
+.mock-card p{ font-family:var(--font-body); font-size:13.5px; color:var(--text-muted); line-height:1.55; margin:0; }
+
+.mock-states{ display:flex; gap:10px; flex-wrap:wrap; }
+.pill{ font-family:var(--font-body); font-size:12.5px; font-weight:600; padding:7px 14px; border-radius:20px; }
+.pill.success{ background:color-mix(in srgb, var(--success) 16%, var(--surface)); color:var(--success); }
+.pill.warning{ background:color-mix(in srgb, var(--warning) 16%, var(--surface)); color:var(--warning); }
+.pill.danger{ background:color-mix(in srgb, var(--danger) 16%, var(--surface)); color:var(--danger); }
+.pill.primary{ background:var(--primary); color:var(--text-on-primary); }
+.pill.accent{ background:var(--accent); color:var(--text-on-accent); }
+
+.mock-quote{
+  font-family:var(--font-display); font-style:italic; font-size:22px; line-height:1.5;
+  color:var(--text); max-width:36ch; margin:0 0 14px;
+}
+.mock-quote-attr{ font-family:var(--font-body); font-size:13px; color:var(--text-muted); }
+
+.mock-footer{ padding-top:40px; display:flex; justify-content:space-between; align-items:center; font-family:var(--font-body); font-size:12.5px; color:var(--text-muted); }
+
+@media(max-width:720px){
+  .mock-grid{ grid-template-columns:1fr; }
+  .mock-links{ display:none; }
+}
+</style>
+</head>
+<body>
+
+<div id="controls">
+  <div id="tool-title">🎨 Visualiseur
+    <span class="sub">clique une palette / une paire de polices pour prévisualiser</span>
+  </div>
+  <div class="ctrl-group">
+    <label>Palette de couleurs</label>
+    <div class="swatch-select" id="palette-select"></div>
+  </div>
+  <div class="ctrl-group">
+    <label>Paire de polices</label>
+    <div class="swatch-select" id="font-select"></div>
+  </div>
+  <div class="ctrl-group" style="min-width:260px;">
+    <label>Importer un fichier .css</label>
+    <div style="display:flex; gap:8px;">
+      <button id="import-btn" class="import-btn">📁 Choisir un fichier</button>
+      <button id="paste-btn" class="import-btn">📋 Coller du CSS</button>
+    </div>
+    <input type="file" id="file-input" accept=".css,text/css" multiple style="display:none;">
+    <div id="import-status"></div>
+  </div>
+</div>
+
+<div id="paste-modal" class="modal-overlay">
+  <div class="modal-box">
+    <h3>Coller un bloc CSS</h3>
+    <p class="modal-hint">Colle un bloc <code>:root{ --bg:...; --primary:...; }</code> (palette) ou des déclarations <code>--font-display</code> / <code>--font-body</code> (police). Le nom est déduit du commentaire d'en-tête si présent.</p>
+    <textarea id="paste-textarea" placeholder=":root{
+  --bg:#ffffff;
+  --primary:#222222;
+  --accent:#ff5533;
+  ...
+}"></textarea>
+    <div class="modal-actions">
+      <button id="paste-cancel" class="import-btn">Annuler</button>
+      <button id="paste-confirm" class="import-btn primary">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<div id="stage">
+  <div class="mock">
+    <nav class="mock-nav">
+      <div class="mock-logo" id="mock-brand-name">Studio Nord</div>
+      <div class="mock-links">
+        <a class="current" href="#">Travaux</a>
+        <a href="#">Approche</a>
+        <a href="#">Journal</a>
+        <a href="#">Contact</a>
+      </div>
+      <button class="mock-cta-nav">Démarrer un projet</button>
+    </nav>
+
+    <section class="mock-hero">
+      <div class="mock-eyebrow" id="mock-eyebrow-text">Studio de design produit</div>
+      <h1 class="mock-h1">Des interfaces qui tiennent debout sans décoration</h1>
+      <p class="mock-lede">Nous concevons des produits numériques pour des équipes qui préfèrent la clarté aux effets. Chaque écran est pensé comme un outil, pas comme une vitrine.</p>
+      <div class="mock-actions">
+        <button class="btn-primary">Voir nos travaux</button>
+        <button class="btn-secondary">Prendre rendez-vous</button>
+      </div>
+    </section>
+
+    <section class="mock-section">
+      <div class="mock-section-head">
+        <h2 class="mock-h2">Trois projets récents</h2>
+        <p class="mock-section-sub">Un aperçu de ce que ça donne en carte — texte, étiquette, hiérarchie.</p>
+      </div>
+      <div class="mock-grid">
+        <div class="mock-card">
+          <span class="mock-card-tag">Produit</span>
+          <h3>Refonte du tableau de bord</h3>
+          <p>Simplification d'un outil interne utilisé par 400 analystes au quotidien.</p>
+        </div>
+        <div class="mock-card">
+          <span class="mock-card-tag">Identité</span>
+          <h3>Système visuel d'une coopérative</h3>
+          <p>Palette, typographie et gabarits pour une marque agricole en expansion.</p>
+        </div>
+        <div class="mock-card">
+          <span class="mock-card-tag">Site</span>
+          <h3>Vitrine d'un cabinet d'architecture</h3>
+          <p>Un site pensé pour laisser respirer les photographies de chantier.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="mock-section">
+      <div class="mock-section-head">
+        <h2 class="mock-h2">États &amp; indicateurs</h2>
+        <p class="mock-section-sub">Vérifie que succès / alerte / erreur restent lisibles sur cette palette.</p>
+      </div>
+      <div class="mock-states">
+        <span class="pill success">Livré</span>
+        <span class="pill warning">En attente</span>
+        <span class="pill danger">Bloqué</span>
+        <span class="pill primary">Prioritaire</span>
+        <span class="pill accent">Nouveau</span>
+      </div>
+    </section>
+
+    <section class="mock-section">
+      <blockquote class="mock-quote">« On nous a enfin livré un outil que l'équipe utilise sans qu'on ait à l'imposer. »</blockquote>
+      <div class="mock-quote-attr">— Responsable produit, cliente depuis 2023</div>
+    </section>
+
+    <footer class="mock-footer">
+      <span id="mock-footer-name">© Studio Nord</span>
+      <span>Fait avec la palette et la police sélectionnées ci-dessus</span>
+    </footer>
+  </div>
+</div>
+
+<div id="code-box">
+  <h3>CSS à copier pour ce mélange</h3>
+  <div id="code-out"></div>
+  <button id="copy-btn">Copier le CSS</button>
+</div>
+
+<script>
+/* ===== Palettes ===== */
+let palettes = [
+  { id:'deep-ocean', name:'Deep Ocean', vars:{
+    bg:'#F6F8FA', surface:'#FFFFFF', 'surface-alt':'#EAEFF3',
+    primary:'#0B3D5C', 'primary-dark':'#082A40', 'primary-light':'#1E5C82',
+    accent:'#FF6B4A', 'accent-dark':'#E14F30', 'accent-light':'#FFA98F',
+    text:'#0F1B24', 'text-muted':'#5B6B76', 'text-on-primary':'#FFFFFF', 'text-on-accent':'#1A0A05',
+    success:'#1E8E5A', warning:'#D9A441', danger:'#D64545', border:'#DCE3E8'
+  }},
+  { id:'forest-clay', name:'Forest & Clay', vars:{
+    bg:'#FAF6EE', surface:'#FFFFFF', 'surface-alt':'#F1EADA',
+    primary:'#22423A', 'primary-dark':'#152D27', 'primary-light':'#3D6B5D',
+    accent:'#C1613F', 'accent-dark':'#9C4A2E', 'accent-light':'#E0956F',
+    text:'#1E1B15', 'text-muted':'#6E6656', 'text-on-primary':'#FAF6EE', 'text-on-accent':'#FFF8F3',
+    success:'#4C8B5C', warning:'#C99A3C', danger:'#B9503B', border:'#E4DAC4'
+  }},
+  { id:'midnight-violet', name:'Midnight Violet', vars:{
+    bg:'#0D0E1A', surface:'#15172A', 'surface-alt':'#1E2138',
+    primary:'#4C3B8C', 'primary-dark':'#332867', 'primary-light':'#7160B8',
+    accent:'#C6F135', 'accent-dark':'#9FC220', 'accent-light':'#DDF77A',
+    text:'#EDEFFB', 'text-muted':'#9195B8', 'text-on-primary':'#FFFFFF', 'text-on-accent':'#12140A',
+    success:'#3FD68C', warning:'#F0B94A', danger:'#FF6B6B', border:'#2A2D48'
+  }},
+  { id:'warm-neutral-studio', name:'Warm Neutral Studio', vars:{
+    bg:'#FAF8F5', surface:'#FFFFFF', 'surface-alt':'#F0ECE4',
+    primary:'#2B2620', 'primary-dark':'#171410', 'primary-light':'#544B3E',
+    accent:'#D99B2B', 'accent-dark':'#B37E1D', 'accent-light':'#EFC170',
+    text:'#211D18', 'text-muted':'#7A7266', 'text-on-primary':'#FAF8F5', 'text-on-accent':'#231600',
+    success:'#5A8A5E', warning:'#D99B2B', danger:'#C0524A', border:'#E4DED2'
+  }},
+  { id:'clinical-teal', name:'Clinical Teal', vars:{
+    bg:'#F4F8F9', surface:'#FFFFFF', 'surface-alt':'#E7EFF1',
+    primary:'#3A4E58', 'primary-dark':'#26343B', 'primary-light':'#57707C',
+    accent:'#0FA3A3', 'accent-dark':'#0B7C7C', 'accent-light':'#5FD1CE',
+    text:'#1A2226', 'text-muted':'#647178', 'text-on-primary':'#F4F8F9', 'text-on-accent':'#04211F',
+    success:'#2E9E6B', warning:'#D9A441', danger:'#D2504A', border:'#DCE6E8'
+  }},
+  { id:'sunset-plum', name:'Sunset Plum', vars:{
+    bg:'#FBF6F7', surface:'#FFFFFF', 'surface-alt':'#F3E7EA',
+    primary:'#4A1E3D', 'primary-dark':'#301028', 'primary-light':'#6E3A5C',
+    accent:'#FF8C6B', 'accent-dark':'#E06A48', 'accent-light':'#FFB79E',
+    text:'#241019', 'text-muted':'#7A5F70', 'text-on-primary':'#FBF6F7', 'text-on-accent':'#2B0F03',
+    success:'#4C9169', warning:'#DDA23B', danger:'#D14F4F', border:'#EAD9DF'
+  }},
+  { id:'mono-graphite', name:'Mono Graphite', vars:{
+    bg:'#FFFFFF', surface:'#FFFFFF', 'surface-alt':'#F2F2F2',
+    primary:'#141414', 'primary-dark':'#000000', 'primary-light':'#3A3A3A',
+    accent:'#3D5CFF', 'accent-dark':'#2A3FCC', 'accent-light':'#8497FF',
+    text:'#0A0A0A', 'text-muted':'#6B6B6B', 'text-on-primary':'#FFFFFF', 'text-on-accent':'#FFFFFF',
+    success:'#1EA35A', warning:'#E0A100', danger:'#E23D3D', border:'#E4E4E4'
+  }},
+  { id:'desert-sand', name:'Desert Sand', vars:{
+    bg:'#F5EDE2', surface:'#FFFCF7', 'surface-alt':'#EBDDC8',
+    primary:'#5C3A2E', 'primary-dark':'#3D2419', 'primary-light':'#7D5642',
+    accent:'#D97B34', 'accent-dark':'#B15F22', 'accent-light':'#F0A868',
+    text:'#2B1D14', 'text-muted':'#7A6552', 'text-on-primary':'#F5EDE2', 'text-on-accent':'#2B1000',
+    success:'#5F8C5A', warning:'#D9A441', danger:'#C0523E', border:'#E0D0B8'
+  }},
+  { id:'arctic-mint', name:'Arctic Mint', vars:{
+    bg:'#F5FAFA', surface:'#FFFFFF', 'surface-alt':'#E6F0EF',
+    primary:'#2E4756', 'primary-dark':'#1C2E38', 'primary-light':'#4A6A7B',
+    accent:'#2FD9A8', 'accent-dark':'#1FAE84', 'accent-light':'#83EBCB',
+    text:'#16232A', 'text-muted':'#5F7580', 'text-on-primary':'#F5FAFA', 'text-on-accent':'#052E22',
+    success:'#2FD9A8', warning:'#E0B24A', danger:'#E0615A', border:'#DCE9E8'
+  }},
+  { id:'royal-amber', name:'Royal Amber', vars:{
+    bg:'#FAF7F0', surface:'#FFFFFF', 'surface-alt':'#EFE7D8',
+    primary:'#3B1F5C', 'primary-dark':'#26123D', 'primary-light':'#5A3985',
+    accent:'#E0A82E', 'accent-dark':'#B8871B', 'accent-light':'#F0C868',
+    text:'#1E1526', 'text-muted':'#6E6178', 'text-on-primary':'#FAF7F0', 'text-on-accent':'#2B1D00',
+    success:'#4C8B5C', warning:'#E0A82E', danger:'#C24B4B', border:'#E5DCC8'
+  }},
+  { id:'ink-saffron', name:'Ink & Saffron', vars:{
+    bg:'#F7F7F4', surface:'#FFFFFF', 'surface-alt':'#ECEBE4',
+    primary:'#12182B', 'primary-dark':'#080B16', 'primary-light':'#2A3350',
+    accent:'#E8A33D', 'accent-dark':'#C4801E', 'accent-light':'#F3C374',
+    text:'#0C0F1A', 'text-muted':'#5C6070', 'text-on-primary':'#F7F7F4', 'text-on-accent':'#1F1400',
+    success:'#3E8E63', warning:'#E8A33D', danger:'#C7433C', border:'#E2E1D8'
+  }},
+  { id:'moss-brick', name:'Moss & Brick', vars:{
+    bg:'#F4F6F1', surface:'#FFFFFF', 'surface-alt':'#E7ECE0',
+    primary:'#1F2E1C', 'primary-dark':'#101B0E', 'primary-light':'#3A4F34',
+    accent:'#B85C38', 'accent-dark':'#95452A', 'accent-light':'#D68B67',
+    text:'#161F13', 'text-muted':'#5E6B57', 'text-on-primary':'#F4F6F1', 'text-on-accent':'#2A0F04',
+    success:'#3E7D4A', warning:'#C9962E', danger:'#B8452F', border:'#DEE5D6'
+  }},
+  { id:'porcelain-indigo', name:'Porcelain & Indigo', vars:{
+    bg:'#FDFDFC', surface:'#FFFFFF', 'surface-alt':'#EEF0F6',
+    primary:'#28305C', 'primary-dark':'#171C3C', 'primary-light':'#454F82',
+    accent:'#F0837A', 'accent-dark':'#D2645B', 'accent-light':'#F7AEA8',
+    text:'#161A2E', 'text-muted':'#5F6480', 'text-on-primary':'#FDFDFC', 'text-on-accent':'#2E0E0B',
+    success:'#3E9E75', warning:'#DDA23B', danger:'#E0615A', border:'#E4E6EF'
+  }},
+  { id:'charcoal-chartreuse', name:'Charcoal & Chartreuse', vars:{
+    bg:'#161513', surface:'#1E1D1A', 'surface-alt':'#28271F',
+    primary:'#4A4740', 'primary-dark':'#302E28', 'primary-light':'#6B675C',
+    accent:'#D4F04E', 'accent-dark':'#AEC834', 'accent-light':'#E5F896',
+    text:'#F2F1EA', 'text-muted':'#9A968A', 'text-on-primary':'#F2F1EA', 'text-on-accent':'#1A1D06',
+    success:'#7FD68C', warning:'#EAC15C', danger:'#E4685E', border:'#33322A'
+  }},
+  { id:'rose-quartz-slate', name:'Rose Quartz & Slate', vars:{
+    bg:'#FAF7F7', surface:'#FFFFFF', 'surface-alt':'#F0E9EA',
+    primary:'#3E4650', 'primary-dark':'#282E36', 'primary-light':'#5D6771',
+    accent:'#B5495B', 'accent-dark':'#8F3646', 'accent-light':'#D67F8C',
+    text:'#211E20', 'text-muted':'#736A6C', 'text-on-primary':'#FAF7F7', 'text-on-accent':'#FCEEF0',
+    success:'#4C8B6C', warning:'#D3A24A', danger:'#B5495B', border:'#EBDEE0'
+  }},
+  { id:'bioluminescent-deep', name:'Bioluminescent Deep', vars:{
+    bg:'#050912', surface:'#0B111F', 'surface-alt':'#121B2E',
+    primary:'#242F52', 'primary-dark':'#161D35', 'primary-light':'#3C4A78',
+    accent:'#4EF0D6', 'accent-dark':'#26C7AC', 'accent-light':'#9AF9E7',
+    text:'#E7F0F5', 'text-muted':'#7C8AA0', 'text-on-primary':'#E7F0F5', 'text-on-accent':'#031C17',
+    success:'#4EF0D6', warning:'#F0C15C', danger:'#F0615C', border:'#1B2740'
+  }},
+  { id:'alchemy-tarot', name:'Alchemy Tarot', vars:{
+    bg:'#F2E9D8', surface:'#FAF4E7', 'surface-alt':'#E8DBBE',
+    primary:'#5C1A24', 'primary-dark':'#3C0E15', 'primary-light':'#7E2E3A',
+    accent:'#B8923F', 'accent-dark':'#93741F', 'accent-light':'#D4B76C',
+    text:'#2A1610', 'text-muted':'#7A6650', 'text-on-primary':'#F2E9D8', 'text-on-accent':'#2A1D00',
+    success:'#556B3A', warning:'#B8923F', danger:'#8C2A2A', border:'#DACBA5'
+  }},
+  { id:'arcade-cabinet', name:'Arcade Cabinet', vars:{
+    bg:'#0A0512', surface:'#160B26', 'surface-alt':'#1F1235',
+    primary:'#D6299E', 'primary-dark':'#A81C7A', 'primary-light':'#EB5FC1',
+    accent:'#2EE6E6', 'accent-dark':'#1BBBBB', 'accent-light':'#7FF5F5',
+    text:'#F3EAFB', 'text-muted':'#9C8CB8', 'text-on-primary':'#0A0512', 'text-on-accent':'#031A1A',
+    success:'#3EE67A', warning:'#F0D93D', danger:'#F0473D', border:'#2A1B45'
+  }},
+  { id:'workshop-canvas', name:'Workshop Canvas', vars:{
+    bg:'#EFEAE0', surface:'#F8F5EE', 'surface-alt':'#E2DBC9',
+    primary:'#3E4247', 'primary-dark':'#26292D', 'primary-light':'#5C6167',
+    accent:'#E8590C', 'accent-dark':'#BF4708', 'accent-light':'#F58A4E',
+    text:'#232322', 'text-muted':'#6B6862', 'text-on-primary':'#EFEAE0', 'text-on-accent':'#2A0E00',
+    success:'#4C8B5C', warning:'#E8590C', danger:'#C0392B', border:'#D9D1BC'
+  }},
+  { id:'couture-noir', name:'Couture Noir', vars:{
+    bg:'#111010', surface:'#1A1818', 'surface-alt':'#241F1F',
+    primary:'#E7C9C4', 'primary-dark':'#D1A9A2', 'primary-light':'#F2DEDA',
+    accent:'#C9A24A', 'accent-dark':'#A9832F', 'accent-light':'#E0C077',
+    text:'#F5F1EE', 'text-muted':'#A69D98', 'text-on-primary':'#221512', 'text-on-accent':'#211500',
+    success:'#6FA383', warning:'#C9A24A', danger:'#C15C5C', border:'#2E2828'
+  }}
+];
+
+/* ===== Paires de polices ===== */
+let fontPairs = [
+  { id:'editorial', name:'Editorial', display:"'Playfair Display', serif", body:"'Source Sans 3', sans-serif" },
+  { id:'modern-geometric', name:'Modern Geometric', display:"'Space Grotesk', sans-serif", body:"'Inter', sans-serif" },
+  { id:'warm-humanist', name:'Warm Humanist', display:"'Fraunces', serif", body:"'Karla', sans-serif" },
+  { id:'technical', name:'Technical', display:"'Manrope', sans-serif", body:"'Manrope', sans-serif" },
+  { id:'luxury', name:'Luxury', display:"'Cormorant', serif", body:"'Jost', sans-serif" },
+  { id:'brutalist', name:'Brutalist', display:"'Archivo Black', sans-serif", body:"'Archivo', sans-serif" },
+  { id:'scifi', name:'Sci-fi Tech', display:"'Orbitron', sans-serif", body:"'Rajdhani', sans-serif" },
+  { id:'friendly', name:'Friendly Rounded', display:"'Baloo 2', sans-serif", body:"'Nunito Sans', sans-serif" },
+  { id:'corporate', name:'Corporate Trust', display:"'Libre Franklin', sans-serif", body:"'Public Sans', sans-serif" },
+  { id:'artisan', name:'Artisan Serif', display:"'Lora', serif", body:"'Mulish', sans-serif" },
+  { id:'swiss-editorial', name:'Swiss Editorial', display:"'Work Sans', sans-serif", body:"'IBM Plex Sans', sans-serif" },
+  { id:'slab-contrast', name:'Slab Contrast', display:"'Zilla Slab', serif", body:"'Work Sans', sans-serif" },
+  { id:'condensed-display', name:'Condensed Display', display:"'Bebas Neue', sans-serif", body:"'Public Sans', sans-serif" },
+  { id:'literary-classic', name:'Literary Classic', display:"'Source Serif 4', serif", body:"'Source Sans 3', sans-serif" },
+  { id:'neo-vintage', name:'Neo Vintage', display:"'DM Serif Display', serif", body:"'DM Sans', sans-serif" },
+  { id:'occult-editorial', name:'Occult Editorial', display:"'Cinzel', serif", body:"'Cormorant Garamond', serif" },
+  { id:'lab-specimen', name:'Lab Specimen', display:"'Newsreader', serif", body:"'Newsreader', serif" },
+  { id:'arcade-pixel', name:'Arcade Pixel', display:"'Press Start 2P', monospace", body:"'VT323', monospace" },
+  { id:'couture-editorial', name:'Couture Editorial', display:"'Bodoni Moda', serif", body:"'Antic', sans-serif" },
+  { id:'industrial-signage', name:'Industrial Signage', display:"'Oswald', sans-serif", body:"'Roboto Mono', monospace" }
+];
+
+let currentPalette = palettes[0];
+let currentFont = fontPairs[0];
+
+const paletteSelect = document.getElementById('palette-select');
+const fontSelect = document.getElementById('font-select');
+const stage = document.getElementById('stage');
+const codeOut = document.getElementById('code-out');
+
+function applyPalette(p){
+  currentPalette = p;
+  for(const [k,v] of Object.entries(p.vars)){
+    stage.style.setProperty('--'+k, v);
+  }
+  [...paletteSelect.children].forEach(b => b.classList.toggle('active', b.dataset.id === p.id));
+  updateCode();
+}
+
+function applyFont(f){
+  currentFont = f;
+  stage.style.setProperty('--font-display', f.display);
+  stage.style.setProperty('--font-body', f.body);
+  [...fontSelect.children].forEach(b => b.classList.toggle('active', b.dataset.id === f.id));
+  updateCode();
+}
+
+function updateCode(){
+  const lines = [':root{'];
+  for(const [k,v] of Object.entries(currentPalette.vars)){
+    lines.push('  --'+k+':'+v+';');
+  }
+  lines.push('  --font-display:'+currentFont.display+';');
+  lines.push('  --font-body:'+currentFont.body+';');
+  lines.push('}');
+  codeOut.textContent = lines.join('\n');
+}
+
+function makePaletteBtn(p, imported){
+  const btn = document.createElement('button');
+  btn.className = 'swatch-btn' + (imported ? ' imported' : '');
+  btn.dataset.id = p.id;
+  const dotPrimary = p.vars.primary || p.vars.bg;
+  const dotAccent = p.vars.accent || p.vars.primary;
+  const dotBg = p.vars.bg || '#fff';
+  btn.innerHTML = `<span class="swatch-dots">
+      <span style="background:${dotPrimary}"></span>
+      <span style="background:${dotAccent}"></span>
+      <span style="background:${dotBg}"></span>
+    </span><span class="pname">${p.name}</span>${imported ? '<span class="remove-x" title="Retirer">✕</span>' : ''}`;
+  btn.addEventListener('click', (e) => {
+    if(e.target.classList.contains('remove-x')){
+      e.stopPropagation();
+      palettes = palettes.filter(x => x.id !== p.id);
+      btn.remove();
+      if(currentPalette.id === p.id) applyPalette(palettes[0]);
+      return;
+    }
+    applyPalette(p);
+  });
+  paletteSelect.appendChild(btn);
+}
+
+function makeFontBtn(f, imported){
+  const btn = document.createElement('button');
+  btn.className = 'swatch-btn' + (imported ? ' imported' : '');
+  btn.dataset.id = f.id;
+  btn.innerHTML = `<span class="font-preview-tag" style="font-family:${f.display}">Aa</span><span class="pname">${f.name}</span>${imported ? '<span class="remove-x" title="Retirer">✕</span>' : ''}`;
+  btn.addEventListener('click', (e) => {
+    if(e.target.classList.contains('remove-x')){
+      e.stopPropagation();
+      fontPairs = fontPairs.filter(x => x.id !== f.id);
+      btn.remove();
+      if(currentFont.id === f.id) applyFont(fontPairs[0]);
+      return;
+    }
+    applyFont(f);
+  });
+  fontSelect.appendChild(btn);
+}
+
+palettes.forEach(p => makePaletteBtn(p, false));
+fontPairs.forEach(f => makeFontBtn(f, false));
+
+/* ===== Import de fichiers / texte CSS ===== */
+const importStatus = document.getElementById('import-status');
+let importCounter = 0;
+
+function setStatus(msg, type){
+  importStatus.textContent = msg;
+  importStatus.className = type || '';
+}
+
+// Extrait un nom lisible depuis un commentaire d'en-tête "Palette : X" / "Polices : X" / "Police : X"
+function guessName(css, fallback){
+  const m = css.match(/(?:Palette|Police[s]?)\s*:\s*([^\n(]+)/i);
+  if(m) return m[1].trim();
+  return fallback;
+}
+
+// Parse un bloc :root{...} et récupère toutes les déclarations --xxx:val;
+function parseVars(css){
+  const vars = {};
+  const rootMatches = css.match(/:root\s*\{([^}]*)\}/gs) || [];
+  rootMatches.forEach(block => {
+    const inner = block.replace(/:root\s*\{/, '').replace(/\}$/, '');
+    const decls = inner.split(';');
+    decls.forEach(d => {
+      const m = d.match(/--([a-zA-Z0-9-]+)\s*:\s*(.+)/);
+      if(m){
+        const key = m[1].trim();
+        const val = m[2].trim();
+        vars[key] = val;
+      }
+    });
+  });
+  return vars;
+}
+
+function importCss(css, filename){
+  const vars = parseVars(css);
+  if(Object.keys(vars).length === 0){
+    setStatus('Aucune variable --xxx trouvée dans ce fichier.', 'err');
+    return;
+  }
+
+  const hasFontVars = vars['font-display'] || vars['font-body'] || vars['font-sans'] || vars['font-head'];
+  const hasColorVars = vars['bg'] || vars['primary'] || vars['accent'] || vars['ink'];
+
+  let addedSomething = false;
+
+  if(hasColorVars){
+    importCounter++;
+    const id = 'imported-color-' + importCounter;
+    const name = guessName(css, filename || ('Importé ' + importCounter));
+    // normalise quelques alias courants vers le schéma attendu par le mock
+    const norm = Object.assign({
+      bg: vars.bg || vars.ink && vars.paper || '#ffffff',
+      surface: vars.surface || vars.paper || vars.card || '#ffffff',
+      'surface-alt': vars['surface-alt'] || vars.paper2 || vars.card2 || '#f2f2f2',
+      primary: vars.primary || vars.ink || vars.accent || '#222222',
+      'primary-dark': vars['primary-dark'] || vars.primary || '#111111',
+      'primary-light': vars['primary-light'] || vars.primary || '#444444',
+      accent: vars.accent || vars.gold || vars.primary || '#ff5533',
+      'accent-dark': vars['accent-dark'] || vars.accent || '#cc4422',
+      'accent-light': vars['accent-light'] || vars.accent || '#ff9977',
+      text: vars.text || vars.ink || '#111111',
+      'text-muted': vars['text-muted'] || vars.muted || vars.mut || '#666666',
+      'text-on-primary': vars['text-on-primary'] || '#ffffff',
+      'text-on-accent': vars['text-on-accent'] || '#ffffff',
+      success: vars.success || '#2e9e6b',
+      warning: vars.warning || '#d9a441',
+      danger: vars.danger || '#d2504a',
+      border: vars.border || vars.line || '#e0e0e0'
+    }, vars);
+    const palette = { id, name, vars: norm };
+    palettes.push(palette);
+    makePaletteBtn(palette, true);
+    applyPalette(palette);
+    addedSomething = true;
+  }
+
+  if(hasFontVars){
+    importCounter++;
+    const id = 'imported-font-' + importCounter;
+    const name = guessName(css, filename || ('Police importée ' + importCounter));
+    const display = vars['font-display'] || vars['font-head'] || vars['font-sans'] || "'Inter', sans-serif";
+    const body = vars['font-body'] || vars['font-sans'] || vars['font-head'] || "'Inter', sans-serif";
+    const fontPair = { id, name, display, body };
+    fontPairs.push(fontPair);
+    makeFontBtn(fontPair, true);
+    applyFont(fontPair);
+    addedSomething = true;
+
+    // charge la police depuis Google Fonts si le fichier contient un @import
+    const importUrlMatch = css.match(/@import\s+url\((['"]?)(https:\/\/fonts\.googleapis\.com[^'")]+)\1\)/);
+    if(importUrlMatch){
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = importUrlMatch[2];
+      document.head.appendChild(link);
+    }
+  }
+
+  if(addedSomething){
+    setStatus('Importé : ' + (filename || 'bloc collé') + ' ✓', 'ok');
+  } else {
+    setStatus('Fichier lu mais aucune variable couleur/police reconnue.', 'err');
+  }
+}
+
+document.getElementById('import-btn').addEventListener('click', () => {
+  document.getElementById('file-input').click();
+});
+
+document.getElementById('file-input').addEventListener('change', (e) => {
+  const files = [...e.target.files];
+  if(!files.length) return;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = () => importCss(reader.result, file.name.replace(/\.css$/,''));
+    reader.onerror = () => setStatus('Erreur de lecture : ' + file.name, 'err');
+    reader.readAsText(file);
+  });
+  e.target.value = '';
+});
+
+const pasteModal = document.getElementById('paste-modal');
+document.getElementById('paste-btn').addEventListener('click', () => {
+  pasteModal.classList.add('show');
+  document.getElementById('paste-textarea').focus();
+});
+document.getElementById('paste-cancel').addEventListener('click', () => {
+  pasteModal.classList.remove('show');
+});
+document.getElementById('paste-confirm').addEventListener('click', () => {
+  const val = document.getElementById('paste-textarea').value.trim();
+  if(!val){ setStatus('Rien à importer.', 'err'); return; }
+  importCss(val, null);
+  document.getElementById('paste-textarea').value = '';
+  pasteModal.classList.remove('show');
+});
+
+document.getElementById('copy-btn').addEventListener('click', () => {
+  navigator.clipboard.writeText(codeOut.textContent).then(() => {
+    const btn = document.getElementById('copy-btn');
+    const original = btn.textContent;
+    btn.textContent = 'Copié ✓';
+    setTimeout(() => btn.textContent = original, 1400);
+  });
+});
+
+applyPalette(palettes[0]);
+applyFont(fontPairs[0]);
+</script>
+
+</body>
+</html>
