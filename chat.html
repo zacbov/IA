@@ -12,10 +12,11 @@
   }
   #setup {
     padding: 16px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #222;
+    overflow-y: auto;
   }
   #setup.hidden { display: none; }
   #setup label { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #999; }
-  #setup input, #setup textarea {
+  #setup input, #setup textarea, #setup select {
     width: 100%; background: #14201a; border: 1px solid #2a3d33; color: #e8e8e4;
     padding: 9px 10px; border-radius: 8px; font-size: 13px; font-family: inherit;
   }
@@ -24,12 +25,22 @@
     background: #e0a34a; border: none; color: #1a1208; font-weight: 700;
     padding: 11px; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 4px;
   }
+  #setup button.secondary {
+    background: none; border: 1px solid #333; color: #ccc; font-weight: 600;
+  }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  #profileBar { display: flex; gap: 8px; align-items: flex-end; }
+  #profileBar select { flex: 1; }
+  #profileBar button { width: auto; padding: 9px 12px; font-size: 12px; margin-top: 0; white-space: nowrap; }
+  hr.sep { border: none; border-top: 1px solid #222; margin: 6px 0; width: 100%; }
   #topbar {
     display: flex; align-items: center; justify-content: space-between; padding: 10px 14px;
     border-bottom: 1px solid #222; flex-shrink: 0;
   }
   #topbar.hidden { display: none; }
   #topbar span { font-size: 12px; color: #999; font-family: monospace; }
+  #topbar div { display: flex; gap: 8px; }
   #topbar button {
     background: none; border: 1px solid #333; color: #999; border-radius: 6px;
     padding: 5px 10px; font-size: 11px; cursor: pointer;
@@ -54,36 +65,54 @@
 <body>
 
 <div id="setup">
-  <div>
-    <label>Fournisseur</label>
-    <select id="provider" style="width:100%; background:#14201a; border:1px solid #2a3d33; color:#e8e8e4; padding:9px 10px; border-radius:8px; font-size:13px; font-family:inherit;">
-      <option value="groq">groq</option>
-      <option value="openrouter">openrouter</option>
-      <option value="cerebras">cerebras</option>
-      <option value="mistral">mistral</option>
-      <option value="nvidia">nvidia</option>
-      <option value="hf">hf</option>
-      <option value="zai">zai</option>
-    </select>
+  <div id="profileBar">
+    <div style="flex:2">
+      <label>Profil enregistré</label>
+      <select id="profileSelect"><option value="">— Nouveau profil —</option></select>
+    </div>
+    <button id="deleteProfileBtn" class="secondary" title="Supprimer ce profil">🗑</button>
   </div>
-  <div>
-    <label>Modèle</label>
-    <input type="text" id="model" placeholder="ex: llama-3.1-8b-instant">
+  <hr class="sep">
+  <div class="row">
+    <div>
+      <label>Fournisseur</label>
+      <select id="provider">
+        <option value="groq">groq</option>
+        <option value="openrouter">openrouter</option>
+        <option value="cerebras">cerebras</option>
+        <option value="mistral">mistral</option>
+        <option value="nvidia">nvidia</option>
+        <option value="hf">hf</option>
+        <option value="zai">zai</option>
+      </select>
+    </div>
+    <div>
+      <label>Modèle</label>
+      <input type="text" id="model" placeholder="ex: llama-3.1-8b-instant">
+    </div>
   </div>
   <div>
     <label>Mot de passe (worker)</label>
     <input type="password" id="password" placeholder="Mot de passe">
   </div>
   <div>
+    <label>Nom du profil</label>
+    <input type="text" id="profileName" placeholder="ex: Perso A">
+  </div>
+  <div>
     <label>Prompt système / personnalité</label>
     <textarea id="systemPrompt" placeholder="Décris ici le personnage, le ton, le style de réponse attendu..."></textarea>
   </div>
+  <button id="saveProfileBtn" class="secondary">💾 Enregistrer ce profil</button>
   <button id="startBtn">Démarrer la conversation</button>
 </div>
 
 <div id="topbar" class="hidden">
-  <span>Session active</span>
-  <button id="resetBtn">↺ Réinitialiser</button>
+  <span id="sessionLabel">Session active</span>
+  <div>
+    <button id="resetBtn">↺ Réinitialiser</button>
+    <button id="backBtn">⚙ Config</button>
+  </div>
 </div>
 
 <div id="messages" class="hidden"></div>
@@ -96,12 +125,13 @@
 <script>
 const WORKER_BASE = 'https://routeur-ia-proxy.zacharybov.workers.dev/proxy/';
 const HISTORY_WINDOW = 8;
+const STORAGE_KEY = 'chat_profiles_v1';
 
 let provider = 'groq';
 let model = '';
-
 let password = '';
 let systemPrompt = '';
+let profileName = '';
 let history = [];
 
 const setup = document.getElementById('setup');
@@ -110,24 +140,110 @@ const messagesEl = document.getElementById('messages');
 const inputbar = document.getElementById('inputbar');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send');
+const profileSelect = document.getElementById('profileSelect');
+const sessionLabel = document.getElementById('sessionLabel');
 
+// ---------- Gestion des profils (localStorage) ----------
+function loadProfiles() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveProfiles(profiles) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+}
+
+function refreshProfileSelect(selectName) {
+  const profiles = loadProfiles();
+  profileSelect.innerHTML = '<option value="">— Nouveau profil —</option>';
+  Object.keys(profiles).sort().forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    profileSelect.appendChild(opt);
+  });
+  if (selectName && profiles[selectName]) {
+    profileSelect.value = selectName;
+  }
+}
+
+function fillFormFromProfile(name) {
+  const profiles = loadProfiles();
+  const p = profiles[name];
+  if (!p) return;
+  document.getElementById('provider').value = p.provider || 'groq';
+  document.getElementById('model').value = p.model || '';
+  document.getElementById('password').value = p.password || '';
+  document.getElementById('profileName').value = name;
+  document.getElementById('systemPrompt').value = p.systemPrompt || '';
+}
+
+profileSelect.addEventListener('change', () => {
+  const name = profileSelect.value;
+  if (name) fillFormFromProfile(name);
+});
+
+document.getElementById('saveProfileBtn').addEventListener('click', () => {
+  const name = document.getElementById('profileName').value.trim();
+  if (!name) {
+    alert('Donne un nom à ce profil avant de l\'enregistrer.');
+    return;
+  }
+  const profiles = loadProfiles();
+  profiles[name] = {
+    provider: document.getElementById('provider').value,
+    model: document.getElementById('model').value.trim(),
+    password: document.getElementById('password').value,
+    systemPrompt: document.getElementById('systemPrompt').value.trim()
+  };
+  saveProfiles(profiles);
+  refreshProfileSelect(name);
+  alert('Profil "' + name + '" enregistré.');
+});
+
+document.getElementById('deleteProfileBtn').addEventListener('click', () => {
+  const name = profileSelect.value;
+  if (!name) return;
+  if (!confirm('Supprimer le profil "' + name + '" ?')) return;
+  const profiles = loadProfiles();
+  delete profiles[name];
+  saveProfiles(profiles);
+  refreshProfileSelect();
+  document.getElementById('profileName').value = '';
+});
+
+// Charger le dernier profil utilisé automatiquement
+window.addEventListener('DOMContentLoaded', () => {
+  refreshProfileSelect();
+  const lastUsed = localStorage.getItem('chat_last_profile');
+  if (lastUsed && loadProfiles()[lastUsed]) {
+    profileSelect.value = lastUsed;
+    fillFormFromProfile(lastUsed);
+  }
+});
+
+// ---------- Démarrage / config ----------
 document.getElementById('startBtn').addEventListener('click', () => {
   password = document.getElementById('password').value.trim();
   systemPrompt = document.getElementById('systemPrompt').value.trim();
   provider = document.getElementById('provider').value;
   model = document.getElementById('model').value.trim();
-  if (!password) {
-    alert('Entre le mot de passe du worker.');
-    return;
-  }
-  if (!model) {
-    alert('Entre le nom du modèle à utiliser.');
-    return;
-  }
+  profileName = document.getElementById('profileName').value.trim();
+
+  if (!password) { alert('Entre le mot de passe du worker.'); return; }
+  if (!model) { alert('Entre le nom du modèle à utiliser.'); return; }
+
+  if (profileName) localStorage.setItem('chat_last_profile', profileName);
+
   setup.classList.add('hidden');
   topbar.classList.remove('hidden');
   messagesEl.classList.remove('hidden');
   inputbar.classList.remove('hidden');
+  sessionLabel.textContent = (profileName || 'Session') + ' · ' + provider + ' / ' + model;
+  messagesEl.innerHTML = '';
   history = [];
   if (systemPrompt) {
     sendToWorker('__init__');
@@ -143,6 +259,14 @@ document.getElementById('resetBtn').addEventListener('click', () => {
   }
 });
 
+document.getElementById('backBtn').addEventListener('click', () => {
+  topbar.classList.add('hidden');
+  messagesEl.classList.add('hidden');
+  inputbar.classList.add('hidden');
+  setup.classList.remove('hidden');
+});
+
+// ---------- Chat ----------
 function addMessage(text, cls) {
   const div = document.createElement('div');
   div.className = 'msg ' + cls;
@@ -172,6 +296,7 @@ function buildMessages(userText, isInit) {
 async function sendToWorker(userText) {
   const isInit = userText === '__init__';
   let typingEl = null;
+  let botDiv = null;
   try {
     sendBtn.disabled = true;
     typingEl = addMessage('...', 'typing');
@@ -185,35 +310,68 @@ async function sendToWorker(userText) {
         'Content-Type': 'application/json',
         'X-App-Secret': password
       },
-      body: JSON.stringify({
-        model: model,
-        messages: messages,
-        temperature: 1.1,           // Plus créatif (1.0 à 1.2 recommandé)
-        top_p: 0.92,
-        frequency_penalty: 0.75,    // Très important contre les répétitions
-        presence_penalty: 0.6,      // Encourage la variété
-        max_tokens: 1200            // Pour avoir des réponses plus longues
-      })
+      body: JSON.stringify({ model: model, messages: messages, stream: true })
     });
 
-    // ... le reste de ta fonction reste identique
-
-    typingEl.remove();
-
     if (!response.ok) {
+      typingEl.remove();
       const errText = await response.text();
       addMessage('Erreur ' + response.status + ' : ' + errText.slice(0, 200), 'err');
       return;
     }
 
-    const data = await response.json();
-    const botText = data?.choices?.[0]?.message?.content || JSON.stringify(data);
-
-    addMessage(botText, 'bot');
-    if (!isInit) {
-      history.push({ role: 'user', content: userText });
+    if (!response.body) {
+      typingEl.remove();
+      const data = await response.json();
+      const botText = data?.choices?.[0]?.message?.content || JSON.stringify(data);
+      addMessage(botText, 'bot');
+      finalizeHistory(userText, botText, isInit);
+      return;
     }
-    history.push({ role: 'assistant', content: botText });
+
+    // ---- Lecture du flux SSE ----
+    typingEl.remove();
+    botDiv = addMessage('', 'bot');
+    let fullText = '';
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(payload);
+          const delta = parsed?.choices?.[0]?.delta?.content
+                     || parsed?.choices?.[0]?.message?.content
+                     || '';
+          if (delta) {
+            fullText += delta;
+            botDiv.textContent = fullText;
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+        } catch (e) {
+          // ligne non-JSON, on ignore
+        }
+      }
+    }
+
+    if (!fullText) {
+      botDiv.textContent = '(réponse vide — le fournisseur ne supporte peut-être pas le streaming)';
+    }
+
+    finalizeHistory(userText, fullText, isInit);
 
   } catch (err) {
     if (typingEl) typingEl.remove();
@@ -221,6 +379,13 @@ async function sendToWorker(userText) {
   } finally {
     sendBtn.disabled = false;
   }
+}
+
+function finalizeHistory(userText, botText, isInit) {
+  if (!isInit) {
+    history.push({ role: 'user', content: userText });
+  }
+  history.push({ role: 'assistant', content: botText });
 }
 
 function handleSend() {
