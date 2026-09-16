@@ -58,6 +58,20 @@
   .msg.user { align-self: flex-end; background: #e0a34a; color: #1a1208; }
   .msg.bot { align-self: flex-start; background: #17221c; border: 1px solid #263329; }
   .msg.err { align-self: center; background: #3a1414; color: #e0a0a0; font-size: 12.5px; font-family: monospace; }
+  .msg.image-loading {
+    align-self: flex-start;
+    background: #1a2a22;
+    border: 1px dashed #3a5a4a;
+    color: #a0c0b0;
+    font-size: 13px;
+    font-style: italic;
+  }
+  .msg img {
+    max-width: 100%;
+    border-radius: 10px;
+    margin-top: 8px;
+    display: block;
+  }
   #inputbar { display: flex; gap: 8px; padding: 10px 12px calc(env(safe-area-inset-bottom,0px) + 10px); border-top: 1px solid #222; flex-shrink: 0; }
   #inputbar.hidden { display: none; }
   #inputbar textarea {
@@ -184,7 +198,6 @@ const profileSelect = document.getElementById('profileSelect');
 const quickSwitch = document.getElementById('quickSwitch');
 
 // ---------- Stockage des profils ----------
-// Chaque profil = { provider, model, password, systemPrompt, sampling:{...}, history:[...] }
 function loadProfiles() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
@@ -288,7 +301,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// ---------- Persistance de l'historique par profil ----------
+// ---------- Persistance de l'historique ----------
 function persistCurrentHistory() {
   if (!profileName) return;
   const profiles = loadProfiles();
@@ -302,7 +315,7 @@ function activateProfile(name, isSwitch) {
   const p = profiles[name];
   if (!p) return;
 
-  if (isSwitch) persistCurrentHistory(); // sauvegarde la conversation en cours avant de switcher
+  if (isSwitch) persistCurrentHistory();
 
   profileName = name;
   provider = p.provider || 'groq';
@@ -331,7 +344,6 @@ document.getElementById('startBtn').addEventListener('click', () => {
   if (!pw) { alert('Entre le mot de passe du worker.'); return; }
   if (!mdl) { alert('Entre le nom du modèle à utiliser.'); return; }
 
-  // Auto-enregistrer/mettre à jour le profil s'il a un nom
   if (name) {
     const profiles = loadProfiles();
     const existingHistory = (profiles[name] && profiles[name].history) || [];
@@ -355,7 +367,6 @@ document.getElementById('startBtn').addEventListener('click', () => {
   if (name) {
     activateProfile(name, false);
   } else {
-    // Session sans profil sauvegardé (pas d'historique persistant)
     profileName = '';
     provider = document.getElementById('provider').value;
     model = mdl;
@@ -414,6 +425,72 @@ function buildMessages(userText, isInit) {
   return messages;
 }
 
+// ========== GÉNÉRATION D'IMAGE ==========
+async function generateNSFWImage(botText) {
+  // Indicateur de chargement
+  const loadingDiv = document.createElement('div');
+  loadingDiv.className = 'msg image-loading';
+  loadingDiv.textContent = '🎨 Génération de l\'image en cours...';
+  messagesEl.appendChild(loadingDiv);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  try {
+    const prompt = `masterpiece, best quality, highly detailed, explicit erotic scene, ${botText.slice(0, 280)}, futanari, huge breasts, thick veiny cock, wet skin, detailed anatomy, cinematic lighting`;
+
+    const response = await fetch("https://properfool-nsfwadult.hf.space/run/generate_image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        data: [
+          prompt,   // prompt
+          768,      // height
+          512,      // width
+          10,       // num_inference_steps (plus bas = plus rapide)
+          0,        // seed
+          true,     // randomize_seed
+          1         // num_images
+        ]
+      })
+    });
+
+    loadingDiv.remove();
+
+    if (!response.ok) {
+      console.error("Erreur Space:", response.status);
+      return;
+    }
+
+    const result = await response.json();
+    console.log("Réponse image:", result); // utile pour debugger
+
+    // On cherche l'URL de l'image dans différentes structures possibles
+    let imageUrl = null;
+
+    if (result?.data?.[0]) {
+      const first = result.data[0];
+      if (Array.isArray(first) && first[0]) {
+        imageUrl = first[0]?.image?.url || first[0]?.url || first[0];
+      } else {
+        imageUrl = first?.image?.url || first?.url || first;
+      }
+    }
+
+    if (imageUrl && typeof imageUrl === 'string') {
+      const imgDiv = document.createElement('div');
+      imgDiv.className = 'msg bot';
+      imgDiv.innerHTML = `<img src="${imageUrl}" alt="Image générée">`;
+      messagesEl.appendChild(imgDiv);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    } else {
+      console.warn("Impossible de trouver l'URL de l'image dans la réponse");
+    }
+
+  } catch (err) {
+    loadingDiv.remove();
+    console.error("Erreur génération image:", err);
+  }
+}
+
 async function sendToWorker(userText) {
   const isInit = userText === '__init__';
   let typingEl = null;
@@ -454,6 +531,7 @@ async function sendToWorker(userText) {
       const botText = data?.choices?.[0]?.message?.content || JSON.stringify(data);
       addMessage(botText, 'bot');
       finalizeHistory(userText, botText, isInit);
+      generateNSFWImage(botText); // ← génération d'image
       return;
     }
 
@@ -489,8 +567,13 @@ async function sendToWorker(userText) {
       }
     }
 
-    if (!fullText) botDiv.textContent = '(réponse vide — le fournisseur ne supporte peut-être pas le streaming)';
+    if (!fullText) botDiv.textContent = '(réponse vide)';
     finalizeHistory(userText, fullText, isInit);
+
+    // Lance la génération d'image après la réponse texte
+    if (fullText && fullText.length > 20) {
+      generateNSFWImage(fullText);
+    }
 
   } catch (err) {
     if (typingEl) typingEl.remove();
