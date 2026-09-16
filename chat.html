@@ -427,7 +427,6 @@ function buildMessages(userText, isInit) {
 
 // ========== GÉNÉRATION D'IMAGE ==========
 async function generateNSFWImage(botText) {
-  // Indicateur de chargement
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
   loadingDiv.textContent = '🎨 Génération de l\'image en cours...';
@@ -435,20 +434,20 @@ async function generateNSFWImage(botText) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   try {
-    const prompt = `masterpiece, best quality, highly detailed, explicit erotic scene, ${botText.slice(0, 280)}, futanari, huge breasts, thick veiny cock, wet skin, detailed anatomy, cinematic lighting`;
+    const prompt = `masterpiece, best quality, highly detailed explicit erotic scene, ${botText.slice(0, 260)}, futanari, huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting`;
 
-    const response = await fetch("https://properfool-nsfwadult.hf.space/run/generate_image", {
+    const response = await fetch("https://properfool-nsfwadult.hf.space/gradio_api/call/generate_image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         data: [
-          prompt,   // prompt
-          768,      // height
-          512,      // width
-          10,       // num_inference_steps (plus bas = plus rapide)
-          0,        // seed
-          true,     // randomize_seed
-          1         // num_images
+          prompt,
+          768,
+          512,
+          10,
+          0,
+          true,
+          1
         ]
       })
     });
@@ -461,17 +460,16 @@ async function generateNSFWImage(botText) {
     }
 
     const result = await response.json();
-    console.log("Réponse image:", result); // utile pour debugger
+    console.log("Réponse image:", result);
 
-    // On cherche l'URL de l'image dans différentes structures possibles
     let imageUrl = null;
 
-    if (result?.data?.[0]) {
-      const first = result.data[0];
-      if (Array.isArray(first) && first[0]) {
-        imageUrl = first[0]?.image?.url || first[0]?.url || first[0];
+    if (result?.data) {
+      const d = result.data;
+      if (Array.isArray(d[0])) {
+        imageUrl = d[0][0]?.image?.url || d[0][0]?.url || d[0][0];
       } else {
-        imageUrl = first?.image?.url || first?.url || first;
+        imageUrl = d[0]?.image?.url || d[0]?.url || d[0];
       }
     }
 
@@ -481,8 +479,6 @@ async function generateNSFWImage(botText) {
       imgDiv.innerHTML = `<img src="${imageUrl}" alt="Image générée">`;
       messagesEl.appendChild(imgDiv);
       messagesEl.scrollTop = messagesEl.scrollHeight;
-    } else {
-      console.warn("Impossible de trouver l'URL de l'image dans la réponse");
     }
 
   } catch (err) {
@@ -531,7 +527,7 @@ async function sendToWorker(userText) {
       const botText = data?.choices?.[0]?.message?.content || JSON.stringify(data);
       addMessage(botText, 'bot');
       finalizeHistory(userText, botText, isInit);
-      generateNSFWImage(botText); // ← génération d'image
+      if (botText.length > 30) generateNSFWImage(botText);
       return;
     }
 
@@ -570,8 +566,7 @@ async function sendToWorker(userText) {
     if (!fullText) botDiv.textContent = '(réponse vide)';
     finalizeHistory(userText, fullText, isInit);
 
-    // Lance la génération d'image après la réponse texte
-    if (fullText && fullText.length > 20) {
+    if (fullText && fullText.length > 30) {
       generateNSFWImage(fullText);
     }
 
