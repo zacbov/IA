@@ -310,7 +310,12 @@ async function sendToWorker(userText) {
         'Content-Type': 'application/json',
         'X-App-Secret': password
       },
-      body: JSON.stringify({ model: model, messages: messages, stream: true })
+      body: JSON.stringify({ model: model, messages: messages, stream: true,
+        temperature: 1.1,           // Plus créatif (1.0 à 1.2 recommandé)
+        top_p: 0.92,
+        frequency_penalty: 0.75,    // Très important contre les répétitions
+        presence_penalty: 0.6,      // Encourage la variété
+        max_tokens: 1200 })
     });
 
     if (!response.ok) {
