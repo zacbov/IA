@@ -34,13 +34,20 @@
   #profileBar select { flex: 1; }
   #profileBar button { width: auto; padding: 9px 12px; font-size: 12px; margin-top: 0; white-space: nowrap; }
   hr.sep { border: none; border-top: 1px solid #222; margin: 6px 0; width: 100%; }
+  details.advanced { border: 1px solid #222; border-radius: 8px; padding: 8px 10px; }
+  details.advanced summary { cursor: pointer; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #999; }
+  details.advanced .row { margin-top: 8px; }
+  .fieldlabel { font-size: 10px; color: #888; display:block; margin-bottom:3px; }
   #topbar {
     display: flex; align-items: center; justify-content: space-between; padding: 10px 14px;
-    border-bottom: 1px solid #222; flex-shrink: 0;
+    border-bottom: 1px solid #222; flex-shrink: 0; gap: 8px;
   }
   #topbar.hidden { display: none; }
-  #topbar span { font-size: 12px; color: #999; font-family: monospace; }
-  #topbar div { display: flex; gap: 8px; }
+  #topbar select {
+    background: #14201a; border: 1px solid #2a3d33; color: #e8e8e4; border-radius: 6px;
+    padding: 5px 8px; font-size: 11.5px; font-family: inherit; max-width: 140px;
+  }
+  #topbar div.actions { display: flex; gap: 6px; flex-shrink: 0; }
   #topbar button {
     background: none; border: 1px solid #333; color: #999; border-radius: 6px;
     padding: 5px 10px; font-size: 11px; cursor: pointer;
@@ -103,14 +110,45 @@
     <label>Prompt système / personnalité</label>
     <textarea id="systemPrompt" placeholder="Décris ici le personnage, le ton, le style de réponse attendu..."></textarea>
   </div>
+
+  <details class="advanced">
+    <summary>Paramètres de génération (avancé)</summary>
+    <div class="row">
+      <div>
+        <span class="fieldlabel">Temperature</span>
+        <input type="number" id="p_temperature" step="0.05" min="0" max="2" value="1.0">
+      </div>
+      <div>
+        <span class="fieldlabel">Top P</span>
+        <input type="number" id="p_top_p" step="0.05" min="0" max="1" value="1.0">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <span class="fieldlabel">Frequency penalty</span>
+        <input type="number" id="p_frequency_penalty" step="0.05" min="-2" max="2" value="0">
+      </div>
+      <div>
+        <span class="fieldlabel">Presence penalty</span>
+        <input type="number" id="p_presence_penalty" step="0.05" min="-2" max="2" value="0">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <span class="fieldlabel">Max tokens</span>
+        <input type="number" id="p_max_tokens" step="50" min="50" max="8000" value="800">
+      </div>
+    </div>
+  </details>
+
   <button id="saveProfileBtn" class="secondary">💾 Enregistrer ce profil</button>
   <button id="startBtn">Démarrer la conversation</button>
 </div>
 
 <div id="topbar" class="hidden">
-  <span id="sessionLabel">Session active</span>
-  <div>
-    <button id="resetBtn">↺ Réinitialiser</button>
+  <select id="quickSwitch"></select>
+  <div class="actions">
+    <button id="resetBtn">↺ Vider</button>
     <button id="backBtn">⚙ Config</button>
   </div>
 </div>
@@ -125,13 +163,15 @@
 <script>
 const WORKER_BASE = 'https://routeur-ia-proxy.zacharybov.workers.dev/proxy/';
 const HISTORY_WINDOW = 8;
-const STORAGE_KEY = 'chat_profiles_v1';
+const STORAGE_KEY = 'chat_profiles_v2';
+const LAST_PROFILE_KEY = 'chat_last_profile_v2';
 
 let provider = 'groq';
 let model = '';
 let password = '';
 let systemPrompt = '';
 let profileName = '';
+let sampling = {};
 let history = [];
 
 const setup = document.getElementById('setup');
@@ -141,9 +181,10 @@ const inputbar = document.getElementById('inputbar');
 const input = document.getElementById('input');
 const sendBtn = document.getElementById('send');
 const profileSelect = document.getElementById('profileSelect');
-const sessionLabel = document.getElementById('sessionLabel');
+const quickSwitch = document.getElementById('quickSwitch');
 
-// ---------- Gestion des profils (localStorage) ----------
+// ---------- Stockage des profils ----------
+// Chaque profil = { provider, model, password, systemPrompt, sampling:{...}, history:[...] }
 function loadProfiles() {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
@@ -151,115 +192,199 @@ function loadProfiles() {
     return {};
   }
 }
-
 function saveProfiles(profiles) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
 }
 
-function refreshProfileSelect(selectName) {
+function readSamplingFromForm() {
+  return {
+    temperature: parseFloat(document.getElementById('p_temperature').value) || 1.0,
+    top_p: parseFloat(document.getElementById('p_top_p').value) || 1.0,
+    frequency_penalty: parseFloat(document.getElementById('p_frequency_penalty').value) || 0,
+    presence_penalty: parseFloat(document.getElementById('p_presence_penalty').value) || 0,
+    max_tokens: parseInt(document.getElementById('p_max_tokens').value) || 800
+  };
+}
+function writeSamplingToForm(s) {
+  s = s || {};
+  document.getElementById('p_temperature').value = s.temperature ?? 1.0;
+  document.getElementById('p_top_p').value = s.top_p ?? 1.0;
+  document.getElementById('p_frequency_penalty').value = s.frequency_penalty ?? 0;
+  document.getElementById('p_presence_penalty').value = s.presence_penalty ?? 0;
+  document.getElementById('p_max_tokens').value = s.max_tokens ?? 800;
+}
+
+function refreshProfileSelects(selectName) {
   const profiles = loadProfiles();
+  const names = Object.keys(profiles).sort();
+
   profileSelect.innerHTML = '<option value="">— Nouveau profil —</option>';
-  Object.keys(profiles).sort().forEach(name => {
+  names.forEach(name => {
     const opt = document.createElement('option');
-    opt.value = name;
-    opt.textContent = name;
+    opt.value = name; opt.textContent = name;
     profileSelect.appendChild(opt);
   });
-  if (selectName && profiles[selectName]) {
-    profileSelect.value = selectName;
-  }
+  if (selectName && profiles[selectName]) profileSelect.value = selectName;
+
+  quickSwitch.innerHTML = '';
+  names.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    quickSwitch.appendChild(opt);
+  });
+  if (selectName) quickSwitch.value = selectName;
 }
 
 function fillFormFromProfile(name) {
-  const profiles = loadProfiles();
-  const p = profiles[name];
+  const p = loadProfiles()[name];
   if (!p) return;
   document.getElementById('provider').value = p.provider || 'groq';
   document.getElementById('model').value = p.model || '';
   document.getElementById('password').value = p.password || '';
   document.getElementById('profileName').value = name;
   document.getElementById('systemPrompt').value = p.systemPrompt || '';
+  writeSamplingToForm(p.sampling);
 }
 
 profileSelect.addEventListener('change', () => {
-  const name = profileSelect.value;
-  if (name) fillFormFromProfile(name);
+  if (profileSelect.value) fillFormFromProfile(profileSelect.value);
 });
 
 document.getElementById('saveProfileBtn').addEventListener('click', () => {
   const name = document.getElementById('profileName').value.trim();
-  if (!name) {
-    alert('Donne un nom à ce profil avant de l\'enregistrer.');
-    return;
-  }
+  if (!name) { alert("Donne un nom à ce profil avant de l'enregistrer."); return; }
   const profiles = loadProfiles();
+  const existingHistory = (profiles[name] && profiles[name].history) || [];
   profiles[name] = {
     provider: document.getElementById('provider').value,
     model: document.getElementById('model').value.trim(),
     password: document.getElementById('password').value,
-    systemPrompt: document.getElementById('systemPrompt').value.trim()
+    systemPrompt: document.getElementById('systemPrompt').value.trim(),
+    sampling: readSamplingFromForm(),
+    history: existingHistory
   };
   saveProfiles(profiles);
-  refreshProfileSelect(name);
+  refreshProfileSelects(name);
   alert('Profil "' + name + '" enregistré.');
 });
 
 document.getElementById('deleteProfileBtn').addEventListener('click', () => {
   const name = profileSelect.value;
   if (!name) return;
-  if (!confirm('Supprimer le profil "' + name + '" ?')) return;
+  if (!confirm('Supprimer le profil "' + name + '" (et son historique) ?')) return;
   const profiles = loadProfiles();
   delete profiles[name];
   saveProfiles(profiles);
-  refreshProfileSelect();
+  refreshProfileSelects();
   document.getElementById('profileName').value = '';
 });
 
-// Charger le dernier profil utilisé automatiquement
 window.addEventListener('DOMContentLoaded', () => {
-  refreshProfileSelect();
-  const lastUsed = localStorage.getItem('chat_last_profile');
+  refreshProfileSelects();
+  const lastUsed = localStorage.getItem(LAST_PROFILE_KEY);
   if (lastUsed && loadProfiles()[lastUsed]) {
     profileSelect.value = lastUsed;
     fillFormFromProfile(lastUsed);
   }
 });
 
+// ---------- Persistance de l'historique par profil ----------
+function persistCurrentHistory() {
+  if (!profileName) return;
+  const profiles = loadProfiles();
+  if (!profiles[profileName]) return;
+  profiles[profileName].history = history;
+  saveProfiles(profiles);
+}
+
+function activateProfile(name, isSwitch) {
+  const profiles = loadProfiles();
+  const p = profiles[name];
+  if (!p) return;
+
+  if (isSwitch) persistCurrentHistory(); // sauvegarde la conversation en cours avant de switcher
+
+  profileName = name;
+  provider = p.provider || 'groq';
+  model = p.model || '';
+  password = p.password || '';
+  systemPrompt = p.systemPrompt || '';
+  sampling = p.sampling || {};
+  history = p.history || [];
+
+  localStorage.setItem(LAST_PROFILE_KEY, profileName);
+
+  messagesEl.innerHTML = '';
+  history.forEach(m => addMessage(m.content, m.role === 'user' ? 'user' : 'bot'));
+
+  if (history.length === 0 && systemPrompt) {
+    sendToWorker('__init__');
+  }
+}
+
 // ---------- Démarrage / config ----------
 document.getElementById('startBtn').addEventListener('click', () => {
-  password = document.getElementById('password').value.trim();
-  systemPrompt = document.getElementById('systemPrompt').value.trim();
-  provider = document.getElementById('provider').value;
-  model = document.getElementById('model').value.trim();
-  profileName = document.getElementById('profileName').value.trim();
+  const pw = document.getElementById('password').value.trim();
+  const mdl = document.getElementById('model').value.trim();
+  const name = document.getElementById('profileName').value.trim();
 
-  if (!password) { alert('Entre le mot de passe du worker.'); return; }
-  if (!model) { alert('Entre le nom du modèle à utiliser.'); return; }
+  if (!pw) { alert('Entre le mot de passe du worker.'); return; }
+  if (!mdl) { alert('Entre le nom du modèle à utiliser.'); return; }
 
-  if (profileName) localStorage.setItem('chat_last_profile', profileName);
+  // Auto-enregistrer/mettre à jour le profil s'il a un nom
+  if (name) {
+    const profiles = loadProfiles();
+    const existingHistory = (profiles[name] && profiles[name].history) || [];
+    profiles[name] = {
+      provider: document.getElementById('provider').value,
+      model: mdl,
+      password: pw,
+      systemPrompt: document.getElementById('systemPrompt').value.trim(),
+      sampling: readSamplingFromForm(),
+      history: existingHistory
+    };
+    saveProfiles(profiles);
+    refreshProfileSelects(name);
+  }
 
   setup.classList.add('hidden');
   topbar.classList.remove('hidden');
   messagesEl.classList.remove('hidden');
   inputbar.classList.remove('hidden');
-  sessionLabel.textContent = (profileName || 'Session') + ' · ' + provider + ' / ' + model;
-  messagesEl.innerHTML = '';
-  history = [];
-  if (systemPrompt) {
-    sendToWorker('__init__');
+
+  if (name) {
+    activateProfile(name, false);
+  } else {
+    // Session sans profil sauvegardé (pas d'historique persistant)
+    profileName = '';
+    provider = document.getElementById('provider').value;
+    model = mdl;
+    password = pw;
+    systemPrompt = document.getElementById('systemPrompt').value.trim();
+    sampling = readSamplingFromForm();
+    history = [];
+    messagesEl.innerHTML = '';
+    if (systemPrompt) sendToWorker('__init__');
   }
   input.focus();
 });
 
-document.getElementById('resetBtn').addEventListener('click', () => {
-  history = [];
-  messagesEl.innerHTML = '';
-  if (systemPrompt) {
-    sendToWorker('__init__');
+quickSwitch.addEventListener('change', () => {
+  if (quickSwitch.value && quickSwitch.value !== profileName) {
+    activateProfile(quickSwitch.value, true);
   }
 });
 
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Vider l\'historique de cette conversation ?')) return;
+  history = [];
+  messagesEl.innerHTML = '';
+  persistCurrentHistory();
+  if (systemPrompt) sendToWorker('__init__');
+});
+
 document.getElementById('backBtn').addEventListener('click', () => {
+  persistCurrentHistory();
   topbar.classList.add('hidden');
   messagesEl.classList.add('hidden');
   inputbar.classList.add('hidden');
@@ -279,12 +404,8 @@ function addMessage(text, cls) {
 function buildMessages(userText, isInit) {
   const recent = history.slice(-HISTORY_WINDOW);
   const messages = [];
-  if (systemPrompt) {
-    messages.push({ role: 'system', content: systemPrompt });
-  }
-  for (const m of recent) {
-    messages.push({ role: m.role, content: m.content });
-  }
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+  for (const m of recent) messages.push({ role: m.role, content: m.content });
   if (isInit) {
     messages.push({ role: 'user', content: 'Initie la conversation maintenant, en restant fidèle au personnage et au ton décrits dans tes instructions système. Un seul message.' });
   } else {
@@ -303,19 +424,21 @@ async function sendToWorker(userText) {
     typingEl.classList.remove('msg');
 
     const messages = buildMessages(userText, isInit);
+    const s = sampling || {};
 
     const response = await fetch(WORKER_BASE + provider, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-App-Secret': password
-      },
-      body: JSON.stringify({ model: model, messages: messages, stream: true,
-        temperature: 1.1,           // Plus créatif (1.0 à 1.2 recommandé)
-        top_p: 0.92,
-        frequency_penalty: 0.75,    // Très important contre les répétitions
-        presence_penalty: 0.6,      // Encourage la variété
-        max_tokens: 1200 })
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        stream: true,
+        temperature: s.temperature ?? 1.0,
+        top_p: s.top_p ?? 1.0,
+        frequency_penalty: s.frequency_penalty ?? 0,
+        presence_penalty: s.presence_penalty ?? 0,
+        max_tokens: s.max_tokens ?? 800
+      })
     });
 
     if (!response.ok) {
@@ -334,7 +457,6 @@ async function sendToWorker(userText) {
       return;
     }
 
-    // ---- Lecture du flux SSE ----
     typingEl.remove();
     botDiv = addMessage('', 'bot');
     let fullText = '';
@@ -347,7 +469,6 @@ async function sendToWorker(userText) {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-
       const lines = buffer.split('\n');
       buffer = lines.pop();
 
@@ -358,24 +479,17 @@ async function sendToWorker(userText) {
         if (payload === '[DONE]') continue;
         try {
           const parsed = JSON.parse(payload);
-          const delta = parsed?.choices?.[0]?.delta?.content
-                     || parsed?.choices?.[0]?.message?.content
-                     || '';
+          const delta = parsed?.choices?.[0]?.delta?.content || parsed?.choices?.[0]?.message?.content || '';
           if (delta) {
             fullText += delta;
             botDiv.textContent = fullText;
             messagesEl.scrollTop = messagesEl.scrollHeight;
           }
-        } catch (e) {
-          // ligne non-JSON, on ignore
-        }
+        } catch (e) {}
       }
     }
 
-    if (!fullText) {
-      botDiv.textContent = '(réponse vide — le fournisseur ne supporte peut-être pas le streaming)';
-    }
-
+    if (!fullText) botDiv.textContent = '(réponse vide — le fournisseur ne supporte peut-être pas le streaming)';
     finalizeHistory(userText, fullText, isInit);
 
   } catch (err) {
@@ -387,10 +501,9 @@ async function sendToWorker(userText) {
 }
 
 function finalizeHistory(userText, botText, isInit) {
-  if (!isInit) {
-    history.push({ role: 'user', content: userText });
-  }
+  if (!isInit) history.push({ role: 'user', content: userText });
   history.push({ role: 'assistant', content: botText });
+  persistCurrentHistory();
 }
 
 function handleSend() {
@@ -404,10 +517,7 @@ function handleSend() {
 
 sendBtn.addEventListener('click', handleSend);
 input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    handleSend();
-  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
 });
 input.addEventListener('input', () => {
   input.style.height = 'auto';
