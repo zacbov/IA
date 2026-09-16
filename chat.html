@@ -55,6 +55,22 @@
 
 <div id="setup">
   <div>
+    <label>Fournisseur</label>
+    <select id="provider" style="width:100%; background:#14201a; border:1px solid #2a3d33; color:#e8e8e4; padding:9px 10px; border-radius:8px; font-size:13px; font-family:inherit;">
+      <option value="groq">groq</option>
+      <option value="openrouter">openrouter</option>
+      <option value="cerebras">cerebras</option>
+      <option value="mistral">mistral</option>
+      <option value="nvidia">nvidia</option>
+      <option value="hf">hf</option>
+      <option value="zai">zai</option>
+    </select>
+  </div>
+  <div>
+    <label>Modèle</label>
+    <input type="text" id="model" placeholder="ex: llama-3.1-8b-instant">
+  </div>
+  <div>
     <label>Mot de passe (worker)</label>
     <input type="password" id="password" placeholder="Mot de passe">
   </div>
@@ -78,9 +94,11 @@
 </div>
 
 <script>
-const WORKER_URL = 'https://routeur-ia-proxy.zacharybov.workers.dev/proxy/groq';
-const GROQ_MODEL = 'openai/gpt-oss-120b';
+const WORKER_BASE = 'https://routeur-ia-proxy.zacharybov.workers.dev/proxy/';
 const HISTORY_WINDOW = 8;
+
+let provider = 'groq';
+let model = '';
 
 let password = '';
 let systemPrompt = '';
@@ -96,8 +114,14 @@ const sendBtn = document.getElementById('send');
 document.getElementById('startBtn').addEventListener('click', () => {
   password = document.getElementById('password').value.trim();
   systemPrompt = document.getElementById('systemPrompt').value.trim();
+  provider = document.getElementById('provider').value;
+  model = document.getElementById('model').value.trim();
   if (!password) {
     alert('Entre le mot de passe du worker.');
+    return;
+  }
+  if (!model) {
+    alert('Entre le nom du modèle à utiliser.');
     return;
   }
   setup.classList.add('hidden');
@@ -155,13 +179,13 @@ async function sendToWorker(userText) {
 
     const messages = buildMessages(userText, isInit);
 
-    const response = await fetch(WORKER_URL, {
+    const response = await fetch(WORKER_BASE + provider, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-App-Secret': password
       },
-      body: JSON.stringify({ model: GROQ_MODEL, messages: messages })
+      body: JSON.stringify({ model: model, messages: messages })
     });
 
     typingEl.remove();
