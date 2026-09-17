@@ -179,7 +179,7 @@ const WORKER_BASE = 'https://routeur-ia-proxy.zacharybov.workers.dev/proxy/';
 const HISTORY_WINDOW = 8;
 const STORAGE_KEY = 'chat_profiles_v2';
 const LAST_PROFILE_KEY = 'chat_last_profile_v2';
-const ELEVEN_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
+const ELEVEN_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Bella
 
 let provider = 'groq';
 let model = '';
@@ -426,13 +426,24 @@ function buildMessages(userText, isInit) {
   return messages;
 }
 
-// ========== ELEVENLABS TTS ==========
+// ========== ELEVENLABS TTS (amélioré) ==========
 async function speakQuotedText(botText) {
-  const quotes = [...botText.matchAll(/"([^"]+)"/g)].map(m => m[1].trim());
-  if (quotes.length === 0) return;
+  // 1. On cherche d'abord les textes entre guillemets
+  let textsToSpeak = [...botText.matchAll(/"([^"]+)"/g)].map(m => m[1].trim());
 
-  for (const text of quotes) {
-    if (text.length < 4) continue;
+  // 2. Si aucun guillemet, on prend les premières phrases
+  if (textsToSpeak.length === 0) {
+    const sentences = botText
+      .split(/(?<=[.!?…])\s+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 20);
+    textsToSpeak = sentences.slice(0, 2); // max 2 phrases
+  }
+
+  if (textsToSpeak.length === 0) return;
+
+  for (const text of textsToSpeak) {
+    if (text.length < 5) continue;
 
     try {
       const response = await fetch(WORKER_BASE + "eleven-tts", {
@@ -449,7 +460,8 @@ async function speakQuotedText(botText) {
       });
 
       if (!response.ok) {
-        console.error("Erreur TTS:", response.status);
+        const errText = await response.text();
+        console.error("Erreur TTS:", response.status, errText);
         continue;
       }
 
@@ -459,9 +471,12 @@ async function speakQuotedText(botText) {
       const audioDiv = document.createElement("div");
       audioDiv.className = "msg bot";
       audioDiv.innerHTML = `
-        <div style="font-size:12px; color:#aaa; margin-bottom:4px;">🔊 Dialogue</div>
-        <audio controls src="${audioUrl}" style="width:100%; max-width:340px;"></audio>
+        <div style="font-size:12px; color:#aaa; margin-bottom:6px;">🔊 Voix générée</div>
+        <audio controls style="width:100%; max-width:360px;"></audio>
       `;
+      const audioEl = audioDiv.querySelector("audio");
+      audioEl.src = audioUrl;
+
       messagesEl.appendChild(audioDiv);
       messagesEl.scrollTop = messagesEl.scrollHeight;
 
@@ -471,7 +486,7 @@ async function speakQuotedText(botText) {
   }
 }
 
-// ========== GÉNÉRATION D'IMAGE (optionnel) ==========
+// ========== GÉNÉRATION D'IMAGE ==========
 async function generateNSFWImage(botText) {
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
@@ -498,8 +513,9 @@ async function generateNSFWImage(botText) {
     }
 
     const result = await response.json();
-    let imageUrl = null;
+    console.log("Réponse image:", result);
 
+    let imageUrl = null;
     if (result?.data) {
       const d = result.data;
       if (Array.isArray(d[0])) {
@@ -564,7 +580,7 @@ async function sendToWorker(userText) {
       finalizeHistory(userText, botText, isInit);
       if (botText.length > 20) {
         speakQuotedText(botText);
-        // generateNSFWImage(botText); // décommente si tu veux aussi les images
+        generateNSFWImage(botText);
       }
       return;
     }
@@ -606,7 +622,7 @@ async function sendToWorker(userText) {
 
     if (fullText && fullText.length > 20) {
       speakQuotedText(fullText);
-      // generateNSFWImage(fullText); // décommente si tu veux aussi les images
+      generateNSFWImage(fullText);
     }
 
   } catch (err) {
