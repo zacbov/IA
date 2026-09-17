@@ -446,40 +446,34 @@ async function speakQuotedText(botText) {
   }
 }
 
-// ========== IMAGE Multi Spaces ==========
-const IMAGE_SPACES = {
-  adult: {
-    base: "https://heartsync-adult.hf.space",
-    endpoint: "/gradio_api/call/generate_image",
-    buildData: (prompt) => [prompt, 768, 512, 10, 0, true, 1]
-  },
-  zimage: {
-    base: "https://yingzhac-z-image-nsfw.hf.space",
-    endpoint: "/gradio_api/call/generate_image",
-    buildData: (prompt) => [prompt, "", 768, 512, 9, 0.0, 0, true]
-  }
-};
-
-let CURRENT_SPACE = "adult"; // change en "adult" ou "zimage" si tu veux
-
+// ========== GÉNÉRATION D'IMAGE ==========
 async function generateNSFWImage(botText) {
-  const space = IMAGE_SPACES[CURRENT_SPACE];
-  if (!space) return;
-
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
-  loadingDiv.textContent = `🎨 Génération image (${CURRENT_SPACE})...`;
+  loadingDiv.textContent = '🎨 Génération de l\'image en cours...';
   messagesEl.appendChild(loadingDiv);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   try {
     const prompt = `masterpiece, best quality, highly detailed explicit erotic scene, ${botText.slice(0, 220)}, futanari, huge breasts, thick cock, wet, detailed anatomy`;
 
-    const startRes = await fetch(space.base + space.endpoint, {
+    // 1. Lancer la génération
+    const startRes = await fetch("https://properfool-nsfwadult.hf.space/gradio_api/call/generate_image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: space.buildData(prompt) })
+      body: JSON.stringify({
+        data: [prompt, 768, 512, 10, 0, true, 1]
+      })
     });
+
+    // Vérifie que la réponse est bien du JSON
+    const contentType = startRes.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      const text = await startRes.text();
+      console.error("Réponse non-JSON reçue:", text.slice(0, 300));
+      loadingDiv.textContent = '❌ Le Space renvoie une page HTML (probablement en pause)';
+      return;
+    }
 
     if (!startRes.ok) {
       loadingDiv.textContent = `❌ Erreur lancement (${startRes.status})`;
@@ -488,17 +482,23 @@ async function generateNSFWImage(botText) {
 
     const startData = await startRes.json();
     const eventId = startData.event_id;
+
     if (!eventId) {
       loadingDiv.textContent = '❌ Pas d\'event_id';
+      console.log(startData);
       return;
     }
 
+    // 2. Polling
     let imageUrl = null;
+
     for (let i = 0; i < 50; i++) {
       await new Promise(r => setTimeout(r, 1200));
-      const pollRes = await fetch(`${space.base}${space.endpoint}/${eventId}`);
+
+      const pollRes = await fetch(`https://properfool-nsfwadult.hf.space/gradio_api/call/generate_image/${eventId}`);
       const pollText = await pollRes.text();
 
+      // Cherche une URL d'image
       const urlMatch = pollText.match(/https?:\/\/[^\s"'\\]+\.(?:png|jpg|jpeg|webp)(?:\?[^\s"'\\]*)?/i);
       if (urlMatch) {
         imageUrl = urlMatch[0];
@@ -525,6 +525,7 @@ async function generateNSFWImage(botText) {
       errDiv.textContent = '⚠️ Image non récupérée';
       messagesEl.appendChild(errDiv);
     }
+
   } catch (err) {
     loadingDiv.remove();
     console.error("Erreur génération image:", err);
