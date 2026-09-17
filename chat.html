@@ -483,7 +483,7 @@ async function speakQuotedText(botText) {
   }
 }
 
-// ========== GÉNÉRATION D'IMAGE ==========
+// ========== GÉNÉRATION D'IMAGE (version robuste) ==========
 async function generateNSFWImage(botText) {
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
@@ -492,18 +492,19 @@ async function generateNSFWImage(botText) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   try {
-    const prompt = `masterpiece, best quality, highly detailed explicit erotic scene, ${botText.slice(0, 240)}, futanari, huge breasts, thick cock, wet, detailed anatomy`;
+    const prompt = `masterpiece, best quality, highly detailed explicit erotic scene, ${botText.slice(0, 220)}, futanari, huge breasts, thick cock, wet, detailed anatomy`;
 
+    // 1. Lancer la génération
     const startRes = await fetch("https://properfool-nsfwadult.hf.space/gradio_api/call/generate_image", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        data: [prompt, 768, 512, 12, 0, true, 1]
+        data: [prompt, 768, 512, 10, 0, true, 1]
       })
     });
 
     if (!startRes.ok) {
-      loadingDiv.textContent = '❌ Erreur lors du lancement de l\'image';
+      loadingDiv.textContent = '❌ Erreur au lancement';
       return;
     }
 
@@ -511,28 +512,74 @@ async function generateNSFWImage(botText) {
     const eventId = startData.event_id;
 
     if (!eventId) {
-      loadingDiv.textContent = '❌ Pas d\'event_id reçu';
-      console.log(startData);
+      loadingDiv.textContent = '❌ Pas d\'event_id';
+      console.log("Start response:", startData);
       return;
     }
 
+    // 2. Polling
     let imageUrl = null;
-    for (let i = 0; i < 45; i++) {
-      await new Promise(r => setTimeout(r, 1000));
+    let lastText = '';
+
+    for (let i = 0; i < 50; i++) {
+      await new Promise(r => setTimeout(r, 1200));
 
       const pollRes = await fetch(`https://properfool-nsfwadult.hf.space/gradio_api/call/generate_image/${eventId}`);
       const pollText = await pollRes.text();
+      lastText = pollText;
 
-      if (pollText.includes('http') || pollText.includes('"url"')) {
-        const match = pollText.match(/https?:\/\/[^\s"']+\.(png|jpg|jpeg|webp)/i);
-        if (match) {
-          imageUrl = match[0];
-          break;
+      // Méthode 1 : chercher une URL d'image directe
+      const urlMatch = pollText.match(/https?:\/\/[^\s"'\\]+\.(?:png|jpg|jpeg|webp)(?:\?[^\s"'\\]*)?/i);
+      if (urlMatch) {
+        imageUrl = urlMatch[0];
+        break;
+      }
+
+      // Méthode 2 : chercher dans les data: JSON
+      const dataLines = pollText.split('\n').filter(l => l.startsWith('data:'));
+      for (const line of dataLines) {
+        try {
+          const jsonStr = line.replace(/^data:\s*/, '').trim();
+          if (!jsonStr || jsonStr === '[DONE]') continue;
+
+          const parsed = JSON.parse(jsonStr);
+
+          // Structure classique Gradio
+          if (parsed?.data) {
+            const d = parsed.data;
+            let candidate = null;
+
+            if (Array.isArray(d) && d[0]) {
+              if (Array.isArray(d[0])) {
+                candidate = d[0][0]?.image?.url || d[0][0]?.url || d[0][0];
+              } else {
+                candidate = d[0]?.image?.url || d[0]?.url || d[0];
+              }
+            }
+
+            if (typeof candidate === 'string' && candidate.startsWith('http')) {
+              imageUrl = candidate;
+              break;
+            }
+          }
+
+          // Parfois l'URL est directement dans output
+          if (parsed?.output && typeof parsed.output === 'string' && parsed.output.startsWith('http')) {
+            imageUrl = parsed.output;
+            break;
+          }
+
+        } catch (e) {
+          // ignore les lignes non-JSON
         }
       }
 
-      if (pollText.includes('error') || pollText.includes('failed')) {
-        loadingDiv.textContent = '❌ Échec de la génération';
+      if (imageUrl) break;
+
+      // Détection d'erreur
+      if (pollText.toLowerCase().includes('error') || pollText.toLowerCase().includes('failed')) {
+        loadingDiv.textContent = '❌ Échec côté Space';
+        console.log("Poll error content:", pollText.slice(0, 500));
         return;
       }
     }
@@ -546,110 +593,16 @@ async function generateNSFWImage(botText) {
       messagesEl.appendChild(imgDiv);
       messagesEl.scrollTop = messagesEl.scrollHeight;
     } else {
+      console.log("Dernier contenu reçu:", lastText.slice(0, 800));
       const errDiv = document.createElement('div');
       errDiv.className = 'msg image-loading';
-      errDiv.textContent = '⚠️ Image non récupérée';
+      errDiv.textContent = '⚠️ Image non récupérée (voir console)';
       messagesEl.appendChild(errDiv);
     }
 
   } catch (err) {
     loadingDiv.remove();
     console.error("Erreur génération image:", err);
-  }
-}
-
-async function sendToWorker(userText) {
-  const isInit = userText === '__init__';
-  let typingEl = null;
-  let botDiv = null;
-  try {
-    sendBtn.disabled = true;
-    typingEl = addMessage('...', 'typing');
-    typingEl.classList.remove('msg');
-
-    const messages = buildMessages(userText, isInit);
-    const s = sampling || {};
-
-    const response = await fetch(WORKER_BASE + provider, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
-      body: JSON.stringify({
-        model: model,
-        messages: messages,
-        stream: true,
-        temperature: s.temperature ?? 1.0,
-        top_p: s.top_p ?? 1.0,
-        frequency_penalty: s.frequency_penalty ?? 0,
-        presence_penalty: s.presence_penalty ?? 0,
-        max_tokens: s.max_tokens ?? 800
-      })
-    });
-
-    if (!response.ok) {
-      typingEl.remove();
-      const errText = await response.text();
-      addMessage('Erreur ' + response.status + ' : ' + errText.slice(0, 200), 'err');
-      return;
-    }
-
-    if (!response.body) {
-      typingEl.remove();
-      const data = await response.json();
-      const botText = data?.choices?.[0]?.message?.content || JSON.stringify(data);
-      addMessage(botText, 'bot');
-      finalizeHistory(userText, botText, isInit);
-      if (botText.length > 20) {
-        speakQuotedText(botText);
-        generateNSFWImage(botText);
-      }
-      return;
-    }
-
-    typingEl.remove();
-    botDiv = addMessage('', 'bot');
-    let fullText = '';
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) continue;
-        const payload = trimmed.slice(5).trim();
-        if (payload === '[DONE]') continue;
-        try {
-          const parsed = JSON.parse(payload);
-          const delta = parsed?.choices?.[0]?.delta?.content || parsed?.choices?.[0]?.message?.content || '';
-          if (delta) {
-            fullText += delta;
-            botDiv.textContent = fullText;
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-          }
-        } catch (e) {}
-      }
-    }
-
-    if (!fullText) botDiv.textContent = '(réponse vide)';
-    finalizeHistory(userText, fullText, isInit);
-
-    if (fullText && fullText.length > 20) {
-      speakQuotedText(fullText);
-      generateNSFWImage(fullText);
-    }
-
-  } catch (err) {
-    if (typingEl) typingEl.remove();
-    addMessage('Erreur réseau : ' + err.message, 'err');
-  } finally {
-    sendBtn.disabled = false;
   }
 }
 
