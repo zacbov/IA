@@ -179,6 +179,7 @@ const WORKER_BASE = 'https://routeur-ia-proxy.zacharybov.workers.dev/proxy/';
 const HISTORY_WINDOW = 8;
 const STORAGE_KEY = 'chat_profiles_v2';
 const LAST_PROFILE_KEY = 'chat_last_profile_v2';
+const ELEVEN_VOICE_ID = "YxrwjAKoUKULGd0g8K9Y";
 
 let provider = 'groq';
 let model = '';
@@ -425,7 +426,52 @@ function buildMessages(userText, isInit) {
   return messages;
 }
 
-// ========== GÉNÉRATION D'IMAGE ==========
+// ========== ELEVENLABS TTS ==========
+async function speakQuotedText(botText) {
+  const quotes = [...botText.matchAll(/"([^"]+)"/g)].map(m => m[1].trim());
+  if (quotes.length === 0) return;
+
+  for (const text of quotes) {
+    if (text.length < 4) continue;
+
+    try {
+      const response = await fetch(WORKER_BASE + "eleven-tts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-App-Secret": password
+        },
+        body: JSON.stringify({
+          text: text,
+          voice_id: ELEVEN_VOICE_ID,
+          model_id: "eleven_multilingual_v2"
+        })
+      });
+
+      if (!response.ok) {
+        console.error("Erreur TTS:", response.status);
+        continue;
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      const audioDiv = document.createElement("div");
+      audioDiv.className = "msg bot";
+      audioDiv.innerHTML = `
+        <div style="font-size:12px; color:#aaa; margin-bottom:4px;">🔊 Dialogue</div>
+        <audio controls src="${audioUrl}" style="width:100%; max-width:340px;"></audio>
+      `;
+      messagesEl.appendChild(audioDiv);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    } catch (err) {
+      console.error("Erreur génération voix:", err);
+    }
+  }
+}
+
+// ========== GÉNÉRATION D'IMAGE (optionnel) ==========
 async function generateNSFWImage(botText) {
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
@@ -440,15 +486,7 @@ async function generateNSFWImage(botText) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        data: [
-          prompt,
-          768,
-          512,
-          10,
-          0,
-          true,
-          1
-        ]
+        data: [prompt, 768, 512, 10, 0, true, 1]
       })
     });
 
@@ -460,8 +498,6 @@ async function generateNSFWImage(botText) {
     }
 
     const result = await response.json();
-    console.log("Réponse image:", result);
-
     let imageUrl = null;
 
     if (result?.data) {
@@ -480,7 +516,6 @@ async function generateNSFWImage(botText) {
       messagesEl.appendChild(imgDiv);
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
-
   } catch (err) {
     loadingDiv.remove();
     console.error("Erreur génération image:", err);
@@ -527,7 +562,10 @@ async function sendToWorker(userText) {
       const botText = data?.choices?.[0]?.message?.content || JSON.stringify(data);
       addMessage(botText, 'bot');
       finalizeHistory(userText, botText, isInit);
-      if (botText.length > 30) generateNSFWImage(botText);
+      if (botText.length > 20) {
+        speakQuotedText(botText);
+        // generateNSFWImage(botText); // décommente si tu veux aussi les images
+      }
       return;
     }
 
@@ -566,8 +604,9 @@ async function sendToWorker(userText) {
     if (!fullText) botDiv.textContent = '(réponse vide)';
     finalizeHistory(userText, fullText, isInit);
 
-    if (fullText && fullText.length > 30) {
-      generateNSFWImage(fullText);
+    if (fullText && fullText.length > 20) {
+      speakQuotedText(fullText);
+      // generateNSFWImage(fullText); // décommente si tu veux aussi les images
     }
 
   } catch (err) {
