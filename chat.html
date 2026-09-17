@@ -198,13 +198,8 @@ const sendBtn = document.getElementById('send');
 const profileSelect = document.getElementById('profileSelect');
 const quickSwitch = document.getElementById('quickSwitch');
 
-// ---------- Stockage des profils ----------
 function loadProfiles() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
-  } catch (e) {
-    return {};
-  }
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch (e) { return {}; }
 }
 function saveProfiles(profiles) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
@@ -231,7 +226,6 @@ function writeSamplingToForm(s) {
 function refreshProfileSelects(selectName) {
   const profiles = loadProfiles();
   const names = Object.keys(profiles).sort();
-
   profileSelect.innerHTML = '<option value="">— Nouveau profil —</option>';
   names.forEach(name => {
     const opt = document.createElement('option');
@@ -302,7 +296,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// ---------- Persistance de l'historique ----------
 function persistCurrentHistory() {
   if (!profileName) return;
   const profiles = loadProfiles();
@@ -315,9 +308,7 @@ function activateProfile(name, isSwitch) {
   const profiles = loadProfiles();
   const p = profiles[name];
   if (!p) return;
-
   if (isSwitch) persistCurrentHistory();
-
   profileName = name;
   provider = p.provider || 'groq';
   model = p.model || '';
@@ -325,26 +316,18 @@ function activateProfile(name, isSwitch) {
   systemPrompt = p.systemPrompt || '';
   sampling = p.sampling || {};
   history = p.history || [];
-
   localStorage.setItem(LAST_PROFILE_KEY, profileName);
-
   messagesEl.innerHTML = '';
   history.forEach(m => addMessage(m.content, m.role === 'user' ? 'user' : 'bot'));
-
-  if (history.length === 0 && systemPrompt) {
-    sendToWorker('__init__');
-  }
+  if (history.length === 0 && systemPrompt) sendToWorker('__init__');
 }
 
-// ---------- Démarrage / config ----------
 document.getElementById('startBtn').addEventListener('click', () => {
   const pw = document.getElementById('password').value.trim();
   const mdl = document.getElementById('model').value.trim();
   const name = document.getElementById('profileName').value.trim();
-
   if (!pw) { alert('Entre le mot de passe du worker.'); return; }
   if (!mdl) { alert('Entre le nom du modèle à utiliser.'); return; }
-
   if (name) {
     const profiles = loadProfiles();
     const existingHistory = (profiles[name] && profiles[name].history) || [];
@@ -359,12 +342,10 @@ document.getElementById('startBtn').addEventListener('click', () => {
     saveProfiles(profiles);
     refreshProfileSelects(name);
   }
-
   setup.classList.add('hidden');
   topbar.classList.remove('hidden');
   messagesEl.classList.remove('hidden');
   inputbar.classList.remove('hidden');
-
   if (name) {
     activateProfile(name, false);
   } else {
@@ -382,9 +363,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
 });
 
 quickSwitch.addEventListener('change', () => {
-  if (quickSwitch.value && quickSwitch.value !== profileName) {
-    activateProfile(quickSwitch.value, true);
-  }
+  if (quickSwitch.value && quickSwitch.value !== profileName) activateProfile(quickSwitch.value, true);
 });
 
 document.getElementById('resetBtn').addEventListener('click', () => {
@@ -403,7 +382,6 @@ document.getElementById('backBtn').addEventListener('click', () => {
   setup.classList.remove('hidden');
 });
 
-// ---------- Chat ----------
 function addMessage(text, cls) {
   const div = document.createElement('div');
   div.className = 'msg ' + cls;
@@ -426,160 +404,109 @@ function buildMessages(userText, isInit) {
   return messages;
 }
 
-// ========== ELEVENLABS TTS ==========
+// ========== TTS ==========
 async function speakQuotedText(botText) {
   let textsToSpeak = [...botText.matchAll(/"([^"]+)"/g)].map(m => m[1].trim());
-
   if (textsToSpeak.length === 0) {
-    const sentences = botText
-      .split(/(?<=[.!?…])\s+/)
-      .map(s => s.trim())
-      .filter(s => s.length > 20);
+    const sentences = botText.split(/(?<=[.!?…])\s+/).map(s => s.trim()).filter(s => s.length > 20);
     textsToSpeak = sentences.slice(0, 2);
   }
-
   if (textsToSpeak.length === 0) return;
 
   for (const text of textsToSpeak) {
     if (text.length < 5) continue;
-
     try {
       const response = await fetch(WORKER_BASE + "eleven-tts", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-App-Secret": password
-        },
+        headers: { "Content-Type": "application/json", "X-App-Secret": password },
         body: JSON.stringify({
           text: text,
           voice_id: ELEVEN_VOICE_ID,
           model_id: "eleven_multilingual_v2"
         })
       });
-
       if (!response.ok) {
         console.error("Erreur TTS:", response.status);
         continue;
       }
-
       const audioBlob = await response.blob();
       const audioUrl = URL.createObjectURL(audioBlob);
-
       const audioDiv = document.createElement("div");
       audioDiv.className = "msg bot";
       audioDiv.innerHTML = `
         <div style="font-size:12px; color:#aaa; margin-bottom:8px;">🔊 Voix générée</div>
         <audio controls style="width:100%; max-width:380px; height:40px;"></audio>
       `;
-      const audioEl = audioDiv.querySelector("audio");
-      audioEl.src = audioUrl;
-
+      audioDiv.querySelector("audio").src = audioUrl;
       messagesEl.appendChild(audioDiv);
       messagesEl.scrollTop = messagesEl.scrollHeight;
-
     } catch (err) {
       console.error("Erreur génération voix:", err);
     }
   }
 }
 
-// ========== GÉNÉRATION D'IMAGE (version robuste) ==========
+// ========== IMAGE Multi Spaces ==========
+const IMAGE_SPACES = {
+  adult: {
+    base: "https://heartsync-adult.hf.space",
+    endpoint: "/gradio_api/call/generate_image",
+    buildData: (prompt) => [prompt, 768, 512, 10, 0, true, 1]
+  },
+  zimage: {
+    base: "https://yingzhac-z-image-nsfw.hf.space",
+    endpoint: "/gradio_api/call/generate_image",
+    buildData: (prompt) => [prompt, "", 768, 512, 9, 0.0, 0, true]
+  }
+};
+
+let CURRENT_SPACE = "zimage"; // change en "adult" si tu veux
+
 async function generateNSFWImage(botText) {
+  const space = IMAGE_SPACES[CURRENT_SPACE];
+  if (!space) return;
+
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
-  loadingDiv.textContent = '🎨 Génération de l\'image en cours...';
+  loadingDiv.textContent = `🎨 Génération image (${CURRENT_SPACE})...`;
   messagesEl.appendChild(loadingDiv);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   try {
     const prompt = `masterpiece, best quality, highly detailed explicit erotic scene, ${botText.slice(0, 220)}, futanari, huge breasts, thick cock, wet, detailed anatomy`;
 
-    // 1. Lancer la génération
-    const startRes = await fetch("https://properfool-nsfwadult.hf.space/gradio_api/call/generate_image", {
+    const startRes = await fetch(space.base + space.endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        data: [prompt, 768, 512, 10, 0, true, 1]
-      })
+      body: JSON.stringify({ data: space.buildData(prompt) })
     });
 
     if (!startRes.ok) {
-      loadingDiv.textContent = '❌ Erreur au lancement';
+      loadingDiv.textContent = `❌ Erreur lancement (${startRes.status})`;
       return;
     }
 
     const startData = await startRes.json();
     const eventId = startData.event_id;
-
     if (!eventId) {
       loadingDiv.textContent = '❌ Pas d\'event_id';
-      console.log("Start response:", startData);
       return;
     }
 
-    // 2. Polling
     let imageUrl = null;
-    let lastText = '';
-
     for (let i = 0; i < 50; i++) {
       await new Promise(r => setTimeout(r, 1200));
-
-      const pollRes = await fetch(`https://properfool-nsfwadult.hf.space/gradio_api/call/generate_image/${eventId}`);
+      const pollRes = await fetch(`${space.base}${space.endpoint}/${eventId}`);
       const pollText = await pollRes.text();
-      lastText = pollText;
 
-      // Méthode 1 : chercher une URL d'image directe
       const urlMatch = pollText.match(/https?:\/\/[^\s"'\\]+\.(?:png|jpg|jpeg|webp)(?:\?[^\s"'\\]*)?/i);
       if (urlMatch) {
         imageUrl = urlMatch[0];
         break;
       }
 
-      // Méthode 2 : chercher dans les data: JSON
-      const dataLines = pollText.split('\n').filter(l => l.startsWith('data:'));
-      for (const line of dataLines) {
-        try {
-          const jsonStr = line.replace(/^data:\s*/, '').trim();
-          if (!jsonStr || jsonStr === '[DONE]') continue;
-
-          const parsed = JSON.parse(jsonStr);
-
-          // Structure classique Gradio
-          if (parsed?.data) {
-            const d = parsed.data;
-            let candidate = null;
-
-            if (Array.isArray(d) && d[0]) {
-              if (Array.isArray(d[0])) {
-                candidate = d[0][0]?.image?.url || d[0][0]?.url || d[0][0];
-              } else {
-                candidate = d[0]?.image?.url || d[0]?.url || d[0];
-              }
-            }
-
-            if (typeof candidate === 'string' && candidate.startsWith('http')) {
-              imageUrl = candidate;
-              break;
-            }
-          }
-
-          // Parfois l'URL est directement dans output
-          if (parsed?.output && typeof parsed.output === 'string' && parsed.output.startsWith('http')) {
-            imageUrl = parsed.output;
-            break;
-          }
-
-        } catch (e) {
-          // ignore les lignes non-JSON
-        }
-      }
-
-      if (imageUrl) break;
-
-      // Détection d'erreur
       if (pollText.toLowerCase().includes('error') || pollText.toLowerCase().includes('failed')) {
         loadingDiv.textContent = '❌ Échec côté Space';
-        console.log("Poll error content:", pollText.slice(0, 500));
         return;
       }
     }
@@ -593,16 +520,109 @@ async function generateNSFWImage(botText) {
       messagesEl.appendChild(imgDiv);
       messagesEl.scrollTop = messagesEl.scrollHeight;
     } else {
-      console.log("Dernier contenu reçu:", lastText.slice(0, 800));
       const errDiv = document.createElement('div');
       errDiv.className = 'msg image-loading';
-      errDiv.textContent = '⚠️ Image non récupérée (voir console)';
+      errDiv.textContent = '⚠️ Image non récupérée';
       messagesEl.appendChild(errDiv);
     }
-
   } catch (err) {
     loadingDiv.remove();
     console.error("Erreur génération image:", err);
+  }
+}
+
+// ========== sendToWorker (la fonction manquante) ==========
+async function sendToWorker(userText) {
+  const isInit = userText === '__init__';
+  let typingEl = null;
+  let botDiv = null;
+  try {
+    sendBtn.disabled = true;
+    typingEl = addMessage('...', 'typing');
+    typingEl.classList.remove('msg');
+
+    const messages = buildMessages(userText, isInit);
+    const s = sampling || {};
+
+    const response = await fetch(WORKER_BASE + provider, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        stream: true,
+        temperature: s.temperature ?? 1.0,
+        top_p: s.top_p ?? 1.0,
+        frequency_penalty: s.frequency_penalty ?? 0,
+        presence_penalty: s.presence_penalty ?? 0,
+        max_tokens: s.max_tokens ?? 800
+      })
+    });
+
+    if (!response.ok) {
+      typingEl.remove();
+      const errText = await response.text();
+      addMessage('Erreur ' + response.status + ' : ' + errText.slice(0, 200), 'err');
+      return;
+    }
+
+    if (!response.body) {
+      typingEl.remove();
+      const data = await response.json();
+      const botText = data?.choices?.[0]?.message?.content || JSON.stringify(data);
+      addMessage(botText, 'bot');
+      finalizeHistory(userText, botText, isInit);
+      if (botText.length > 20) {
+        speakQuotedText(botText);
+        generateNSFWImage(botText);
+      }
+      return;
+    }
+
+    typingEl.remove();
+    botDiv = addMessage('', 'bot');
+    let fullText = '';
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(payload);
+          const delta = parsed?.choices?.[0]?.delta?.content || parsed?.choices?.[0]?.message?.content || '';
+          if (delta) {
+            fullText += delta;
+            botDiv.textContent = fullText;
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (!fullText) botDiv.textContent = '(réponse vide)';
+    finalizeHistory(userText, fullText, isInit);
+
+    if (fullText && fullText.length > 20) {
+      speakQuotedText(fullText);
+      generateNSFWImage(fullText);
+    }
+
+  } catch (err) {
+    if (typingEl) typingEl.remove();
+    addMessage('Erreur réseau : ' + err.message, 'err');
+  } finally {
+    sendBtn.disabled = false;
   }
 }
 
