@@ -473,8 +473,10 @@ const LOOP_SOUNDS = [
     id: "clac",
     label: "Claquement",
     src: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/flesh_against_flesh__1.mp3",
-    start: 0.00,   // commence à 0.15 seconde
-    end: 0.85      // s'arrête à 0.85 seconde (et reboucle)
+    startMin: 0.10,   // début minimum
+    startMax: 0.25,   // début maximum
+    endMin: 0.65,     // fin minimum
+    endMax: 1.05      // fin maximum
   },
   {
     id: "moan",
@@ -490,6 +492,10 @@ const LOOP_SOUNDS = [
 
 const activeLoops = {};
 
+function randomBetween(min, max) {
+  return min + Math.random() * (max - min);
+}
+
 function createLoopButton(sound) {
   const btn = document.createElement("button");
   btn.textContent = sound.label;
@@ -504,53 +510,56 @@ function createLoopButton(sound) {
       // Arrêter
       clearInterval(activeLoops[sound.id].timer);
       activeLoops[sound.id].audio.pause();
-      activeLoops[sound.id].audio.currentTime = 0;
       delete activeLoops[sound.id];
       btn.style.background = "#1a2a22";
       btn.style.color = "#e8e8e4";
       btn.style.borderColor = "#2a3d33";
-    } else {
-      // Lancer avec tronquage
-      if (!sound.src) {
-        alert("Aucun fichier audio défini pour : " + sound.label);
-        return;
+      return;
+    }
+
+    if (!sound.src) {
+      alert("Aucun fichier audio défini");
+      return;
+    }
+
+    const audio = new Audio(sound.src);
+    audio.volume = 0.7;
+
+    let currentStart = randomBetween(sound.startMin, sound.startMax);
+    let currentEnd = randomBetween(sound.endMin, sound.endMax);
+
+    const playNext = () => {
+      // Nouveau start / end aléatoire à chaque boucle
+      currentStart = randomBetween(sound.startMin, sound.startMax);
+      currentEnd = randomBetween(sound.endMin, sound.endMax);
+
+      // Sécurité : end doit être > start
+      if (currentEnd <= currentStart + 0.05) {
+        currentEnd = currentStart + 0.15;
       }
 
-      const audio = new Audio(sound.src);
-      audio.volume = 0.7;
+      audio.currentTime = currentStart;
+      audio.play().catch(err => console.error(err));
+    };
 
-      const start = sound.start || 0;
-      const end = sound.end || null;
+    // Vérifie en continu si on a atteint la fin de la portion
+    const timer = setInterval(() => {
+      if (audio.currentTime >= currentEnd) {
+        playNext(); // reboucle avec de nouvelles valeurs aléatoires
+      }
+    }, 25);
 
-      // Fonction de boucle tronquée
-      const playTrimmedLoop = () => {
-        audio.currentTime = start;
-        audio.play().catch(err => console.error(err));
-      };
+    // Au cas où le fichier se termine naturellement
+    audio.addEventListener("ended", playNext);
 
-      // Quand on arrive à la fin de la zone voulue → on reboucle
-      const checkTime = () => {
-        if (end && audio.currentTime >= end) {
-          audio.currentTime = start;
-        }
-      };
+    // Première lecture
+    playNext();
 
-      // On vérifie très souvent la position
-      const timer = setInterval(checkTime, 30);
+    activeLoops[sound.id] = { audio, timer };
 
-      audio.addEventListener("ended", () => {
-        // au cas où le fichier est plus court que "end"
-        playTrimmedLoop();
-      });
-
-      playTrimmedLoop();
-
-      activeLoops[sound.id] = { audio, timer };
-
-      btn.style.background = "#e0a34a";
-      btn.style.color = "#1a1208";
-      btn.style.borderColor = "#e0a34a";
-    }
+    btn.style.background = "#e0a34a";
+    btn.style.color = "#1a1208";
+    btn.style.borderColor = "#e0a34a";
   });
 
   return btn;
