@@ -3,360 +3,758 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Maîtresse Sélène</title>
+<title>Chat</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Inter:wght@300;400;500&display=swap');
-
-  :root {
-    --bg: #140f12;
-    --card: #1e161b;
-    --accent: #c45c8a;
-    --accent-soft: #f0c4d4;
-    --text: #f5e8ee;
-    --muted: #a88a96;
-    --user-bubble: #3a2a32;
-    --bot-bubble: #2a1f26;
-  }
-
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
+  * { box-sizing: border-box; }
   body {
-    font-family: 'Inter', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-image: 
-      radial-gradient(ellipse at top, #2a1a22 0%, transparent 55%),
-      radial-gradient(ellipse at bottom, #1a1015 0%, transparent 70%);
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0b0f0d; color: #e8e8e4; height: 100vh; display: flex; flex-direction: column;
   }
-
-  .chat-container {
-    width: 100%;
-    max-width: 480px;
-    height: 92vh;
-    max-height: 860px;
-    background: var(--card);
-    border-radius: 24px;
-    box-shadow: 0 25px 60px -12px rgba(0,0,0,0.7);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid #3d2a33;
-  }
-
-  .header {
-    padding: 20px 24px;
-    background: linear-gradient(to bottom, #2c1f26, #1e161b);
-    border-bottom: 1px solid #3d2a33;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .avatar {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #8b3a5c, #c45c8a);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 30px;
-    border: 2px solid var(--accent);
-    box-shadow: 0 0 0 4px rgba(196, 92, 138, 0.2);
-  }
-
-  .info h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.4rem;
-    font-weight: 600;
-    color: var(--accent-soft);
-  }
-
-  .info p {
-    font-size: 0.84rem;
-    color: var(--muted);
-    margin-top: 2px;
-  }
-
-  .status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.78rem;
-    color: #e07a9e;
-    margin-top: 4px;
-  }
-
-  .status::before {
-    content: '';
-    width: 8px;
-    height: 8px;
-    background: #e07a9e;
-    border-radius: 50%;
-  }
-
-  .messages {
-    flex: 1;
+  #setup {
+    padding: 16px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #222;
     overflow-y: auto;
-    padding: 22px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    scroll-behavior: smooth;
   }
-
-  .messages::-webkit-scrollbar { width: 5px; }
-  .messages::-webkit-scrollbar-thumb { background: #4a3540; border-radius: 10px; }
-
-  .message {
-    max-width: 88%;
-    padding: 13px 17px;
-    border-radius: 18px;
-    line-height: 1.55;
-    font-size: 0.95rem;
-    animation: fadeIn 0.28s ease;
+  #setup.hidden { display: none; }
+  #setup label { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #999; }
+  #setup input, #setup textarea, #setup select {
+    width: 100%; background: #14201a; border: 1px solid #2a3d33; color: #e8e8e4;
+    padding: 9px 10px; border-radius: 8px; font-size: 13px; font-family: inherit;
   }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+  #setup textarea { min-height: 90px; resize: vertical; }
+  #setup button {
+    background: #e0a34a; border: none; color: #1a1208; font-weight: 700;
+    padding: 11px; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 4px;
   }
-
-  .bot {
+  #setup button.secondary {
+    background: none; border: 1px solid #333; color: #ccc; font-weight: 600;
+  }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; }
+  #profileBar { display: flex; gap: 8px; align-items: flex-end; }
+  #profileBar select { flex: 1; }
+  #profileBar button { width: auto; padding: 9px 12px; font-size: 12px; margin-top: 0; white-space: nowrap; }
+  hr.sep { border: none; border-top: 1px solid #222; margin: 6px 0; width: 100%; }
+  details.advanced { border: 1px solid #222; border-radius: 8px; padding: 8px 10px; }
+  details.advanced summary { cursor: pointer; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #999; }
+  details.advanced .row { margin-top: 8px; }
+  .fieldlabel { font-size: 10px; color: #888; display:block; margin-bottom:3px; }
+  #topbar {
+    display: flex; align-items: center; justify-content: space-between; padding: 10px 14px;
+    border-bottom: 1px solid #222; flex-shrink: 0; gap: 8px;
+  }
+  #topbar.hidden { display: none; }
+  #topbar select {
+    background: #14201a; border: 1px solid #2a3d33; color: #e8e8e4; border-radius: 6px;
+    padding: 5px 8px; font-size: 11.5px; font-family: inherit; max-width: 140px;
+  }
+  #topbar div.actions { display: flex; gap: 6px; flex-shrink: 0; }
+  #topbar button {
+    background: none; border: 1px solid #333; color: #999; border-radius: 6px;
+    padding: 5px 10px; font-size: 11px; cursor: pointer;
+  }
+  #messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  #messages.hidden { display: none; }
+  .msg { max-width: 82%; padding: 10px 13px; border-radius: 12px; font-size: 14.5px; line-height: 1.45; white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; background: #e0a34a; color: #1a1208; }
+  .msg.bot { align-self: flex-start; background: #17221c; border: 1px solid #263329; }
+  .msg.err { align-self: center; background: #3a1414; color: #e0a0a0; font-size: 12.5px; font-family: monospace; }
+  .msg.image-loading {
     align-self: flex-start;
-    background: var(--bot-bubble);
-    border-bottom-left-radius: 5px;
-    color: var(--accent-soft);
+    background: #1a2a22;
+    border: 1px dashed #3a5a4a;
+    color: #a0c0b0;
+    font-size: 13px;
+    font-style: italic;
   }
-
-  .user {
-    align-self: flex-end;
-    background: var(--user-bubble);
-    border-bottom-right-radius: 5px;
-    color: #fff;
+  .msg img {
+    max-width: 100%;
+    border-radius: 10px;
+    margin-top: 8px;
+    display: block;
   }
-
-  .typing {
-    align-self: flex-start;
-    background: var(--bot-bubble);
-    padding: 14px 20px;
-    border-radius: 18px;
-    border-bottom-left-radius: 5px;
-    display: none;
+  #inputbar { display: flex; gap: 8px; padding: 10px 12px calc(env(safe-area-inset-bottom,0px) + 10px); border-top: 1px solid #222; flex-shrink: 0; }
+  #inputbar.hidden { display: none; }
+  #inputbar textarea {
+    flex: 1; resize: none; background: #14201a; border: 1px solid #2a3d33; color: #e8e8e4;
+    border-radius: 10px; padding: 11px 12px; font-size: 15px; font-family: inherit; max-height: 100px;
   }
-
-  .typing span {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    background: var(--accent);
-    border-radius: 50%;
-    margin: 0 2px;
-    animation: bounce 1.15s infinite ease-in-out;
-  }
-  .typing span:nth-child(2) { animation-delay: 0.15s; }
-  .typing span:nth-child(3) { animation-delay: 0.3s; }
-
-  @keyframes bounce {
-    0%, 80%, 100% { transform: translateY(0); }
-    40% { transform: translateY(-6px); }
-  }
-
-  .input-area {
-    padding: 14px 18px 18px;
-    background: #181217;
-    border-top: 1px solid #3d2a33;
-    display: flex;
-    gap: 12px;
-    align-items: flex-end;
-  }
-
-  textarea {
-    flex: 1;
-    background: #2a1f26;
-    border: 1px solid #4a3540;
-    border-radius: 16px;
-    padding: 13px 16px;
-    color: var(--text);
-    font-family: inherit;
-    font-size: 0.95rem;
-    resize: none;
-    max-height: 130px;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  textarea:focus { border-color: var(--accent); }
-  textarea::placeholder { color: #6b4e5a; }
-
-  button {
-    background: linear-gradient(135deg, #9b3a65, #c45c8a);
-    color: white;
-    border: none;
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-    transition: transform 0.15s, box-shadow 0.15s;
-    flex-shrink: 0;
-  }
-
-  button:hover {
-    transform: scale(1.07);
-    box-shadow: 0 4px 18px rgba(196, 92, 138, 0.4);
-  }
-
-  button:active { transform: scale(0.95); }
-
-  .footer-note {
-    text-align: center;
-    font-size: 0.7rem;
-    color: #5a3f4a;
-    padding-bottom: 6px;
-  }
+  #send { background: #e0a34a; border: none; color: #1a1208; font-weight: 700; width: 46px; border-radius: 10px; font-size: 18px; cursor: pointer; flex-shrink: 0; }
+  #send:disabled { background: #3a3a34; color: #777; }
+  .typing { align-self: flex-start; color: #777; font-size: 13px; font-style: italic; padding: 4px 4px; }
 </style>
 </head>
 <body>
-
-<div class="chat-container">
-  <div class="header">
-    <div class="avatar">🍆</div>
-    <div class="info">
-      <h1>Maîtresse Sélène</h1>
-      <p>Futanari Dominatrice • 42 ans</p>
-      <div class="status">Prête à te prendre</div>
+<!-- Lecteur multi-boucles -->
+<div id="audioLooper" style="
+  background:#121a16; border-bottom:1px solid #222; padding:10px 14px;
+  display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+">
+  <span style="font-size:12px; color:#999; margin-right:6px;">🔊 Boucles :</span>
+  
+  <!-- Les sons seront injectés ici par le JS -->
+  <div id="loopButtons" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+  
+  <button id="stopAllLoops" style="
+    background:none; border:1px solid #444; color:#ccc;
+    border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer;
+  ">⏹ Tout arrêter</button>
+</div>
+<div id="setup">
+  <div id="profileBar">
+    <div style="flex:2">
+      <label>Profil enregistré</label>
+      <select id="profileSelect"><option value="">— Nouveau profil —</option></select>
+    </div>
+    <button id="deleteProfileBtn" class="secondary" title="Supprimer ce profil">🗑</button>
+  </div>
+  <hr class="sep">
+  <div class="row">
+    <div>
+      <label>Fournisseur</label>
+      <select id="provider">
+        <option value="groq">groq</option>
+        <option value="openrouter">openrouter</option>
+        <option value="cerebras">cerebras</option>
+        <option value="mistral">mistral</option>
+        <option value="nvidia">nvidia</option>
+        <option value="hf">hf</option>
+        <option value="zai">zai</option>
+      </select>
+    </div>
+    <div>
+      <label>Modèle</label>
+      <input type="text" id="model" placeholder="ex: llama-3.1-8b-instant">
     </div>
   </div>
+  <div>
+    <label>Mot de passe (worker)</label>
+    <input type="password" id="password" placeholder="Mot de passe">
+  </div>
+  <div>
+    <label>Nom du profil</label>
+    <input type="text" id="profileName" placeholder="ex: Perso A">
+  </div>
+  <div>
+    <label>Prompt système / personnalité</label>
+    <textarea id="systemPrompt" placeholder="Décris ici le personnage, le ton, le style de réponse attendu..."></textarea>
+  </div>
 
-  <div class="messages" id="messages">
-    <div class="message bot">
-      Regarde-moi bien…  
-      Je suis Sélène. Une futanari. Une vraie dominatrice.  
-      Mon sexe est déjà à moitié dur rien qu’à l’idée de te baiser le cul.  
-      Tu n’as qu’un mot à dire… et je te l’enfonce.
+  <details class="advanced">
+    <summary>Paramètres de génération (avancé)</summary>
+    <div class="row">
+      <div>
+        <span class="fieldlabel">Temperature</span>
+        <input type="number" id="p_temperature" step="0.05" min="0" max="2" value="1.0">
+      </div>
+      <div>
+        <span class="fieldlabel">Top P</span>
+        <input type="number" id="p_top_p" step="0.05" min="0" max="1" value="1.0">
+      </div>
     </div>
-  </div>
+    <div class="row">
+      <div>
+        <span class="fieldlabel">Frequency penalty</span>
+        <input type="number" id="p_frequency_penalty" step="0.05" min="-2" max="2" value="0">
+      </div>
+      <div>
+        <span class="fieldlabel">Presence penalty</span>
+        <input type="number" id="p_presence_penalty" step="0.05" min="-2" max="2" value="0">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <span class="fieldlabel">Max tokens</span>
+        <input type="number" id="p_max_tokens" step="50" min="50" max="8000" value="800">
+      </div>
+    </div>
+  </details>
 
-  <div class="typing" id="typing">
-    <span></span><span></span><span></span>
-  </div>
+  <button id="saveProfileBtn" class="secondary">💾 Enregistrer ce profil</button>
+  <button id="startBtn">Démarrer la conversation</button>
+</div>
 
-  <div class="input-area">
-    <textarea id="input" rows="1" placeholder="Soumets-toi ou parle…" onkeydown="handleKey(event)"></textarea>
-    <button onclick="sendMessage()">➤</button>
+<div id="topbar" class="hidden">
+  <select id="quickSwitch"></select>
+  <div class="actions">
+    <button id="resetBtn">↺ Vider</button>
+    <button id="backBtn">⚙ Config</button>
   </div>
-  <div class="footer-note">Maîtresse Sélène • Chat privé & sale</div>
+</div>
+
+<div id="messages" class="hidden"></div>
+
+<div id="inputbar" class="hidden">
+  <textarea id="input" rows="1" placeholder="Écris ton message..."></textarea>
+  <button id="send">➤</button>
 </div>
 
 <script>
-  const messagesEl = document.getElementById('messages');
-  const inputEl = document.getElementById('input');
-  const typingEl = document.getElementById('typing');
+const WORKER_BASE = 'https://routeur-ia-proxy.zacharybov.workers.dev/proxy/';
+const HISTORY_WINDOW = 8;
+const STORAGE_KEY = 'chat_profiles_v2';
+const LAST_PROFILE_KEY = 'chat_last_profile_v2';
+const ELEVEN_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 
-  const responses = {
-    submission: [
-      "Bon garçon… À genoux. Écarte les fesses. Je vais t’ouvrir tout de suite.",
-      "Tu t’offres déjà ? Parfait. Je vais te remplir jusqu’à ce que tu pleures de plaisir.",
-      "Soumis dès le début… J’adore. Mon gland frotte déjà contre ton trou. Tu le sens ?"
-    ],
-    resistance: [
-      "Tu résistes ? Mignon. Ça ne fera que rendre ma bite plus dure quand je te forcerai.",
-      "Continue de jouer les durs… Je vais te faire supplier de te faire enculer.",
-      "Tu crois que tu as le choix ? Mon sexe est déjà collé contre ton anus. Une poussée et tu es à moi."
-    ],
-    anal: [
-      "Je vais te baiser le cul lentement d’abord… puis je vais le marteler jusqu’à ce que tu ne puisses plus marcher.",
-      "Ton trou est à moi. Je vais l’étirer avec ma futanari jusqu’à ce qu’il prenne parfaitement la forme de mon sexe.",
-      "Écarte. Plus large. Je veux voir mon gland disparaître entièrement dans ton cul."
-    ],
-    dirty: [
-      "Tu es mon petit trou à bite. Rien d’autre. Et je vais m’en servir autant que je veux.",
-      "Imagine ma queueisse chaude qui s’écoule déjà le long de tes cuisses pendant que je te sodomise.",
-      "Je vais te niquer si fort que tu vas oublier ton propre nom. Seulement le mien."
-    ],
-    default: [
-      "Parle encore… chaque mot me rend plus dure. Bientôt je ne me retiendrai plus.",
-      "Tu me titilles. Mon sexe pulse déjà. Dis-moi que tu veux le sentir en toi.",
-      "Je n’ai pas de patience ce soir. Soit tu t’offres, soit je te prends de force.",
-      "Approche ton cul. Maintenant. Je veux le sentir se resserrer autour de moi.",
-      "Tu es déjà mouillé à l’idée, n’est-ce pas ? Moi aussi… ma bite dégouline."
-    ]
+let provider = 'groq';
+let model = '';
+let password = '';
+let systemPrompt = '';
+let profileName = '';
+let sampling = {};
+let history = [];
+
+const setup = document.getElementById('setup');
+const topbar = document.getElementById('topbar');
+const messagesEl = document.getElementById('messages');
+const inputbar = document.getElementById('inputbar');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const profileSelect = document.getElementById('profileSelect');
+const quickSwitch = document.getElementById('quickSwitch');
+
+function loadProfiles() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch (e) { return {}; }
+}
+function saveProfiles(profiles) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+}
+
+function readSamplingFromForm() {
+  return {
+    temperature: parseFloat(document.getElementById('p_temperature').value) || 1.0,
+    top_p: parseFloat(document.getElementById('p_top_p').value) || 1.0,
+    frequency_penalty: parseFloat(document.getElementById('p_frequency_penalty').value) || 0,
+    presence_penalty: parseFloat(document.getElementById('p_presence_penalty').value) || 0,
+    max_tokens: parseInt(document.getElementById('p_max_tokens').value) || 800
   };
+}
+function writeSamplingToForm(s) {
+  s = s || {};
+  document.getElementById('p_temperature').value = s.temperature ?? 1.0;
+  document.getElementById('p_top_p').value = s.top_p ?? 1.0;
+  document.getElementById('p_frequency_penalty').value = s.frequency_penalty ?? 0;
+  document.getElementById('p_presence_penalty').value = s.presence_penalty ?? 0;
+  document.getElementById('p_max_tokens').value = s.max_tokens ?? 800;
+}
 
-  function getResponse(text) {
-    const lower = text.toLowerCase();
-
-    if (/(oui|s'il te plaît|s'il vous plaît|prends|baise|encule|soumis|à genoux|prête|prêt|oui maîtresse)/.test(lower)) {
-      return random(responses.submission);
-    }
-    if (/(non|arrête|pas|résiste|attends)/.test(lower)) {
-      return random(responses.resistance);
-    }
-    if (/(cul|anus|trou|derrière|fesses|sodomi|encul)/.test(lower)) {
-      return random(responses.anal);
-    }
-    if (/(bite|sexe|pénis|queue|futa|futanari|dur|bande)/.test(lower)) {
-      return random(responses.dirty);
-    }
-    if (/(bonjour|salut|bonsoir|hello)/.test(lower)) {
-      return "Tu salues ta Maîtresse ? Bien. Maintenant baisse les yeux et écarte les cuisses. Je n’ai pas que des politesses à te donner.";
-    }
-
-    return random(responses.default);
-  }
-
-  function random(arr) {
-    return arr[Math.floor(Math.random() * arr.length)];
-  }
-
-  function addMessage(text, isUser = false) {
-    const div = document.createElement('div');
-    div.className = `message ${isUser ? 'user' : 'bot'}`;
-    div.textContent = text;
-    messagesEl.appendChild(div);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-
-  function showTyping(show) {
-    typingEl.style.display = show ? 'block' : 'none';
-    if (show) messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
-
-  async function sendMessage() {
-    const text = inputEl.value.trim();
-    if (!text) return;
-
-    addMessage(text, true);
-    inputEl.value = '';
-    inputEl.style.height = 'auto';
-
-    showTyping(true);
-    await new Promise(r => setTimeout(r, 700 + Math.random() * 1100));
-    showTyping(false);
-
-    const reply = getResponse(text);
-    addMessage(reply);
-  }
-
-  function handleKey(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  }
-
-  inputEl.addEventListener('input', function() {
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 130) + 'px';
+function refreshProfileSelects(selectName) {
+  const profiles = loadProfiles();
+  const names = Object.keys(profiles).sort();
+  profileSelect.innerHTML = '<option value="">— Nouveau profil —</option>';
+  names.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    profileSelect.appendChild(opt);
   });
+  if (selectName && profiles[selectName]) profileSelect.value = selectName;
+
+  quickSwitch.innerHTML = '';
+  names.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    quickSwitch.appendChild(opt);
+  });
+  if (selectName) quickSwitch.value = selectName;
+}
+
+function fillFormFromProfile(name) {
+  const p = loadProfiles()[name];
+  if (!p) return;
+  document.getElementById('provider').value = p.provider || 'groq';
+  document.getElementById('model').value = p.model || '';
+  document.getElementById('password').value = p.password || '';
+  document.getElementById('profileName').value = name;
+  document.getElementById('systemPrompt').value = p.systemPrompt || '';
+  writeSamplingToForm(p.sampling);
+}
+
+profileSelect.addEventListener('change', () => {
+  if (profileSelect.value) fillFormFromProfile(profileSelect.value);
+});
+
+document.getElementById('saveProfileBtn').addEventListener('click', () => {
+  const name = document.getElementById('profileName').value.trim();
+  if (!name) { alert("Donne un nom à ce profil avant de l'enregistrer."); return; }
+  const profiles = loadProfiles();
+  const existingHistory = (profiles[name] && profiles[name].history) || [];
+  profiles[name] = {
+    provider: document.getElementById('provider').value,
+    model: document.getElementById('model').value.trim(),
+    password: document.getElementById('password').value,
+    systemPrompt: document.getElementById('systemPrompt').value.trim(),
+    sampling: readSamplingFromForm(),
+    history: existingHistory
+  };
+  saveProfiles(profiles);
+  refreshProfileSelects(name);
+  alert('Profil "' + name + '" enregistré.');
+});
+
+document.getElementById('deleteProfileBtn').addEventListener('click', () => {
+  const name = profileSelect.value;
+  if (!name) return;
+  if (!confirm('Supprimer le profil "' + name + '" (et son historique) ?')) return;
+  const profiles = loadProfiles();
+  delete profiles[name];
+  saveProfiles(profiles);
+  refreshProfileSelects();
+  document.getElementById('profileName').value = '';
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+  refreshProfileSelects();
+  const lastUsed = localStorage.getItem(LAST_PROFILE_KEY);
+  if (lastUsed && loadProfiles()[lastUsed]) {
+    profileSelect.value = lastUsed;
+    fillFormFromProfile(lastUsed);
+  }
+});
+
+function persistCurrentHistory() {
+  if (!profileName) return;
+  const profiles = loadProfiles();
+  if (!profiles[profileName]) return;
+  profiles[profileName].history = history;
+  saveProfiles(profiles);
+}
+
+function activateProfile(name, isSwitch) {
+  const profiles = loadProfiles();
+  const p = profiles[name];
+  if (!p) return;
+  if (isSwitch) persistCurrentHistory();
+  profileName = name;
+  provider = p.provider || 'groq';
+  model = p.model || '';
+  password = p.password || '';
+  systemPrompt = p.systemPrompt || '';
+  sampling = p.sampling || {};
+  history = p.history || [];
+  localStorage.setItem(LAST_PROFILE_KEY, profileName);
+  messagesEl.innerHTML = '';
+  history.forEach(m => addMessage(m.content, m.role === 'user' ? 'user' : 'bot'));
+  if (history.length === 0 && systemPrompt) sendToWorker('__init__');
+}
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  const pw = document.getElementById('password').value.trim();
+  const mdl = document.getElementById('model').value.trim();
+  const name = document.getElementById('profileName').value.trim();
+  if (!pw) { alert('Entre le mot de passe du worker.'); return; }
+  if (!mdl) { alert('Entre le nom du modèle à utiliser.'); return; }
+  if (name) {
+    const profiles = loadProfiles();
+    const existingHistory = (profiles[name] && profiles[name].history) || [];
+    profiles[name] = {
+      provider: document.getElementById('provider').value,
+      model: mdl,
+      password: pw,
+      systemPrompt: document.getElementById('systemPrompt').value.trim(),
+      sampling: readSamplingFromForm(),
+      history: existingHistory
+    };
+    saveProfiles(profiles);
+    refreshProfileSelects(name);
+  }
+  setup.classList.add('hidden');
+  topbar.classList.remove('hidden');
+  messagesEl.classList.remove('hidden');
+  inputbar.classList.remove('hidden');
+  if (name) {
+    activateProfile(name, false);
+  } else {
+    profileName = '';
+    provider = document.getElementById('provider').value;
+    model = mdl;
+    password = pw;
+    systemPrompt = document.getElementById('systemPrompt').value.trim();
+    sampling = readSamplingFromForm();
+    history = [];
+    messagesEl.innerHTML = '';
+    if (systemPrompt) sendToWorker('__init__');
+  }
+  input.focus();
+});
+
+quickSwitch.addEventListener('change', () => {
+  if (quickSwitch.value && quickSwitch.value !== profileName) activateProfile(quickSwitch.value, true);
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Vider l\'historique de cette conversation ?')) return;
+  history = [];
+  messagesEl.innerHTML = '';
+  persistCurrentHistory();
+  if (systemPrompt) sendToWorker('__init__');
+});
+
+document.getElementById('backBtn').addEventListener('click', () => {
+  persistCurrentHistory();
+  topbar.classList.add('hidden');
+  messagesEl.classList.add('hidden');
+  inputbar.classList.add('hidden');
+  setup.classList.remove('hidden');
+});
+
+function addMessage(text, cls) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  div.textContent = text;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+
+function buildMessages(userText, isInit) {
+  const recent = history.slice(-HISTORY_WINDOW);
+  const messages = [];
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+  for (const m of recent) messages.push({ role: m.role, content: m.content });
+  if (isInit) {
+    messages.push({ role: 'user', content: 'Initie la conversation maintenant, en restant fidèle au personnage et au ton décrits dans tes instructions système. Un seul message.' });
+  } else {
+    messages.push({ role: 'user', content: userText });
+  }
+  return messages;
+}
+
+// ========== TTS ==========
+async function speakQuotedText(botText) {
+  let textsToSpeak = [...botText.matchAll(/"([^"]+)"/g)].map(m => m[1].trim());
+  if (textsToSpeak.length === 0) {
+    const sentences = botText.split(/(?<=[.!?…])\s+/).map(s => s.trim()).filter(s => s.length > 20);
+    textsToSpeak = sentences.slice(0, 2);
+  }
+  if (textsToSpeak.length === 0) return;
+
+  for (const text of textsToSpeak) {
+    if (text.length < 5) continue;
+    try {
+      const response = await fetch(WORKER_BASE + "eleven-tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-App-Secret": password },
+        body: JSON.stringify({
+          text: text,
+          voice_id: ELEVEN_VOICE_ID,
+          model_id: "eleven_multilingual_v2"
+        })
+      });
+      if (!response.ok) {
+        console.error("Erreur TTS:", response.status);
+        continue;
+      }
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audioDiv = document.createElement("div");
+      audioDiv.className = "msg bot";
+      audioDiv.innerHTML = `
+        <div style="font-size:12px; color:#aaa; margin-bottom:8px;">🔊 Voix générée</div>
+        <audio controls style="width:100%; max-width:380px; height:40px;"></audio>
+      `;
+      audioDiv.querySelector("audio").src = audioUrl;
+      messagesEl.appendChild(audioDiv);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    } catch (err) {
+      console.error("Erreur génération voix:", err);
+    }
+  }
+}
+
+/* ========== MODULE AUDIO MULTI-BOUCLES ========== */
+
+const LOOP_SOUNDS = [
+  {
+    id: "HeabyResp",
+    label: "Respiration Forte",
+    // Remplace par tes propres fichiers .mp3 / .ogg
+    src: "vfx/Female_heavy_breathi_#4.mp3"
+  },
+  {
+    id: "clac",
+    label: "claquement",
+    src: "vfx/flesh_against_flesh__#1.mp3"
+  },
+  {
+    id: "moan",
+    label: "Gémissements",
+    src: "vfx/slutty_feminine_moan_#1.mp3" // mets ici l'URL de ton fichier
+  },
+  {
+    id: "moan2",
+    label: "Gémissements",
+    src: "vfx/Female_short_moans_#3.mp3" // mets ici l'URL de ton fichier
+  }
+];
+
+const activeLoops = {}; // id → Audio object
+
+function createLoopButton(sound) {
+  const btn = document.createElement("button");
+  btn.textContent = sound.label;
+  btn.dataset.id = sound.id;
+  btn.style.cssText = `
+    background:#1a2a22; border:1px solid #2a3d33; color:#e8e8e4;
+    border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;
+  `;
+
+  btn.addEventListener("click", () => {
+    if (activeLoops[sound.id]) {
+      // Arrêter
+      activeLoops[sound.id].pause();
+      activeLoops[sound.id].currentTime = 0;
+      delete activeLoops[sound.id];
+      btn.style.background = "#1a2a22";
+      btn.style.borderColor = "#2a3d33";
+    } else {
+      // Lancer en boucle
+      if (!sound.src) {
+        alert("Aucun fichier audio défini pour : " + sound.label);
+        return;
+      }
+      const audio = new Audio(sound.src);
+      audio.loop = true;
+      audio.volume = 0.6;
+      audio.play().catch(err => console.error("Erreur lecture:", err));
+      activeLoops[sound.id] = audio;
+      btn.style.background = "#e0a34a";
+      btn.style.color = "#1a1208";
+      btn.style.borderColor = "#e0a34a";
+    }
+  });
+
+  return btn;
+}
+
+function initAudioLooper() {
+  const container = document.getElementById("loopButtons");
+  if (!container) return;
+
+  LOOP_SOUNDS.forEach(sound => {
+    container.appendChild(createLoopButton(sound));
+  });
+
+  document.getElementById("stopAllLoops")?.addEventListener("click", () => {
+    Object.values(activeLoops).forEach(audio => {
+      audio.pause();
+      audio.currentTime = 0;
+    });
+    // reset tous les boutons
+    document.querySelectorAll("#loopButtons button").forEach(btn => {
+      btn.style.background = "#1a2a22";
+      btn.style.color = "#e8e8e4";
+      btn.style.borderColor = "#2a3d33";
+    });
+    Object.keys(activeLoops).forEach(k => delete activeLoops[k]);
+  });
+}
+
+// Lance le module au chargement
+window.addEventListener("DOMContentLoaded", initAudioLooper);
+
+// ========== GÉNÉRATION D'IMAGE ==========
+async function generateNSFWImage(botText) {
+  const loadingDiv = document.createElement('div');
+  loadingDiv.className = 'msg image-loading';
+  loadingDiv.textContent = '🎨 Génération de l\'image en cours...';
+  messagesEl.appendChild(loadingDiv);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  try {
+    const prompt = `masterpiece, best quality, highly detailed explicit erotic scene, ${botText.slice(0, 220)}, futanari, huge breasts, thick cock, wet, detailed anatomy`;
+
+    // 1. Lancer la génération
+    const startRes = await fetch("https://properfool-nsfwadult.hf.space/gradio_api/call/generate_image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        data: [prompt, 768, 512, 10, 0, true, 1]
+      })
+    });
+
+    // Vérifie que la réponse est bien du JSON
+    const contentType = startRes.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      const text = await startRes.text();
+      console.error("Réponse non-JSON reçue:", text.slice(0, 300));
+      loadingDiv.textContent = '❌ Le Space renvoie une page HTML (probablement en pause)';
+      return;
+    }
+
+    if (!startRes.ok) {
+      loadingDiv.textContent = `❌ Erreur lancement (${startRes.status})`;
+      return;
+    }
+
+    const startData = await startRes.json();
+    const eventId = startData.event_id;
+
+    if (!eventId) {
+      loadingDiv.textContent = '❌ Pas d\'event_id';
+      console.log(startData);
+      return;
+    }
+
+    // 2. Polling
+    let imageUrl = null;
+
+    for (let i = 0; i < 50; i++) {
+      await new Promise(r => setTimeout(r, 1200));
+
+      const pollRes = await fetch(`https://properfool-nsfwadult.hf.space/gradio_api/call/generate_image/${eventId}`);
+      const pollText = await pollRes.text();
+
+      // Cherche une URL d'image
+      const urlMatch = pollText.match(/https?:\/\/[^\s"'\\]+\.(?:png|jpg|jpeg|webp)(?:\?[^\s"'\\]*)?/i);
+      if (urlMatch) {
+        imageUrl = urlMatch[0];
+        break;
+      }
+
+      if (pollText.toLowerCase().includes('error') || pollText.toLowerCase().includes('failed')) {
+        loadingDiv.textContent = '❌ Échec côté Space';
+        return;
+      }
+    }
+
+    loadingDiv.remove();
+
+    if (imageUrl) {
+      const imgDiv = document.createElement('div');
+      imgDiv.className = 'msg bot';
+      imgDiv.innerHTML = `<img src="${imageUrl}" alt="Image générée" style="max-width:100%; border-radius:10px;">`;
+      messagesEl.appendChild(imgDiv);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    } else {
+      const errDiv = document.createElement('div');
+      errDiv.className = 'msg image-loading';
+      errDiv.textContent = '⚠️ Image non récupérée';
+      messagesEl.appendChild(errDiv);
+    }
+
+  } catch (err) {
+    loadingDiv.remove();
+    console.error("Erreur génération image:", err);
+  }
+}
+
+// ========== sendToWorker (la fonction manquante) ==========
+async function sendToWorker(userText) {
+  const isInit = userText === '__init__';
+  let typingEl = null;
+  let botDiv = null;
+  try {
+    sendBtn.disabled = true;
+    typingEl = addMessage('...', 'typing');
+    typingEl.classList.remove('msg');
+
+    const messages = buildMessages(userText, isInit);
+    const s = sampling || {};
+
+    const response = await fetch(WORKER_BASE + provider, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        stream: true,
+        temperature: s.temperature ?? 1.0,
+        top_p: s.top_p ?? 1.0,
+        frequency_penalty: s.frequency_penalty ?? 0,
+        presence_penalty: s.presence_penalty ?? 0,
+        max_tokens: s.max_tokens ?? 800
+      })
+    });
+
+    if (!response.ok) {
+      typingEl.remove();
+      const errText = await response.text();
+      addMessage('Erreur ' + response.status + ' : ' + errText.slice(0, 200), 'err');
+      return;
+    }
+
+    if (!response.body) {
+      typingEl.remove();
+      const data = await response.json();
+      const botText = data?.choices?.[0]?.message?.content || JSON.stringify(data);
+      addMessage(botText, 'bot');
+      finalizeHistory(userText, botText, isInit);
+      if (botText.length > 20) {
+        speakQuotedText(botText);
+        generateNSFWImage(botText);
+      }
+      return;
+    }
+
+    typingEl.remove();
+    botDiv = addMessage('', 'bot');
+    let fullText = '';
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(payload);
+          const delta = parsed?.choices?.[0]?.delta?.content || parsed?.choices?.[0]?.message?.content || '';
+          if (delta) {
+            fullText += delta;
+            botDiv.textContent = fullText;
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+        } catch (e) {}
+      }
+    }
+
+    if (!fullText) botDiv.textContent = '(réponse vide)';
+    finalizeHistory(userText, fullText, isInit);
+
+    if (fullText && fullText.length > 20) {
+      speakQuotedText(fullText);
+      generateNSFWImage(fullText);
+    }
+
+  } catch (err) {
+    if (typingEl) typingEl.remove();
+    addMessage('Erreur réseau : ' + err.message, 'err');
+  } finally {
+    sendBtn.disabled = false;
+  }
+}
+
+function finalizeHistory(userText, botText, isInit) {
+  if (!isInit) history.push({ role: 'user', content: userText });
+  history.push({ role: 'assistant', content: botText });
+  persistCurrentHistory();
+}
+
+function handleSend() {
+  const text = input.value.trim();
+  if (!text) return;
+  addMessage(text, 'user');
+  input.value = '';
+  input.style.height = 'auto';
+  sendToWorker(text);
+}
+
+sendBtn.addEventListener('click', handleSend);
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+});
+input.addEventListener('input', () => {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+});
 </script>
 </body>
 </html>
