@@ -471,8 +471,10 @@ const LOOP_SOUNDS = [
   },
   {
     id: "clac",
-    label: "claquement",
-    src: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/flesh_against_flesh__1.mp3"
+    label: "Claquement",
+    src: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/flesh_against_flesh__1.mp3",
+    start: 0.00,   // commence à 0.15 seconde
+    end: 0.85      // s'arrête à 0.85 seconde (et reboucle)
   },
   {
     id: "moan",
@@ -486,7 +488,7 @@ const LOOP_SOUNDS = [
   }
 ];
 
-const activeLoops = {}; // id → Audio object
+const activeLoops = {};
 
 function createLoopButton(sound) {
   const btn = document.createElement("button");
@@ -500,22 +502,51 @@ function createLoopButton(sound) {
   btn.addEventListener("click", () => {
     if (activeLoops[sound.id]) {
       // Arrêter
-      activeLoops[sound.id].pause();
-      activeLoops[sound.id].currentTime = 0;
+      clearInterval(activeLoops[sound.id].timer);
+      activeLoops[sound.id].audio.pause();
+      activeLoops[sound.id].audio.currentTime = 0;
       delete activeLoops[sound.id];
       btn.style.background = "#1a2a22";
+      btn.style.color = "#e8e8e4";
       btn.style.borderColor = "#2a3d33";
     } else {
-      // Lancer en boucle
+      // Lancer avec tronquage
       if (!sound.src) {
         alert("Aucun fichier audio défini pour : " + sound.label);
         return;
       }
+
       const audio = new Audio(sound.src);
-      audio.loop = true;
-      audio.volume = 0.6;
-      audio.play().catch(err => console.error("Erreur lecture:", err));
-      activeLoops[sound.id] = audio;
+      audio.volume = 0.7;
+
+      const start = sound.start || 0;
+      const end = sound.end || null;
+
+      // Fonction de boucle tronquée
+      const playTrimmedLoop = () => {
+        audio.currentTime = start;
+        audio.play().catch(err => console.error(err));
+      };
+
+      // Quand on arrive à la fin de la zone voulue → on reboucle
+      const checkTime = () => {
+        if (end && audio.currentTime >= end) {
+          audio.currentTime = start;
+        }
+      };
+
+      // On vérifie très souvent la position
+      const timer = setInterval(checkTime, 30);
+
+      audio.addEventListener("ended", () => {
+        // au cas où le fichier est plus court que "end"
+        playTrimmedLoop();
+      });
+
+      playTrimmedLoop();
+
+      activeLoops[sound.id] = { audio, timer };
+
       btn.style.background = "#e0a34a";
       btn.style.color = "#1a1208";
       btn.style.borderColor = "#e0a34a";
