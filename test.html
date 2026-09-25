@@ -506,57 +506,67 @@ function createLoopButton(sound) {
   `;
 
   btn.addEventListener("click", () => {
+    // === ARRÊT ===
     if (activeLoops[sound.id]) {
-      // Arrêter
-      clearInterval(activeLoops[sound.id].timer);
-      activeLoops[sound.id].audio.pause();
+      const loop = activeLoops[sound.id];
+      if (loop.timer) clearInterval(loop.timer);
+      loop.audio.pause();
+      loop.audio.currentTime = 0;
       delete activeLoops[sound.id];
+
       btn.style.background = "#1a2a22";
       btn.style.color = "#e8e8e4";
       btn.style.borderColor = "#2a3d33";
       return;
     }
 
+    // === LECTURE ===
     if (!sound.src) {
-      alert("Aucun fichier audio défini");
+      alert("Aucun fichier audio défini pour : " + sound.label);
       return;
     }
 
     const audio = new Audio(sound.src);
     audio.volume = 0.7;
 
-    let currentStart = randomBetween(sound.startMin, sound.startMax);
-    let currentEnd = randomBetween(sound.endMin, sound.endMax);
+    // Est-ce un son avec plages aléatoires ?
+    const hasRange = sound.startMin !== undefined && sound.endMin !== undefined;
 
-    const playNext = () => {
-      // Nouveau start / end aléatoire à chaque boucle
-      currentStart = randomBetween(sound.startMin, sound.startMax);
-      currentEnd = randomBetween(sound.endMin, sound.endMax);
+    if (hasRange) {
+      // ----- Mode aléatoire tronqué -----
+      let currentStart = randomBetween(sound.startMin, sound.startMax);
+      let currentEnd = randomBetween(sound.endMin, sound.endMax);
 
-      // Sécurité : end doit être > start
-      if (currentEnd <= currentStart + 0.05) {
-        currentEnd = currentStart + 0.15;
-      }
+      const playNext = () => {
+        currentStart = randomBetween(sound.startMin, sound.startMax);
+        currentEnd = randomBetween(sound.endMin, sound.endMax);
 
-      audio.currentTime = currentStart;
+        if (currentEnd <= currentStart + 0.05) {
+          currentEnd = currentStart + 0.15;
+        }
+
+        audio.currentTime = currentStart;
+        audio.play().catch(err => console.error(err));
+      };
+
+      const timer = setInterval(() => {
+        if (audio.currentTime >= currentEnd) {
+          playNext();
+        }
+      }, 25);
+
+      audio.addEventListener("ended", playNext);
+      playNext();
+
+      activeLoops[sound.id] = { audio, timer };
+    } else {
+      // ----- Mode boucle normale (fichier entier) -----
+      audio.loop = true;
       audio.play().catch(err => console.error(err));
-    };
+      activeLoops[sound.id] = { audio, timer: null };
+    }
 
-    // Vérifie en continu si on a atteint la fin de la portion
-    const timer = setInterval(() => {
-      if (audio.currentTime >= currentEnd) {
-        playNext(); // reboucle avec de nouvelles valeurs aléatoires
-      }
-    }, 25);
-
-    // Au cas où le fichier se termine naturellement
-    audio.addEventListener("ended", playNext);
-
-    // Première lecture
-    playNext();
-
-    activeLoops[sound.id] = { audio, timer };
-
+    // Style bouton actif
     btn.style.background = "#e0a34a";
     btn.style.color = "#1a1208";
     btn.style.borderColor = "#e0a34a";
