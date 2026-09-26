@@ -84,7 +84,21 @@
 </style>
 </head>
 <body>
-
+<!-- Lecteur multi-boucles -->
+<div id="audioLooper" style="
+  background:#121a16; border-bottom:1px solid #222; padding:10px 14px;
+  display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+">
+  <span style="font-size:12px; color:#999; margin-right:6px;">🔊 Boucles :</span>
+  
+  <!-- Les sons seront injectés ici par le JS -->
+  <div id="loopButtons" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+  
+  <button id="stopAllLoops" style="
+    background:none; border:1px solid #444; color:#ccc;
+    border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer;
+  ">⏹ Tout arrêter</button>
+</div>
 <div id="setup">
   <div id="profileBar">
     <div style="flex:2">
@@ -445,6 +459,224 @@ async function speakQuotedText(botText) {
     }
   }
 }
+
+/* ========== MODULE AUDIO MULTI-BOUCLES + GÉMISSEMENTS ========== */
+
+const LOOP_SOUNDS = [
+  {
+    id: "HeabyResp",
+    label: "Respiration Forte",
+    src: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Female_heavy_breathi_4.mp3"
+  },
+  {
+    id: "clac",
+    label: "Claquement",
+    src: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/flesh_against_flesh__1.mp3",
+    startMin: 0.10,
+    startMax: 0.25,
+    endMin: 0.65,
+    endMax: 1.05
+  },
+  {
+    id: "moan",
+    label: "Gémissements",
+    src: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Young_female_Bubbly__4.mp3"
+  },
+  {
+    id: "moan2",
+    label: "Gémissements 2",
+    src: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Young_female_Bubbly__3.mp3"
+  }
+];
+
+const MOAN_CONFIG = {
+  base: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Young_female_Bubbly__4.mp3",
+  interruptions: [
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Aurore-Baise.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Aurore-Continue.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Aurore-Encule.mp3"
+  ],
+  minInterval: 8,
+  maxInterval: 18
+};
+
+const activeLoops = {};
+let moanState = null;
+
+function randomBetween(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+/* ----- Boutons classiques ----- */
+function createLoopButton(sound) {
+  const btn = document.createElement("button");
+  btn.textContent = sound.label;
+  btn.dataset.id = sound.id;
+  btn.style.cssText = `
+    background:#1a2a22; border:1px solid #2a3d33; color:#e8e8e4;
+    border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;
+  `;
+
+  btn.addEventListener("click", () => {
+    // Arrêt
+    if (activeLoops[sound.id]) {
+      const loop = activeLoops[sound.id];
+      if (loop.timer) clearInterval(loop.timer);
+      loop.audio.pause();
+      loop.audio.currentTime = 0;
+      delete activeLoops[sound.id];
+
+      btn.style.background = "#1a2a22";
+      btn.style.color = "#e8e8e4";
+      btn.style.borderColor = "#2a3d33";
+      return;
+    }
+
+    if (!sound.src) {
+      alert("Aucun fichier audio défini");
+      return;
+    }
+
+    const audio = new Audio(sound.src);
+    audio.volume = 0.7;
+    const hasRange = sound.startMin !== undefined && sound.endMin !== undefined;
+
+    if (hasRange) {
+      // Mode aléatoire tronqué
+      let currentStart = randomBetween(sound.startMin, sound.startMax);
+      let currentEnd = randomBetween(sound.endMin, sound.endMax);
+
+      const playNext = () => {
+        currentStart = randomBetween(sound.startMin, sound.startMax);
+        currentEnd = randomBetween(sound.endMin, sound.endMax);
+        if (currentEnd <= currentStart + 0.05) currentEnd = currentStart + 0.15;
+        audio.currentTime = currentStart;
+        audio.play().catch(console.error);
+      };
+
+      const timer = setInterval(() => {
+        if (audio.currentTime >= currentEnd) playNext();
+      }, 25);
+
+      audio.addEventListener("ended", playNext);
+      playNext();
+      activeLoops[sound.id] = { audio, timer };
+    } else {
+      // Boucle normale
+      audio.loop = true;
+      audio.play().catch(console.error);
+      activeLoops[sound.id] = { audio, timer: null };
+    }
+
+    btn.style.background = "#e0a34a";
+    btn.style.color = "#1a1208";
+    btn.style.borderColor = "#e0a34a";
+  });
+
+  return btn;
+}
+
+/* ----- Bouton spécial Gémissements + ----- */
+function createMoanButton() {
+  const btn = document.createElement("button");
+  btn.textContent = "Gémissements +";
+  btn.style.cssText = `
+    background:#1a2a22; border:1px solid #2a3d33; color:#e8e8e4;
+    border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;
+  `;
+
+  btn.addEventListener("click", () => {
+    // Arrêt
+    if (moanState) {
+      clearTimeout(moanState.timer);
+      moanState.baseAudio.pause();
+      moanState.baseAudio.currentTime = 0;
+      moanState = null;
+
+      btn.style.background = "#1a2a22";
+      btn.style.color = "#e8e8e4";
+      btn.style.borderColor = "#2a3d33";
+      return;
+    }
+
+    // Démarrage
+    const baseAudio = new Audio(MOAN_CONFIG.base);
+    baseAudio.loop = true;
+    baseAudio.volume = 0.65;
+    baseAudio.play().catch(console.error);
+
+    const scheduleNext = () => {
+      const delay = randomBetween(MOAN_CONFIG.minInterval, MOAN_CONFIG.maxInterval) * 1000;
+
+      moanState.timer = setTimeout(() => {
+        const randomSrc = MOAN_CONFIG.interruptions[
+          Math.floor(Math.random() * MOAN_CONFIG.interruptions.length)
+        ];
+        const interrupt = new Audio(randomSrc);
+        interrupt.volume = 0.85;
+
+        // Baisse le volume de base pendant l'interruption
+        baseAudio.volume = 0.25;
+
+        interrupt.play().catch(console.error);
+
+        interrupt.addEventListener("ended", () => {
+          baseAudio.volume = 0.65;
+          scheduleNext();
+        });
+      }, delay);
+    };
+
+    moanState = { baseAudio, timer: null };
+    scheduleNext();
+
+    btn.style.background = "#e0a34a";
+    btn.style.color = "#1a1208";
+    btn.style.borderColor = "#e0a34a";
+  });
+
+  return btn;
+}
+
+/* ----- Initialisation ----- */
+function initAudioLooper() {
+  const container = document.getElementById("loopButtons");
+  if (!container) return;
+
+  // Boutons classiques
+  LOOP_SOUNDS.forEach(sound => {
+    container.appendChild(createLoopButton(sound));
+  });
+
+  // Bouton spécial
+  container.appendChild(createMoanButton());
+
+  // Bouton Tout arrêter
+  document.getElementById("stopAllLoops")?.addEventListener("click", () => {
+    // Arrête les boucles classiques
+    Object.values(activeLoops).forEach(loop => {
+      if (loop.timer) clearInterval(loop.timer);
+      loop.audio.pause();
+    });
+    Object.keys(activeLoops).forEach(k => delete activeLoops[k]);
+
+    // Arrête le gémissement spécial
+    if (moanState) {
+      clearTimeout(moanState.timer);
+      moanState.baseAudio.pause();
+      moanState = null;
+    }
+
+    // Reset style des boutons
+    document.querySelectorAll("#loopButtons button").forEach(btn => {
+      btn.style.background = "#1a2a22";
+      btn.style.color = "#e8e8e4";
+      btn.style.borderColor = "#2a3d33";
+    });
+  });
+}
+
+window.addEventListener("DOMContentLoaded", initAudioLooper);
 
 // ========== GÉNÉRATION D'IMAGE ==========
 async function generateNSFWImage(botText) {
