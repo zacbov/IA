@@ -497,7 +497,7 @@ function initBackgroundMedia() {
 }
 
 window.addEventListener("DOMContentLoaded", initBackgroundMedia);
- 
+
 // ========== TTS ==========
 async function speakQuotedText(botText) {
   let textsToSpeak = [...botText.matchAll(/"([^"]+)"/g)].map(m => m[1].trim());
@@ -736,92 +736,78 @@ function initAudioLooper() {
 
 window.addEventListener("DOMContentLoaded", initAudioLooper);
 
-// ========== GÉNÉRATION D'IMAGE via Perchance ==========
+// ========== GÉNÉRATION D'IMAGE via Perchance (onglet réel, pas d'iframe) ==========
+// Une iframe cross-origin se fait quasi systématiquement bloquer par la protection
+// anti-bot de Cloudflare. Une vraie navigation (onglet ouvert par un vrai clic) passe
+// presque toujours. On ouvre donc un onglet vide de façon SYNCHRONE dès le clic sur
+// "Envoyer" (sinon le navigateur bloque le popup), on le redirige une fois le prompt
+// prêt, et on écoute quand même le postMessage : s'il arrive, on récupère l'image et
+// on referme l'onglet automatiquement ; sinon l'onglet reste ouvert avec l'image visible
+// dedans (secours manuel, plus besoin de copier-coller à la main dans la plupart des cas).
 
-function generateImagePerchance(prompt, opts = {}, _attempt = 1) {
-  return new Promise((resolve, reject) => {
-    const id = Math.random().toString(36).slice(2);
-    const params = new URLSearchParams({ prompt, format: 'json', id, ...opts });
+async function generateNSFWImage(botText, popup) {
+  if (!popup || popup.closed) {
+    const errDiv = document.createElement('div');
+    errDiv.className = 'msg image-loading';
+    errDiv.textContent = '⚠️ Le navigateur a bloqué l\'onglet de génération — autorise les popups pour ce site.';
+    messagesEl.appendChild(errDiv);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return;
+  }
 
-    const iframe = document.createElement('iframe');
-    // Hors-écran mais "visible" pour le navigateur (taille réelle, opacité non nulle) —
-    // certains challenges Cloudflare ne se résolvent pas dans un élément caché.
-    iframe.style.position = 'fixed';
-    iframe.style.top = '-9999px';
-    iframe.style.left = '-9999px';
-    iframe.style.width = '400px';
-    iframe.style.height = '400px';
-    iframe.style.opacity = '0.01';
-    iframe.style.pointerEvents = 'none';
-    iframe.setAttribute('aria-hidden', 'true');
-    iframe.src = 'https://perchance.org/perchance-ai-api?' + params.toString();
-
-    const timeout = setTimeout(() => {
-      cleanup();
-      if (_attempt < 2) {
-        // Deuxième essai : le challenge anti-bot passe parfois à la relance.
-        generateImagePerchance(prompt, opts, _attempt + 1).then(resolve, reject);
-      } else {
-        reject(new Error('Le générateur Perchance ne répond pas (probablement bloqué par une vérification anti-bot). Réessaie dans quelques instants.'));
-      }
-    }, 45000);
-
-    function cleanup() {
-      clearTimeout(timeout);
-      window.removeEventListener('message', onMessage);
-      iframe.remove();
-    }
-
-    function onMessage(e) {
-      const d = e.data || {};
-      if (d.api !== 'perchance-image-api' || !d.result || d.result.id !== id) return;
-      cleanup();
-      d.result.ok ? resolve(d.result) : reject(new Error(d.result.error || 'Échec de génération'));
-    }
-
-    window.addEventListener('message', onMessage);
-    document.body.appendChild(iframe);
-  });
-}
-
-async function generateNSFWImage(botText) {
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
   loadingDiv.textContent = '🎨 Génération de l\'image en cours (Perchance)...';
   messagesEl.appendChild(loadingDiv);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
+  const id = Math.random().toString(36).slice(2);
+  const prompt = `masterpiece, best quality, highly detailed explicit erotic scene, ${botText.slice(0, 220)}, futanari, huge breasts, thick cock, wet, detailed anatomy, cinematic lighting`;
+  const params = new URLSearchParams({
+    prompt,
+    format: 'html',
+    id,
+    resolution: '768x512',
+    guidanceScale: 7,
+    negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark'
+  });
+
   try {
-    const prompt = `masterpiece, best quality, highly detailed explicit erotic scene, ${botText.slice(0, 220)}, futanari, huge breasts, thick cock, wet, detailed anatomy, cinematic lighting`;
+    popup.location.href = 'https://perchance.org/perchance-ai-api?' + params.toString();
+  } catch (e) {
+    // Le popup a pu être fermé entre-temps par l'utilisateur, on continue quand même.
+  }
 
-    const result = await generateImagePerchance(prompt, {
-      resolution: '768x512',
-      guidanceScale: 7,
-      negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark'
-    });
-
-    loadingDiv.remove();
-
-    if (result && result.url) {
-      const imgDiv = document.createElement('div');
-      imgDiv.className = 'msg bot';
-      imgDiv.innerHTML = `<img src="${result.url}" alt="Image générée" style="max-width:100%; border-radius:10px;">`;
-      messagesEl.appendChild(imgDiv);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    } else {
-      const errDiv = document.createElement('div');
-      errDiv.className = 'msg image-loading';
-      errDiv.textContent = '⚠️ Image non récupérée';
-      messagesEl.appendChild(errDiv);
+  const result = await new Promise((resolve) => {
+    const timeout = setTimeout(() => { cleanup(); resolve(null); }, 45000);
+    function cleanup() {
+      clearTimeout(timeout);
+      window.removeEventListener('message', onMessage);
     }
-  } catch (err) {
-    loadingDiv.remove();
-    console.error("Erreur génération image Perchance:", err);
+    function onMessage(e) {
+      const d = e.data || {};
+      if (d.api !== 'perchance-image-api' || !d.result || d.result.id !== id) return;
+      cleanup();
+      resolve(d.result);
+    }
+    window.addEventListener('message', onMessage);
+  });
+
+  loadingDiv.remove();
+
+  if (result && result.ok && result.url) {
+    try { popup.close(); } catch (e) {}
+    const imgDiv = document.createElement('div');
+    imgDiv.className = 'msg bot';
+    imgDiv.innerHTML = `<img src="${result.url}" alt="Image générée" style="max-width:100%; border-radius:10px;">`;
+    messagesEl.appendChild(imgDiv);
+  } else {
     const errDiv = document.createElement('div');
     errDiv.className = 'msg image-loading';
-    errDiv.textContent = '❌ Erreur : ' + (err.message || 'génération échouée');
+    errDiv.textContent = '⏳ Pas de retour automatique — l\'image est visible directement dans l\'onglet Perchance resté ouvert.';
     messagesEl.appendChild(errDiv);
   }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
 // ========== sendToWorker ==========
@@ -829,6 +815,14 @@ async function sendToWorker(userText) {
   const isInit = userText === '__init__';
   let typingEl = null;
   let botDiv = null;
+
+  // Ouvert tout de suite, de façon SYNCHRONE, pour rester rattaché au geste utilisateur
+  // (clic sur Envoyer) — si on attend le premier `await`, le navigateur bloque le popup.
+  const imagePopup = window.open('about:blank', '_blank');
+  function closeUnusedPopup() {
+    if (imagePopup && !imagePopup.closed) { try { imagePopup.close(); } catch (e) {} }
+  }
+
   try {
     sendBtn.disabled = true;
     typingEl = addMessage('...', 'typing');
@@ -854,6 +848,7 @@ async function sendToWorker(userText) {
 
     if (!response.ok) {
       typingEl.remove();
+      closeUnusedPopup();
       const errText = await response.text();
       addMessage('Erreur ' + response.status + ' : ' + errText.slice(0, 200), 'err');
       return;
@@ -867,7 +862,9 @@ async function sendToWorker(userText) {
       finalizeHistory(userText, botText, isInit);
       if (botText.length > 20) {
         speakQuotedText(botText);
-        generateNSFWImage(botText);
+        generateNSFWImage(botText, imagePopup);
+      } else {
+        closeUnusedPopup();
       }
       return;
     }
@@ -908,10 +905,13 @@ async function sendToWorker(userText) {
 
     if (fullText && fullText.length > 20) {
       speakQuotedText(fullText);
-      generateNSFWImage(fullText);
+      generateNSFWImage(fullText, imagePopup);
+    } else {
+      closeUnusedPopup();
     }
 
   } catch (err) {
+    closeUnusedPopup();
     if (typingEl) typingEl.remove();
     addMessage('Erreur réseau : ' + err.message, 'err');
   } finally {
