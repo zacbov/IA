@@ -25,6 +25,29 @@
     background: #e0a34a; border: none; color: #1a1208; font-weight: 700;
     padding: 11px; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 4px;
   }
+ #bgMedia {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+#bgMedia video,
+#bgMedia img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.35; /* ajuste la transparence */
+}
+/* Le reste de l'interface au-dessus du fond */
+#audioLooper, #setup, #topbar, #messages, #inputbar {
+  position: relative;
+  z-index: 1;
+}
+/* Un léger voile pour garder le texte lisible */
+#messages {
+  background: rgba(11, 15, 13, 0.55);
+}
   #setup button.secondary {
     background: none; border: 1px solid #333; color: #ccc; font-weight: 600;
   }
@@ -84,7 +107,7 @@
 </style>
 </head>
 <body>
-
+<div id="bgMedia"></div>
 <!-- Lecteur multi-boucles -->
 <div id="audioLooper" style="
   background:#121a16; border-bottom:1px solid #222; padding:10px 14px;
@@ -417,6 +440,64 @@ function buildMessages(userText, isInit) {
   return messages;
 }
 
+/* ========== FOND MÉDIA ALÉATOIRE ========== */
+
+const BG_BASE = "https://raw.githubusercontent.com/zacbov/IA/main/vfx/";
+
+const BG_MEDIA = [
+  { type: "video", src: BG_BASE + "2026-06-29_19-44-56_244_to-video.webm" },
+  { type: "video", src: BG_BASE + "2026-07-28_15-59-44_709_edited%2824%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "2026-07-28_15-59-44_721_edited%286%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "20260626_230701_edited_to-videoL263614.webm" },
+  { type: "video", src: BG_BASE + "9d4931d0-2a40-4b7f-ad8b-a4a7661c3f68_edited_to-videoj.webm" },
+  { type: "video", src: BG_BASE + "Capture%20d'%C3%A9cran%202026-07-22%20125646_swap_edited_to-video%282%29.webm" },
+  { type: "video", src: BG_BASE + "cc3f98d21dbbfd4fbc16b721637d04ab_edited%282%29_edited%281%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "cc3f98d21dbbfd4fbc16b721637d04ab_edited%2822%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "cc3f98d21dbbfd4fbc16b721637d04ab_edited%2832%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "dfe9be61c7c0e707093f2d144b1beb8b_edited%282%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "dfe9be61c7c0e707093f2d144b1beb8b_edited%2885%29_edited%287%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "download.webm" },
+  { type: "video", src: BG_BASE + "download_1782471692890L714344.webm" },
+  { type: "video", src: BG_BASE + "ricci_edited%2826%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "ricci%C3%A9f_edited%2817%29_edited%284%29_to-video.webm" }
+];
+
+// Change de vidéo toutes les 25 secondes
+const BG_CHANGE_EVERY = 25;
+
+function playRandomBackground() {
+  const container = document.getElementById("bgMedia");
+  if (!container || BG_MEDIA.length === 0) return;
+
+  container.innerHTML = "";
+
+  const item = BG_MEDIA[Math.floor(Math.random() * BG_MEDIA.length)];
+
+  if (item.type === "video") {
+    const video = document.createElement("video");
+    video.src = item.src;
+    video.autoplay = true;
+    video.muted = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.setAttribute("playsinline", "");
+    container.appendChild(video);
+    video.play().catch(() => {});
+  } else {
+    const img = document.createElement("img");
+    img.src = item.src;
+    img.alt = "";
+    container.appendChild(img);
+  }
+}
+
+function initBackgroundMedia() {
+  playRandomBackground();
+  setInterval(playRandomBackground, BG_CHANGE_EVERY * 1000);
+}
+
+window.addEventListener("DOMContentLoaded", initBackgroundMedia);
+ 
 // ========== TTS ==========
 async function speakQuotedText(botText) {
   let textsToSpeak = [...botText.matchAll(/"([^"]+)"/g)].map(m => m[1].trim());
