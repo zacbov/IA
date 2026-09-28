@@ -25,6 +25,29 @@
     background: #e0a34a; border: none; color: #1a1208; font-weight: 700;
     padding: 11px; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 4px;
   }
+ #bgMedia {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+#bgMedia video,
+#bgMedia img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.35; /* ajuste la transparence */
+}
+/* Le reste de l'interface au-dessus du fond */
+#audioLooper, #setup, #topbar, #messages, #inputbar {
+  position: relative;
+  z-index: 1;
+}
+/* Un léger voile pour garder le texte lisible */
+#messages {
+  background: rgba(11, 15, 13, 0.55);
+}
   #setup button.secondary {
     background: none; border: 1px solid #333; color: #ccc; font-weight: 600;
   }
@@ -84,21 +107,20 @@
 </style>
 </head>
 <body>
+<div id="bgMedia"></div>
 <!-- Lecteur multi-boucles -->
 <div id="audioLooper" style="
   background:#121a16; border-bottom:1px solid #222; padding:10px 14px;
   display:flex; flex-wrap:wrap; gap:10px; align-items:center;
 ">
   <span style="font-size:12px; color:#999; margin-right:6px;">🔊 Boucles :</span>
-  
-  <!-- Les sons seront injectés ici par le JS -->
   <div id="loopButtons" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
-  
   <button id="stopAllLoops" style="
     background:none; border:1px solid #444; color:#ccc;
     border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer;
   ">⏹ Tout arrêter</button>
 </div>
+
 <div id="setup">
   <div id="profileBar">
     <div style="flex:2">
@@ -418,6 +440,64 @@ function buildMessages(userText, isInit) {
   return messages;
 }
 
+/* ========== FOND MÉDIA ALÉATOIRE ========== */
+
+const BG_BASE = "https://raw.githubusercontent.com/zacbov/IA/main/vfx/";
+
+const BG_MEDIA = [
+  { type: "video", src: BG_BASE + "2026-06-29_19-44-56_244_to-video.webm" },
+  { type: "video", src: BG_BASE + "2026-07-28_15-59-44_709_edited%2824%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "2026-07-28_15-59-44_721_edited%286%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "20260626_230701_edited_to-videoL263614.webm" },
+  { type: "video", src: BG_BASE + "9d4931d0-2a40-4b7f-ad8b-a4a7661c3f68_edited_to-videoj.webm" },
+  { type: "video", src: BG_BASE + "Capture%20d'%C3%A9cran%202026-07-22%20125646_swap_edited_to-video%282%29.webm" },
+  { type: "video", src: BG_BASE + "cc3f98d21dbbfd4fbc16b721637d04ab_edited%282%29_edited%281%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "cc3f98d21dbbfd4fbc16b721637d04ab_edited%2822%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "cc3f98d21dbbfd4fbc16b721637d04ab_edited%2832%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "dfe9be61c7c0e707093f2d144b1beb8b_edited%282%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "dfe9be61c7c0e707093f2d144b1beb8b_edited%2885%29_edited%287%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "download.webm" },
+  { type: "video", src: BG_BASE + "download_1782471692890L714344.webm" },
+  { type: "video", src: BG_BASE + "ricci_edited%2826%29_to-video.webm" },
+  { type: "video", src: BG_BASE + "ricci%C3%A9f_edited%2817%29_edited%284%29_to-video.webm" }
+];
+
+// Change de vidéo toutes les 25 secondes
+const BG_CHANGE_EVERY = 25;
+
+function playRandomBackground() {
+  const container = document.getElementById("bgMedia");
+  if (!container || BG_MEDIA.length === 0) return;
+
+  container.innerHTML = "";
+
+  const item = BG_MEDIA[Math.floor(Math.random() * BG_MEDIA.length)];
+
+  if (item.type === "video") {
+    const video = document.createElement("video");
+    video.src = item.src;
+    video.autoplay = true;
+    video.muted = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.setAttribute("playsinline", "");
+    container.appendChild(video);
+    video.play().catch(() => {});
+  } else {
+    const img = document.createElement("img");
+    img.src = item.src;
+    img.alt = "";
+    container.appendChild(img);
+  }
+}
+
+function initBackgroundMedia() {
+  playRandomBackground();
+  setInterval(playRandomBackground, BG_CHANGE_EVERY * 1000);
+}
+
+window.addEventListener("DOMContentLoaded", initBackgroundMedia);
+
 // ========== TTS ==========
 async function speakQuotedText(botText) {
   let textsToSpeak = [...botText.matchAll(/"([^"]+)"/g)].map(m => m[1].trim());
@@ -492,12 +572,29 @@ const LOOP_SOUNDS = [
 const MOAN_CONFIG = {
   base: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Young_female_Bubbly__4.mp3",
   interruptions: [
-    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Aurore-Baise.mp3",
-    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Aurore-Continue.mp3",
-    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Aurore-Encule.mp3"
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/defonce.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/suce.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/plusfort.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/oui.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/ohouiencore.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/baisemoi.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/enculemoi.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/han-continue.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/moan-long.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/defoncemoi.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/oui-top2.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/puai-encore2.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/putain-encore.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/oui-top.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/encore.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/jouir-top.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/plusprofond.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/vasybaise.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/coninue.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/jouir.mp3"
   ],
-  minInterval: 8,
-  maxInterval: 18
+  minInterval: 2,
+  maxInterval: 10
 };
 
 const activeLoops = {};
@@ -507,7 +604,6 @@ function randomBetween(min, max) {
   return min + Math.random() * (max - min);
 }
 
-/* ----- Boutons classiques ----- */
 function createLoopButton(sound) {
   const btn = document.createElement("button");
   btn.textContent = sound.label;
@@ -518,14 +614,12 @@ function createLoopButton(sound) {
   `;
 
   btn.addEventListener("click", () => {
-    // Arrêt
     if (activeLoops[sound.id]) {
       const loop = activeLoops[sound.id];
       if (loop.timer) clearInterval(loop.timer);
       loop.audio.pause();
       loop.audio.currentTime = 0;
       delete activeLoops[sound.id];
-
       btn.style.background = "#1a2a22";
       btn.style.color = "#e8e8e4";
       btn.style.borderColor = "#2a3d33";
@@ -542,7 +636,6 @@ function createLoopButton(sound) {
     const hasRange = sound.startMin !== undefined && sound.endMin !== undefined;
 
     if (hasRange) {
-      // Mode aléatoire tronqué
       let currentStart = randomBetween(sound.startMin, sound.startMax);
       let currentEnd = randomBetween(sound.endMin, sound.endMax);
 
@@ -562,7 +655,6 @@ function createLoopButton(sound) {
       playNext();
       activeLoops[sound.id] = { audio, timer };
     } else {
-      // Boucle normale
       audio.loop = true;
       audio.play().catch(console.error);
       activeLoops[sound.id] = { audio, timer: null };
@@ -576,7 +668,6 @@ function createLoopButton(sound) {
   return btn;
 }
 
-/* ----- Bouton spécial Gémissements + ----- */
 function createMoanButton() {
   const btn = document.createElement("button");
   btn.textContent = "Gémissements +";
@@ -586,20 +677,17 @@ function createMoanButton() {
   `;
 
   btn.addEventListener("click", () => {
-    // Arrêt
     if (moanState) {
       clearTimeout(moanState.timer);
       moanState.baseAudio.pause();
       moanState.baseAudio.currentTime = 0;
       moanState = null;
-
       btn.style.background = "#1a2a22";
       btn.style.color = "#e8e8e4";
       btn.style.borderColor = "#2a3d33";
       return;
     }
 
-    // Démarrage
     const baseAudio = new Audio(MOAN_CONFIG.base);
     baseAudio.loop = true;
     baseAudio.volume = 0.65;
@@ -607,19 +695,14 @@ function createMoanButton() {
 
     const scheduleNext = () => {
       const delay = randomBetween(MOAN_CONFIG.minInterval, MOAN_CONFIG.maxInterval) * 1000;
-
       moanState.timer = setTimeout(() => {
         const randomSrc = MOAN_CONFIG.interruptions[
           Math.floor(Math.random() * MOAN_CONFIG.interruptions.length)
         ];
         const interrupt = new Audio(randomSrc);
         interrupt.volume = 0.85;
-
-        // Baisse le volume de base pendant l'interruption
         baseAudio.volume = 0.25;
-
         interrupt.play().catch(console.error);
-
         interrupt.addEventListener("ended", () => {
           baseAudio.volume = 0.65;
           scheduleNext();
@@ -638,36 +721,28 @@ function createMoanButton() {
   return btn;
 }
 
-/* ----- Initialisation ----- */
 function initAudioLooper() {
   const container = document.getElementById("loopButtons");
   if (!container) return;
 
-  // Boutons classiques
   LOOP_SOUNDS.forEach(sound => {
     container.appendChild(createLoopButton(sound));
   });
-
-  // Bouton spécial
   container.appendChild(createMoanButton());
 
-  // Bouton Tout arrêter
   document.getElementById("stopAllLoops")?.addEventListener("click", () => {
-    // Arrête les boucles classiques
     Object.values(activeLoops).forEach(loop => {
       if (loop.timer) clearInterval(loop.timer);
       loop.audio.pause();
     });
     Object.keys(activeLoops).forEach(k => delete activeLoops[k]);
 
-    // Arrête le gémissement spécial
     if (moanState) {
       clearTimeout(moanState.timer);
       moanState.baseAudio.pause();
       moanState = null;
     }
 
-    // Reset style des boutons
     document.querySelectorAll("#loopButtons button").forEach(btn => {
       btn.style.background = "#1a2a22";
       btn.style.color = "#e8e8e4";
@@ -678,97 +753,93 @@ function initAudioLooper() {
 
 window.addEventListener("DOMContentLoaded", initAudioLooper);
 
-// ========== GÉNÉRATION D'IMAGE ==========
-async function generateNSFWImage(botText) {
+// ========== GÉNÉRATION D'IMAGE via Perchance (onglet réel, pas d'iframe) ==========
+// Une iframe cross-origin se fait quasi systématiquement bloquer par la protection
+// anti-bot de Cloudflare. Une vraie navigation (onglet ouvert par un vrai clic) passe
+// presque toujours. On ouvre donc un onglet vide de façon SYNCHRONE dès le clic sur
+// "Envoyer" (sinon le navigateur bloque le popup), on le redirige une fois le prompt
+// prêt, et on écoute quand même le postMessage : s'il arrive, on récupère l'image et
+// on referme l'onglet automatiquement ; sinon l'onglet reste ouvert avec l'image visible
+// dedans (secours manuel, plus besoin de copier-coller à la main dans la plupart des cas).
+
+async function generateNSFWImage(botText, popup) {
+  if (!popup || popup.closed) {
+    const errDiv = document.createElement('div');
+    errDiv.className = 'msg image-loading';
+    errDiv.textContent = '⚠️ Le navigateur a bloqué l\'onglet de génération — autorise les popups pour ce site.';
+    messagesEl.appendChild(errDiv);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return;
+  }
+
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
-  loadingDiv.textContent = '🎨 Génération de l\'image en cours...';
+  loadingDiv.textContent = '🎨 Génération de l\'image en cours (Perchance)...';
   messagesEl.appendChild(loadingDiv);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
+  const id = Math.random().toString(36).slice(2);
+  const prompt = `masterpiece, best quality, highly detailed explicit erotic scene, ${botText.slice(0, 220)}, futanari, huge breasts, thick cock, wet, detailed anatomy, cinematic lighting`;
+  const params = new URLSearchParams({
+    prompt,
+    format: 'html',
+    id,
+    resolution: '768x512',
+    guidanceScale: 7,
+    negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark'
+  });
+
   try {
-    const prompt = `masterpiece, best quality, highly detailed explicit erotic scene, ${botText.slice(0, 220)}, futanari, huge breasts, thick cock, wet, detailed anatomy`;
-
-    // 1. Lancer la génération
-    const startRes = await fetch("https://properfool-nsfwadult.hf.space/gradio_api/call/generate_image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        data: [prompt, 768, 512, 10, 0, true, 1]
-      })
-    });
-
-    // Vérifie que la réponse est bien du JSON
-    const contentType = startRes.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      const text = await startRes.text();
-      console.error("Réponse non-JSON reçue:", text.slice(0, 300));
-      loadingDiv.textContent = '❌ Le Space renvoie une page HTML (probablement en pause)';
-      return;
-    }
-
-    if (!startRes.ok) {
-      loadingDiv.textContent = `❌ Erreur lancement (${startRes.status})`;
-      return;
-    }
-
-    const startData = await startRes.json();
-    const eventId = startData.event_id;
-
-    if (!eventId) {
-      loadingDiv.textContent = '❌ Pas d\'event_id';
-      console.log(startData);
-      return;
-    }
-
-    // 2. Polling
-    let imageUrl = null;
-
-    for (let i = 0; i < 50; i++) {
-      await new Promise(r => setTimeout(r, 1200));
-
-      const pollRes = await fetch(`https://properfool-nsfwadult.hf.space/gradio_api/call/generate_image/${eventId}`);
-      const pollText = await pollRes.text();
-
-      // Cherche une URL d'image
-      const urlMatch = pollText.match(/https?:\/\/[^\s"'\\]+\.(?:png|jpg|jpeg|webp)(?:\?[^\s"'\\]*)?/i);
-      if (urlMatch) {
-        imageUrl = urlMatch[0];
-        break;
-      }
-
-      if (pollText.toLowerCase().includes('error') || pollText.toLowerCase().includes('failed')) {
-        loadingDiv.textContent = '❌ Échec côté Space';
-        return;
-      }
-    }
-
-    loadingDiv.remove();
-
-    if (imageUrl) {
-      const imgDiv = document.createElement('div');
-      imgDiv.className = 'msg bot';
-      imgDiv.innerHTML = `<img src="${imageUrl}" alt="Image générée" style="max-width:100%; border-radius:10px;">`;
-      messagesEl.appendChild(imgDiv);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    } else {
-      const errDiv = document.createElement('div');
-      errDiv.className = 'msg image-loading';
-      errDiv.textContent = '⚠️ Image non récupérée';
-      messagesEl.appendChild(errDiv);
-    }
-
-  } catch (err) {
-    loadingDiv.remove();
-    console.error("Erreur génération image:", err);
+    popup.location.href = 'https://perchance.org/perchance-ai-api?' + params.toString();
+  } catch (e) {
+    // Le popup a pu être fermé entre-temps par l'utilisateur, on continue quand même.
   }
+
+  const result = await new Promise((resolve) => {
+    const timeout = setTimeout(() => { cleanup(); resolve(null); }, 45000);
+    function cleanup() {
+      clearTimeout(timeout);
+      window.removeEventListener('message', onMessage);
+    }
+    function onMessage(e) {
+      const d = e.data || {};
+      if (d.api !== 'perchance-image-api' || !d.result || d.result.id !== id) return;
+      cleanup();
+      resolve(d.result);
+    }
+    window.addEventListener('message', onMessage);
+  });
+
+  loadingDiv.remove();
+
+  if (result && result.ok && result.url) {
+    try { popup.close(); } catch (e) {}
+    const imgDiv = document.createElement('div');
+    imgDiv.className = 'msg bot';
+    imgDiv.innerHTML = `<img src="${result.url}" alt="Image générée" style="max-width:100%; border-radius:10px;">`;
+    messagesEl.appendChild(imgDiv);
+  } else {
+    const errDiv = document.createElement('div');
+    errDiv.className = 'msg image-loading';
+    errDiv.textContent = '⏳ Pas de retour automatique — l\'image est visible directement dans l\'onglet Perchance resté ouvert.';
+    messagesEl.appendChild(errDiv);
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-// ========== sendToWorker (la fonction manquante) ==========
+// ========== sendToWorker ==========
 async function sendToWorker(userText) {
   const isInit = userText === '__init__';
   let typingEl = null;
   let botDiv = null;
+
+  // Ouvert tout de suite, de façon SYNCHRONE, pour rester rattaché au geste utilisateur
+  // (clic sur Envoyer) — si on attend le premier `await`, le navigateur bloque le popup.
+  const imagePopup = window.open('about:blank', '_blank');
+  function closeUnusedPopup() {
+    if (imagePopup && !imagePopup.closed) { try { imagePopup.close(); } catch (e) {} }
+  }
+
   try {
     sendBtn.disabled = true;
     typingEl = addMessage('...', 'typing');
@@ -794,6 +865,7 @@ async function sendToWorker(userText) {
 
     if (!response.ok) {
       typingEl.remove();
+      closeUnusedPopup();
       const errText = await response.text();
       addMessage('Erreur ' + response.status + ' : ' + errText.slice(0, 200), 'err');
       return;
@@ -807,7 +879,9 @@ async function sendToWorker(userText) {
       finalizeHistory(userText, botText, isInit);
       if (botText.length > 20) {
         speakQuotedText(botText);
-        generateNSFWImage(botText);
+        generateNSFWImage(botText, imagePopup);
+      } else {
+        closeUnusedPopup();
       }
       return;
     }
@@ -848,10 +922,13 @@ async function sendToWorker(userText) {
 
     if (fullText && fullText.length > 20) {
       speakQuotedText(fullText);
-      generateNSFWImage(fullText);
+      generateNSFWImage(fullText, imagePopup);
+    } else {
+      closeUnusedPopup();
     }
 
   } catch (err) {
+    closeUnusedPopup();
     if (typingEl) typingEl.remove();
     addMessage('Erreur réseau : ' + err.message, 'err');
   } finally {
