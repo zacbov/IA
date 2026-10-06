@@ -192,6 +192,9 @@
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; text-transform:none; letter-spacing:normal; cursor:pointer;">
         <input type="checkbox" id="genAIHorde" style="width:auto;"> AI Horde (gratuit, communautaire, NSFW natif)
       </label>
+      <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; text-transform:none; letter-spacing:normal; cursor:pointer;">
+        <input type="checkbox" id="genVenice" style="width:auto;"> Venice AI
+      </label>
     </div>
   </div>
 
@@ -261,6 +264,7 @@ let genHFSpace = false;
 let hfSpaceId = 'properfool/nsfwadult';
 let genPollination = false;
 let genAIHorde = false;
+let genVenice = false;
 let profileName = '';
 let sampling = {};
 let history = [];
@@ -305,7 +309,8 @@ function readImageGeneratorsFromForm() {
     hfSpace: document.getElementById('genHFSpace').checked,
     hfSpaceId: document.getElementById('hfSpaceId').value.trim() || 'properfool/nsfwadult',
     pollination: document.getElementById('genPollination').checked,
-    aiHorde: document.getElementById('genAIHorde').checked
+    aiHorde: document.getElementById('genAIHorde').checked,
+    venice: document.getElementById('genVenice').checked
   };
 }
 
@@ -344,6 +349,7 @@ function fillFormFromProfile(name) {
   document.getElementById('hfSpaceId').value = igForm.hfSpaceId || 'properfool/nsfwadult';
   document.getElementById('genPollination').checked = !!igForm.pollination;
   document.getElementById('genAIHorde').checked = !!igForm.aiHorde;
+  document.getElementById('genVenice').checked = !!igForm.venice;
   writeSamplingToForm(p.sampling);
 }
 
@@ -416,6 +422,7 @@ function activateProfile(name, isSwitch) {
   hfSpaceId = ig.hfSpaceId || 'properfool/nsfwadult';
   genPollination = !!ig.pollination;
   genAIHorde = !!ig.aiHorde;
+  genVenice = !!ig.venice;
   sampling = p.sampling || {};
   history = p.history || [];
   localStorage.setItem(LAST_PROFILE_KEY, profileName);
@@ -465,6 +472,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
     hfSpaceId = ig.hfSpaceId;
     genPollination = ig.pollination;
     genAIHorde = ig.aiHorde;
+    genVenice = ig.venice;
     sampling = readSamplingFromForm();
     history = [];
     messagesEl.innerHTML = '';
@@ -1142,16 +1150,13 @@ function generatePollinationImage(botText) {
 // Réseau de GPU donnés par des bénévoles — gratuit sans inscription (clé anonyme), pas de
 // file d'attente réservée aux comptes authentifiés comme ZeroGPU. Fonctionne par polling :
 // on soumet, puis on interroge périodiquement jusqu'à ce que l'image soit prête.
-const AIHORDE_API_KEY = '0000000000'; // clé anonyme publique — priorité basse mais gratuite
-
+// Passe par le Worker (/proxy/horde/...) plutôt que d'appeler aihorde.net directement
+// depuis le navigateur, pour éviter tout souci de CORS et utiliser la vraie clé AIHORDE_KEY
+// côté serveur (meilleure priorité dans la file que la clé anonyme).
 async function callAIHorde(prompt) {
-  const submitRes = await fetch('https://aihorde.net/api/v2/generate/async', {
+  const submitRes = await fetch(WORKER_BASE + 'horde/generate/async', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': AIHORDE_API_KEY,
-      'Client-Agent': 'chat-perso-zacbov:1:chat.html'
-    },
+    headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
     body: JSON.stringify({
       prompt,
       nsfw: true,
@@ -1173,12 +1178,16 @@ async function callAIHorde(prompt) {
   const deadline = Date.now() + 90000; // la file bénévole peut être plus lente qu'un service dédié
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 4000));
-    const checkRes = await fetch('https://aihorde.net/api/v2/generate/check/' + id);
+    const checkRes = await fetch(WORKER_BASE + 'horde/generate/check/' + id, {
+      headers: { 'X-App-Secret': password }
+    });
     if (!checkRes.ok) continue;
     const checkData = await checkRes.json();
     if (checkData.faulted) throw new Error('génération en échec côté Horde');
     if (checkData.done) {
-      const statusRes = await fetch('https://aihorde.net/api/v2/generate/status/' + id);
+      const statusRes = await fetch(WORKER_BASE + 'horde/generate/status/' + id, {
+        headers: { 'X-App-Secret': password }
+      });
       if (!statusRes.ok) throw new Error('résultat indisponible (' + statusRes.status + ')');
       const statusData = await statusRes.json();
       const gen = statusData.generations && statusData.generations[0];
@@ -1210,6 +1219,62 @@ async function generateAIHordeImage(botText) {
     const errDiv = document.createElement('div');
     errDiv.className = 'msg image-loading';
     errDiv.textContent = '❌ AI Horde : ' + (err.message || 'génération échouée');
+    messagesEl.appendChild(errDiv);
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+// ========== GÉNÉRATION D'IMAGE via Venice AI ==========
+// Point d'accès compatible OpenAI (/images/generations), réponse en base64 directement
+// utilisable. Passe par le Worker (VENICE_KEY reste côté serveur).
+async function generateVeniceImage(botText) {
+  const loadingDiv = document.createElement('div');
+  loadingDiv.className = 'msg image-loading';
+  loadingDiv.textContent = '🎨 Génération de l\'image en cours (Venice)...';
+  messagesEl.appendChild(loadingDiv);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  try {
+    const prompt = buildImagePrompt(botText, 1400);
+    const res = await fetch(WORKER_BASE + 'venice-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      body: JSON.stringify({
+        prompt,
+        model: 'venice-sd35',
+        n: 1,
+        size: '768x512',
+        response_format: 'b64_json',
+        moderation: 'low'
+      })
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error('Erreur ' + res.status + ' : ' + errText.slice(0, 150));
+    }
+    const data = await res.json();
+    const first = (data?.data && data.data[0]) || (data?.images && data.images[0]) || null;
+    const b64 = (first && (first.b64_json || (typeof first === 'string' ? first : null))) || null;
+
+    loadingDiv.remove();
+
+    if (!b64) {
+      const errDiv = document.createElement('div');
+      errDiv.className = 'msg image-loading';
+      errDiv.textContent = '⚠️ Venice : image non récupérée.';
+      messagesEl.appendChild(errDiv);
+    } else {
+      const imgDiv = document.createElement('div');
+      imgDiv.className = 'msg bot';
+      imgDiv.innerHTML = `<img src="data:image/png;base64,${b64}" alt="Image générée (Venice)" style="max-width:100%; border-radius:10px;">`;
+      messagesEl.appendChild(imgDiv);
+    }
+  } catch (err) {
+    loadingDiv.remove();
+    console.error('Erreur Venice:', err);
+    const errDiv = document.createElement('div');
+    errDiv.className = 'msg image-loading';
+    errDiv.textContent = '❌ Venice : ' + (err.message || 'génération échouée');
     messagesEl.appendChild(errDiv);
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -1272,6 +1337,7 @@ async function sendToWorker(userText, userTs) {
         if (genHFSpace) generateHFSpaceImage(botText);
         if (genPollination) generatePollinationImage(botText);
         if (genAIHorde) generateAIHordeImage(botText);
+        if (genVenice) generateVeniceImage(botText);
       } else {
         closeUnusedPopup();
       }
