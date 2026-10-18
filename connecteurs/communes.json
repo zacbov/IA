@@ -1,0 +1,9 @@
+{
+  "name": "Communes françaises",
+  "description": "Cherche une commune française par son nom : code INSEE, codes postaux, département, population. Idéal pour un formulaire avec autocomplétion ville ↔ code postal : l'API (geo.api.gouv.fr) s'appelle aussi directement depuis le HTML généré. Paramètre : nom ou début de nom (ex : Villeurb).",
+  "url": "https://geo.api.gouv.fr/communes?fields=nom,code,codesPostaux,codeDepartement,population&boost=population&limit=5",
+  "method": "GET",
+  "paramName": "nom",
+  "test": "Lyon",
+  "maxChars": 1500
+}

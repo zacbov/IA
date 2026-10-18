@@ -1,0 +1,9 @@
+{
+  "name": "Vacances scolaires (Éducation nationale)",
+  "description": "Donne les dates officielles des vacances scolaires françaises (début, fin, zone, académie, année scolaire), les plus récentes d'abord. Pour un agenda, un planning de classe ou un compte à rebours. Paramètre : filtre au format champ:valeur, par exemple location:Lyon, zones:Zone A ou annee_scolaire:2026-2027.",
+  "url": "https://data.education.gouv.fr/api/explore/v2.1/catalog/datasets/fr-en-calendrier-scolaire/records?limit=10&order_by=start_date%20desc&select=description,start_date,end_date,zones,location,annee_scolaire",
+  "method": "GET",
+  "paramName": "refine",
+  "test": "location:Lyon",
+  "maxChars": 3000
+}

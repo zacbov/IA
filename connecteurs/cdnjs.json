@@ -1,0 +1,9 @@
+{
+  "name": "Bibliothèques JS/CSS (cdnjs)",
+  "description": "Cherche une bibliothèque JavaScript ou CSS sur cdnjs et renvoie sa dernière version et l'URL exacte à mettre dans une balise <script> ou <link> (champ « latest »). Utilise-le AVANT d'inclure une bibliothèque dans un fichier HTML, pour ne jamais inventer une URL ni un numéro de version. Paramètre : nom ou mot-clé en anglais (ex : chart, three, confetti, sortable).",
+  "url": "https://api.cdnjs.com/libraries?fields=version,description&limit=6",
+  "method": "GET",
+  "paramName": "search",
+  "test": "chart",
+  "maxChars": 2500
+}

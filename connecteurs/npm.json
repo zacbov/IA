@@ -1,0 +1,9 @@
+{
+  "name": "Paquets npm (jsDelivr / esm.sh)",
+  "description": "Cherche un paquet JavaScript sur npm (nom exact, dernière version, description) quand il n'est pas sur cdnjs. Il s'utilise ensuite dans le HTML via https://cdn.jsdelivr.net/npm/NOM@VERSION ou en module via https://esm.sh/NOM@VERSION. Paramètre : mots-clés en anglais (ex : qr code reader, markdown parser).",
+  "url": "https://registry.npmjs.org/-/v1/search?size=4",
+  "method": "GET",
+  "paramName": "text",
+  "test": "markdown parser",
+  "maxChars": 5000
+}

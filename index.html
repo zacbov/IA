@@ -261,6 +261,8 @@
   <div id="sheet">
     <h2>🔌 Mes connecteurs</h2>
     <div style="font-size:11px;color:var(--dim);margin-bottom:14px;">Branche n'importe quelle API qui accepte un texte simple en entrée. L'IA choisira d'elle-même quand l'utiliser, à partir de la description que tu donnes.</div>
+    <button id="sync-cn-github-btn" style="width:100%;background:var(--cyan);border:none;color:#08211c;font-weight:700;padding:10px;border-radius:8px;font-size:12.5px;cursor:pointer;margin-bottom:8px;">🔄 Synchroniser depuis mon dépôt GitHub (zacbov/IA/connecteurs)</button>
+    <div id="cn-sync-status" style="font-size:11px;color:var(--dim);margin-bottom:12px;display:none;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto;"></div>
     <div id="connectors-list" style="margin-bottom:16px;"></div>
     <div class="field"><label>Nom</label><input type="text" id="cn-name" placeholder="ex: Mon suivi de stock"></div>
     <div class="field"><label>Description (pour l'IA — quand l'utiliser)</label><input type="text" id="cn-desc" placeholder="ex: Vérifie le stock d'un produit par son nom"></div>
@@ -440,8 +442,8 @@
   } }, 8000);
 })();
 
-const APP_VERSION = 'v13';
-const APP_BUILD = '2026-10-18 10:30';
+const APP_VERSION = 'v14';
+const APP_BUILD = '2026-10-18 12:15';
 
 // --- Clés intégrées directement (à usage personnel uniquement) ---
 let KEYS = {
@@ -1817,8 +1819,9 @@ function renderConnectors(){
   list.innerHTML = entries.length ? entries.map(([id, c])=>`
     <div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-bottom:6px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <b style="font-size:12px;">${escapeHtml(c.name)}</b>
-        <div>
+        <b style="font-size:12px;">${escapeHtml(c.name)}${c.source === 'github' ? ' <span class="mono" style="font-size:9px;color:var(--cyan);font-weight:400;">GITHUB</span>' : ''}</b>
+        <div style="flex-shrink:0;">
+          <button data-id="${id}" class="cn-export" title="Exporter en .json (à déposer dans zacbov/IA/connecteurs)" style="background:none;border:none;color:var(--dim);font-size:13px;cursor:pointer;">⬇</button>
           <button data-id="${id}" class="cn-testbtn" style="background:none;border:none;color:var(--cyan);font-size:13px;cursor:pointer;">🧪</button>
           <button data-id="${id}" class="cn-del" style="background:none;border:none;color:var(--danger);font-size:14px;cursor:pointer;">✕</button>
         </div>
@@ -1830,10 +1833,17 @@ function renderConnectors(){
   list.querySelectorAll('.cn-del').forEach(btn=>{
     btn.onclick = ()=>{ delete CUSTOM_CONNECTORS[btn.dataset.id]; persistConnectors(); renderConnectors(); };
   });
+  list.querySelectorAll('.cn-export').forEach(btn=>{
+    btn.onclick = ()=>{
+      const { source, file, ...data } = CUSTOM_CONNECTORS[btn.dataset.id];
+      const slug = normTxt(data.name).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'connecteur';
+      downloadBlob(file || slug + '.json', JSON.stringify(data, null, 2) + '\n');
+    };
+  });
   list.querySelectorAll('.cn-testbtn').forEach(btn=>{
     btn.onclick = async ()=>{
       const c = CUSTOM_CONNECTORS[btn.dataset.id];
-      const val = prompt('Valeur de test pour "'+c.paramName+'" :', '');
+      const val = prompt('Valeur de test pour "'+c.paramName+'" :', c.test || '');
       if(val === null) return;
       const resEl = list.querySelector(`.cn-saved-result[data-id="${btn.dataset.id}"]`);
       resEl.style.display = 'block'; resEl.style.background = '#0e1512'; resEl.style.color = 'var(--dim)';
@@ -1898,6 +1908,65 @@ document.getElementById('cn-add').onclick = ()=>{
   CUSTOM_CONNECTORS[id] = { name, description, url, method, paramName };
   persistConnectors(); renderConnectors();
   document.getElementById('cn-name').value=''; document.getElementById('cn-desc').value=''; document.getElementById('cn-url').value=''; document.getElementById('cn-param').value=''; document.getElementById('cn-testval').value=''; document.getElementById('cn-test-result').style.display='none';
+};
+
+/* Connecteurs partagés via GitHub, comme les CSS : un fichier .json par connecteur
+   dans zacbov/IA/connecteurs. La resynchro met à jour, ajoute, retire ceux qui ont
+   disparu du dépôt, puis teste chacun avec la valeur « test » de son fichier. */
+const DEFAULT_CONNECTORS_REPO_API = 'https://api.github.com/repos/zacbov/IA/contents/connecteurs';
+function connectorFromJson(d){
+  if(!d || typeof d !== 'object') throw new Error('contenu JSON invalide');
+  const name = String(d.name || '').trim(), description = String(d.description || '').trim(), url = String(d.url || '').trim();
+  if(!name || !description) throw new Error('champs « name » et « description » obligatoires');
+  if(!/^https:\/\//i.test(url)) throw new Error('« url » doit commencer par https://');
+  return {
+    name, description, url,
+    method: String(d.method || 'GET').toUpperCase() === 'POST' ? 'POST' : 'GET',
+    paramName: String(d.paramName || 'query').trim() || 'query',
+    maxChars: Math.max(500, Math.min(8000, parseInt(d.maxChars, 10) || 1500)),
+    test: d.test !== undefined ? String(d.test) : ''
+  };
+}
+document.getElementById('sync-cn-github-btn').onclick = async ()=>{
+  const btn = document.getElementById('sync-cn-github-btn');
+  const statusEl = document.getElementById('cn-sync-status');
+  btn.disabled = true; btn.textContent = '🔄 Synchronisation…';
+  statusEl.style.display = 'block'; statusEl.style.color = 'var(--dim)';
+  statusEl.textContent = 'Récupération de la liste des connecteurs…';
+  try{
+    const listing = await fetchJson(DEFAULT_CONNECTORS_REPO_API);
+    const files = (Array.isArray(listing) ? listing : []).filter(f => f.type === 'file' && /\.json$/i.test(f.name));
+    const seen = new Set(), problems = [];
+    for(const f of files){
+      // l'id sert aussi de nom d'outil pour l'IA (connector_<id>) : caractères sûrs uniquement
+      const id = 'gh_' + f.name.replace(/\.json$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
+      try{
+        const res = await fetchWithTimeout(f.download_url, {}, 12000);
+        if(!res.ok) throw new Error('HTTP ' + res.status);
+        CUSTOM_CONNECTORS[id] = { ...connectorFromJson(JSON.parse(await res.text())), source:'github', file:f.name };
+        seen.add(id);
+      }catch(e){ problems.push('⚠ ' + f.name + ' ignoré : ' + e.message); }
+    }
+    let removed = 0;
+    for(const [id, c] of Object.entries(CUSTOM_CONNECTORS)){
+      if(c.source === 'github' && !seen.has(id)){ delete CUSTOM_CONNECTORS[id]; removed++; }
+    }
+    await persistConnectors(); renderConnectors();
+    const head = `✅ ${seen.size} connecteur(s) synchronisé(s)` + (removed ? `, ${removed} retiré(s)` : '') + ' depuis GitHub.';
+    statusEl.textContent = head + '\nTest de chacun depuis ce navigateur…';
+    const tests = await Promise.all([...seen].map(async id => {
+      const c = CUSTOM_CONNECTORS[id];
+      if(!c.test) return '• ' + c.name + ' : pas de valeur « test » dans le fichier';
+      const r = await testConnector(c.url, c.method, c.paramName, c.test);
+      return (r.ok ? '✅ ' : '❌ ') + c.name + (r.ok ? '' : ' — ' + r.error);
+    }));
+    statusEl.textContent = head + '\n' + tests.concat(problems).join('\n');
+  }catch(e){
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = '❌ Échec de la synchronisation : ' + e.message
+      + (/HTTP 404/.test(e.message) ? '\n(Crée le dossier « connecteurs » dans zacbov/IA et mets-y les fichiers .json.)' : '');
+  }
+  btn.disabled = false; btn.textContent = '🔄 Synchroniser depuis mon dépôt GitHub (zacbov/IA/connecteurs)';
 };
 
 // --- Instructions permanentes ---
@@ -2136,7 +2205,7 @@ async function runSkill(name, args){
       }
       const text = await res.text();
       if(!res.ok) return `Erreur du connecteur "${c.name}" (HTTP ${res.status}) : ${text.slice(0,400)}`;
-      return text.slice(0, 1500);
+      return text.slice(0, Math.min(8000, c.maxChars || 1500));
     }
     if(name === 'get_weather'){
       const geo = await fetchJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(args.city)}&count=1&language=fr`);

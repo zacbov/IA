@@ -1,0 +1,9 @@
+{
+  "name": "Code postal → communes",
+  "description": "Donne la ou les communes correspondant à un code postal français (nom, code INSEE, département), pour pré-remplir la ville dans un formulaire. Utilisable aussi directement depuis le HTML généré. Paramètre : code postal à 5 chiffres (ex : 69100).",
+  "url": "https://geo.api.gouv.fr/communes?fields=nom,code,codeDepartement&limit=20",
+  "method": "GET",
+  "paramName": "codePostal",
+  "test": "69100",
+  "maxChars": 1500
+}

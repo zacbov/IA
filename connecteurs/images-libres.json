@@ -1,0 +1,9 @@
+{
+  "name": "Images libres (Wikimedia Commons)",
+  "description": "Trouve de vraies photos et illustrations sous licence libre pour un site ou un outil, au lieu d'inventer des liens d'images. Pour chaque fichier : « thumburl » (version 800 px à mettre dans <img src>) et « descriptionurl » (page de crédit : cite l'auteur et « Wikimedia Commons »). Paramètre : mots-clés, de préférence en anglais (ex : pharmacy shelf, mountain lake).",
+  "url": "https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=6&prop=imageinfo&iiprop=url&iiurlwidth=800",
+  "method": "GET",
+  "paramName": "gsrsearch",
+  "test": "mountain lake",
+  "maxChars": 4000
+}

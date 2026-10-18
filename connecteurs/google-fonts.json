@@ -1,0 +1,9 @@
+{
+  "name": "Polices Google Fonts",
+  "description": "Vérifie qu'une police Google Fonts existe vraiment : la réponse est sa feuille @font-face, une erreur HTTP 400 veut dire que la police n'existe pas (choisis-en une autre). Paramètre : nom exact, graisses en option (ex : Inter, Playfair Display:wght@400;700). Dans le HTML : <link href=\"https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap\" rel=\"stylesheet\">.",
+  "url": "https://fonts.googleapis.com/css2?display=swap",
+  "method": "GET",
+  "paramName": "family",
+  "test": "Inter",
+  "maxChars": 1200
+}

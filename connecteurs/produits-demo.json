@@ -1,0 +1,9 @@
+{
+  "name": "Produits de démonstration (DummyJSON)",
+  "description": "Fournit de faux produits réalistes (titre, prix, description, catégorie, image) pour remplir une maquette de boutique, de catalogue ou de tableau de bord. L'API est aussi utilisable directement depuis le HTML généré (fetch). Paramètre : mot-clé en anglais (ex : phone, perfume, laptop).",
+  "url": "https://dummyjson.com/products/search?limit=6&select=title,price,description,category,thumbnail",
+  "method": "GET",
+  "paramName": "q",
+  "test": "phone",
+  "maxChars": 3500
+}

@@ -1,0 +1,9 @@
+{
+  "name": "Aperçu d'un lien (Microlink)",
+  "description": "Lit une page web à partir de son adresse et renvoie son titre, sa description, son image principale et son logo. Pour fabriquer des cartes d'aperçu de liens ou récupérer le visuel d'un site. Limité à environ 50 appels par jour. Paramètre : URL complète commençant par https://.",
+  "url": "https://api.microlink.io/",
+  "method": "GET",
+  "paramName": "url",
+  "test": "https://github.com",
+  "maxChars": 2000
+}

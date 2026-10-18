@@ -1,0 +1,9 @@
+{
+  "name": "Entreprises françaises (SIREN)",
+  "description": "Recherche une entreprise ou un établissement français par nom, SIREN ou SIRET : raison sociale, adresse du siège, activité, dirigeants. Pour un outil de prospection, de facturation ou de vérification fournisseur ; API publique de l'État, utilisable aussi depuis le HTML généré. Paramètre : nom, SIREN ou SIRET (ex : pharmacie lyon).",
+  "url": "https://recherche-entreprises.api.gouv.fr/search?per_page=3",
+  "method": "GET",
+  "paramName": "q",
+  "test": "pharmacie lyon",
+  "maxChars": 5000
+}
