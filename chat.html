@@ -1096,8 +1096,9 @@ function buildPerchancePrompt(botText, maxLen) {
   const core = [physicalDescription, action, 'futanari, huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting']
     .filter(Boolean)
     .join(', ');
-  const prefix = 'A casual real-life photograph, ';
-  const suffix = ". Overall, it's an absolute world-class cinematic masterpiece. It's an aesthetically pleasing cinematic shot with impeccable attention to detail and impressive composition.. It's a casual photo. Overall it's an actual real-life photograph.";
+  const prefix = 'A casual real-life photograph. A casual photo of A casual real-life photograph';
+  const suffix = "(((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. All characters are over 19-years-old. It's a casual photo. Overall it's an actual real-life photograph. It's a casual photo. Overall it's an actual real-life photograph.
+";
   const budget = Math.max((maxLen || 900) - prefix.length - suffix.length, 0);
   return prefix + core.slice(0, budget) + suffix;
 }
