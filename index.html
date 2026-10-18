@@ -266,7 +266,7 @@
     <div id="connectors-list" style="margin-bottom:16px;"></div>
     <div class="field"><label>Nom</label><input type="text" id="cn-name" placeholder="ex: Mon suivi de stock"></div>
     <div class="field"><label>Description (pour l'IA — quand l'utiliser)</label><input type="text" id="cn-desc" placeholder="ex: Vérifie le stock d'un produit par son nom"></div>
-    <div class="field"><label>URL</label><input type="text" id="cn-url" placeholder="https://mon-api.com/stock"></div>
+    <div class="field"><label>URL</label><input type="text" id="cn-url" placeholder="https://mon-api.com/stock  —  ou …/produit/{valeur}"></div>
     <div class="field"><label>Méthode</label>
       <select id="cn-method" style="width:100%;background:#0e1512;border:1px solid var(--line);color:var(--text);padding:10px 11px;border-radius:8px;font-size:13px;">
         <option value="GET">GET (valeur en paramètre d'URL)</option>
@@ -442,8 +442,8 @@
   } }, 8000);
 })();
 
-const APP_VERSION = 'v14';
-const APP_BUILD = '2026-10-18 12:15';
+const APP_VERSION = 'v15';
+const APP_BUILD = '2026-10-18 14:00';
 
 // --- Clés intégrées directement (à usage personnel uniquement) ---
 let KEYS = {
@@ -1821,6 +1821,7 @@ function renderConnectors(){
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <b style="font-size:12px;">${escapeHtml(c.name)}${c.source === 'github' ? ' <span class="mono" style="font-size:9px;color:var(--cyan);font-weight:400;">GITHUB</span>' : ''}</b>
         <div style="flex-shrink:0;">
+          ${connectorKeyNames(c).length ? `<button data-id="${id}" class="cn-key" title="Clé API (gardée sur cet appareil)" style="background:none;border:none;color:${connectorKeyNames(c).every(k => CONNECTOR_KEYS[k]) ? 'var(--cyan)' : 'var(--amber)'};font-size:13px;cursor:pointer;">🔑</button>` : ''}
           <button data-id="${id}" class="cn-export" title="Exporter en .json (à déposer dans zacbov/IA/connecteurs)" style="background:none;border:none;color:var(--dim);font-size:13px;cursor:pointer;">⬇</button>
           <button data-id="${id}" class="cn-testbtn" style="background:none;border:none;color:var(--cyan);font-size:13px;cursor:pointer;">🧪</button>
           <button data-id="${id}" class="cn-del" style="background:none;border:none;color:var(--danger);font-size:14px;cursor:pointer;">✕</button>
@@ -1832,6 +1833,9 @@ function renderConnectors(){
     </div>`).join('') : '<div style="color:var(--dim);font-size:12px;">Aucun connecteur pour l\'instant.</div>';
   list.querySelectorAll('.cn-del').forEach(btn=>{
     btn.onclick = ()=>{ delete CUSTOM_CONNECTORS[btn.dataset.id]; persistConnectors(); renderConnectors(); };
+  });
+  list.querySelectorAll('.cn-key').forEach(btn=>{
+    btn.onclick = ()=>{ const c = CUSTOM_CONNECTORS[btn.dataset.id]; connectorKeyNames(c).forEach(k => askConnectorKey(k, c.name)); renderConnectors(); };
   });
   list.querySelectorAll('.cn-export').forEach(btn=>{
     btn.onclick = ()=>{
@@ -1848,25 +1852,68 @@ function renderConnectors(){
       const resEl = list.querySelector(`.cn-saved-result[data-id="${btn.dataset.id}"]`);
       resEl.style.display = 'block'; resEl.style.background = '#0e1512'; resEl.style.color = 'var(--dim)';
       resEl.textContent = 'Test en cours…';
-      const r = await testConnector(c.url, c.method, c.paramName, val);
+      const r = await testConnector(c, val);
       resEl.style.color = r.ok ? 'var(--cyan)' : 'var(--danger)';
       resEl.textContent = (r.ok ? '✅ HTTP '+r.status+'\n' : '❌ '+r.error+'\n') + (r.preview||'');
     };
   });
 }
 
-async function testConnector(url, method, paramName, testValue){
+/* Format des connecteurs :
+   - {valeur} dans l'URL : la valeur va dans le chemin (…/entries/{valeur}) au lieu de ?param=
+   - {cle:nom} dans l'URL : clé API gardée sur cet appareil seulement, jamais dans le dépôt GitHub
+   - fields : ne garder que ces champs du JSON (sinon la troncature ne laisse voir qu'un résultat) */
+let CONNECTOR_KEYS = {};
+try{ CONNECTOR_KEYS = JSON.parse(localStorage.getItem('routeur-ia-connector-keys') || '{}') || {}; }catch(e){}
+function saveConnectorKeys(){ try{ localStorage.setItem('routeur-ia-connector-keys', JSON.stringify(CONNECTOR_KEYS)); }catch(e){} }
+function connectorKeyNames(c){ return [...new Set([...String(c.url || '').matchAll(/\{cle:([\w-]+)\}/g)].map(m => m[1]))]; }
+function askConnectorKey(name, connName){
+  const v = prompt('Le connecteur « ' + connName + ' » a besoin de ta clé API « ' + name + ' ».\nColle-la ici : elle reste sur cet appareil, jamais sur GitHub.', CONNECTOR_KEYS[name] || '');
+  if(v === null){ if(!(name in CONNECTOR_KEYS)){ CONNECTOR_KEYS[name] = ''; saveConnectorKeys(); } return false; }
+  CONNECTOR_KEYS[name] = v.trim(); saveConnectorKeys();
+  return !!v.trim();
+}
+function buildConnectorRequest(c, value){
+  if(/^http:\/\//i.test(c.url)) throw new Error('adresse en http:// : bloquée par le navigateur sur une page https, il faut une API en https://');
+  const missing = connectorKeyNames(c).filter(k => !CONNECTOR_KEYS[k]);
+  if(missing.length) throw new Error('clé API « ' + missing.join(', ') + ' » manquante (bouton 🔑 dans ⚙ → Connecteurs)');
+  let url = String(c.url).replace(/\{cle:([\w-]+)\}/g, (m, k) => encodeURIComponent(CONNECTOR_KEYS[k]));
+  const hasSlot = url.includes('{valeur}');
+  url = url.split('{valeur}').join(encodeURIComponent(value));
+  if(c.method === 'POST') return { url, options:{ method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ [c.paramName]: value }) } };
+  if(!hasSlot) url += (url.includes('?') ? '&' : '?') + encodeURIComponent(c.paramName) + '=' + encodeURIComponent(value);
+  return { url, options:{} };
+}
+function pickFields(node, tree){
+  if(Array.isArray(node)) return node.map(n => pickFields(n, tree));
+  if(!node || typeof node !== 'object') return node;
+  const o = {};
+  for(const k of Object.keys(tree)) if(node[k] !== undefined) o[k] = tree[k] === true ? node[k] : pickFields(node[k], tree[k]);
+  return o;
+}
+function shapeConnectorText(c, text){
+  if(!Array.isArray(c.fields) || !c.fields.length) return text;
   try{
-    let res;
-    if(method === 'GET'){
-      const sep = url.includes('?') ? '&' : '?';
-      res = await fetchWithTimeout(`${url}${sep}${encodeURIComponent(paramName)}=${encodeURIComponent(testValue)}`, {}, 12000);
-    } else {
-      res = await fetchWithTimeout(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ [paramName]: testValue }) }, 12000);
+    const tree = {};
+    for(const p of c.fields){
+      const parts = String(p).split('.');
+      let cur = tree;
+      parts.forEach((k, i)=>{
+        if(i === parts.length - 1){ if(cur[k] === undefined) cur[k] = true; }
+        else { if(!cur[k] || cur[k] === true) cur[k] = {}; cur = cur[k]; }
+      });
     }
+    return JSON.stringify(pickFields(JSON.parse(text), tree));
+  }catch(e){ return text; }   // pas du JSON : réponse telle quelle
+}
+async function testConnector(c, testValue){
+  let req;
+  try{ req = buildConnectorRequest(c, testValue); }catch(e){ return { ok:false, error:e.message }; }
+  try{
+    const res = await fetchWithTimeout(req.url, req.options, 12000);
     const text = await res.text();
     if(!res.ok) return { ok:false, error:`HTTP ${res.status} — l'URL, la méthode ou le paramètre sont probablement incorrects.`, preview:text.slice(0,300) };
-    return { ok:true, status:res.status, preview:text.slice(0,400) || '(réponse vide mais HTTP 200 — vérifie quand même que c\'est le résultat attendu)' };
+    return { ok:true, status:res.status, preview:shapeConnectorText(c, text).slice(0,400) || '(réponse vide mais HTTP 200 — vérifie quand même que c\'est le résultat attendu)' };
   }catch(e){
     return { ok:false, error:'Échec réseau — URL invalide, injoignable, ou bloquée par CORS : ' + e.message };
   }
@@ -1893,7 +1940,7 @@ document.getElementById('cn-test').onclick = async ()=>{
   if(!url || !testVal){ alert('Renseigne au moins l\'URL et une valeur de test.'); return; }
   resultEl.style.display = 'block'; resultEl.style.background = '#0e1512'; resultEl.style.color = 'var(--dim)';
   resultEl.textContent = 'Test en cours…';
-  const r = await testConnector(url, method, paramName, testVal);
+  const r = await testConnector({ url, method, paramName }, testVal);
   resultEl.style.color = r.ok ? 'var(--cyan)' : 'var(--danger)';
   resultEl.textContent = (r.ok ? '✅ HTTP '+r.status+' — ça fonctionne\n' : '❌ '+r.error+'\n') + (r.preview||'');
 };
@@ -1924,7 +1971,8 @@ function connectorFromJson(d){
     method: String(d.method || 'GET').toUpperCase() === 'POST' ? 'POST' : 'GET',
     paramName: String(d.paramName || 'query').trim() || 'query',
     maxChars: Math.max(500, Math.min(8000, parseInt(d.maxChars, 10) || 1500)),
-    test: d.test !== undefined ? String(d.test) : ''
+    test: d.test !== undefined ? String(d.test) : '',
+    fields: Array.isArray(d.fields) ? d.fields.map(String).filter(Boolean).slice(0, 40) : undefined
   };
 }
 document.getElementById('sync-cn-github-btn').onclick = async ()=>{
@@ -1951,13 +1999,15 @@ document.getElementById('sync-cn-github-btn').onclick = async ()=>{
     for(const [id, c] of Object.entries(CUSTOM_CONNECTORS)){
       if(c.source === 'github' && !seen.has(id)){ delete CUSTOM_CONNECTORS[id]; removed++; }
     }
+    // clés API : demandées une seule fois, gardées sur l'appareil
+    for(const id of seen){ const c = CUSTOM_CONNECTORS[id]; connectorKeyNames(c).forEach(k => { if(!(k in CONNECTOR_KEYS)) askConnectorKey(k, c.name); }); }
     await persistConnectors(); renderConnectors();
     const head = `✅ ${seen.size} connecteur(s) synchronisé(s)` + (removed ? `, ${removed} retiré(s)` : '') + ' depuis GitHub.';
     statusEl.textContent = head + '\nTest de chacun depuis ce navigateur…';
     const tests = await Promise.all([...seen].map(async id => {
       const c = CUSTOM_CONNECTORS[id];
       if(!c.test) return '• ' + c.name + ' : pas de valeur « test » dans le fichier';
-      const r = await testConnector(c.url, c.method, c.paramName, c.test);
+      const r = await testConnector(c, c.test);
       return (r.ok ? '✅ ' : '❌ ') + c.name + (r.ok ? '' : ' — ' + r.error);
     }));
     statusEl.textContent = head + '\n' + tests.concat(problems).join('\n');
@@ -2196,16 +2246,12 @@ async function runSkill(name, args){
       const c = CUSTOM_CONNECTORS[name.slice('connector_'.length)];
       if(!c) return 'Connecteur inconnu.';
       const value = args[c.paramName] ?? Object.values(args)[0] ?? '';
-      let res;
-      if(c.method === 'GET'){
-        const sep = c.url.includes('?') ? '&' : '?';
-        res = await fetchWithTimeout(`${c.url}${sep}${encodeURIComponent(c.paramName)}=${encodeURIComponent(value)}`, {}, 15000);
-      } else {
-        res = await fetchWithTimeout(c.url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ [c.paramName]: value }) }, 15000);
-      }
+      let req;
+      try{ req = buildConnectorRequest(c, value); }catch(e){ return `Connecteur "${c.name}" inutilisable : ${e.message}`; }
+      const res = await fetchWithTimeout(req.url, req.options, 15000);
       const text = await res.text();
       if(!res.ok) return `Erreur du connecteur "${c.name}" (HTTP ${res.status}) : ${text.slice(0,400)}`;
-      return text.slice(0, Math.min(8000, c.maxChars || 1500));
+      return shapeConnectorText(c, text).slice(0, Math.min(8000, c.maxChars || 1500));
     }
     if(name === 'get_weather'){
       const geo = await fetchJson(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(args.city)}&count=1&language=fr`);
