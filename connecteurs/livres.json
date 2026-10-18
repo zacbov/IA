@@ -1,0 +1,9 @@
+{
+  "name": "Livres & auteurs (Open Library)",
+  "description": "Cherche des livres par titre ou auteur : titre, auteurs, année de première publication, nombre de pages. Couverture : https://covers.openlibrary.org/b/id/COVER_I-L.jpg. Page de l'œuvre (avec le résumé quand il existe) : https://openlibrary.org + key. Paramètre : titre et/ou auteur (ex : Dune Herbert).",
+  "url": "https://openlibrary.org/search.json?limit=5&fields=key,title,author_name,first_publish_year,cover_i,number_of_pages_median,language",
+  "method": "GET",
+  "paramName": "q",
+  "test": "Dune",
+  "maxChars": 3000
+}

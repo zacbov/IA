@@ -1,0 +1,9 @@
+{
+  "name": "Fiche produit alimentaire (Open Food Facts)",
+  "description": "Fiche d'un produit alimentaire à partir de son code-barres : nom, marque, Nutri-Score, groupe NOVA, ingrédients, allergènes, valeurs nutritionnelles pour 100 g et photo. Paramètre : code-barres EAN à 8 ou 13 chiffres (ex : 3017620422003).",
+  "url": "https://world.openfoodfacts.org/api/v2/product/{valeur}?fields=product_name,brands,quantity,nutriscore_grade,nova_group,ingredients_text_fr,allergens_tags,image_front_url,nutriments",
+  "method": "GET",
+  "paramName": "code_barres",
+  "test": "3017620422003",
+  "maxChars": 4000
+}

@@ -1,0 +1,23 @@
+{
+  "name": "Inspecteur d'IP",
+  "description": "Localise une adresse IP : pays, région, ville, coordonnées GPS, fuseau horaire, fournisseur d'accès. Pour un nom de domaine, utilise d'abord le connecteur DNS pour obtenir son IP. Paramètre : adresse IPv4 ou IPv6 (ex : 8.8.8.8).",
+  "url": "https://ipwho.is/{valeur}",
+  "method": "GET",
+  "paramName": "ip",
+  "test": "8.8.8.8",
+  "maxChars": 1500,
+  "fields": [
+    "success",
+    "message",
+    "ip",
+    "type",
+    "country",
+    "region",
+    "city",
+    "latitude",
+    "longitude",
+    "timezone.id",
+    "connection.isp",
+    "connection.org"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Photos HD (Unsplash)",
+  "description": "Cherche des photos haute résolution par mot-clé. Dans le HTML, utilise urls.regular (ou urls.small pour une vignette) et crédite le photographe : « Photo : NOM sur Unsplash » avec le lien links.html. Paramètre : mots-clés en anglais (ex : cinematic lighting).",
+  "url": "https://api.unsplash.com/search/photos?per_page=6&client_id={cle:unsplash}",
+  "method": "GET",
+  "paramName": "query",
+  "test": "cinematic lighting",
+  "maxChars": 4000,
+  "fields": [
+    "total",
+    "results.alt_description",
+    "results.color",
+    "results.urls.regular",
+    "results.urls.small",
+    "results.user.name",
+    "results.links.html"
+  ]
+}

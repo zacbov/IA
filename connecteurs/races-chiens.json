@@ -1,0 +1,20 @@
+{
+  "name": "Races de chiens (TheDogAPI)",
+  "description": "Fiche d'une race de chien : usage d'origine, groupe, espérance de vie, tempérament, taille et poids. Les données sont en anglais : traduis-les. Photo de la race : https://cdn2.thedogapi.com/images/REFERENCE_IMAGE_ID.jpg. Paramètre : nom de la race en anglais (ex : Labrador, German Shepherd, Beagle).",
+  "url": "https://api.thedogapi.com/v1/breeds/search",
+  "method": "GET",
+  "paramName": "q",
+  "test": "Labrador",
+  "maxChars": 3000,
+  "fields": [
+    "name",
+    "bred_for",
+    "breed_group",
+    "life_span",
+    "temperament",
+    "origin",
+    "weight.metric",
+    "height.metric",
+    "reference_image_id"
+  ]
+}

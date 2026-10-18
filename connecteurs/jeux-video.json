@@ -1,0 +1,19 @@
+{
+  "name": "Jeux vidéo (RAWG)",
+  "description": "Cherche des jeux vidéo par nom : date de sortie, plateformes, genres, notes et image. Paramètre : nom du jeu (ex : Zelda).",
+  "url": "https://api.rawg.io/api/games?page_size=5&key={cle:rawg}",
+  "method": "GET",
+  "paramName": "search",
+  "test": "Zelda",
+  "maxChars": 4000,
+  "fields": [
+    "count",
+    "results.name",
+    "results.released",
+    "results.rating",
+    "results.metacritic",
+    "results.platforms.platform.name",
+    "results.genres.name",
+    "results.background_image"
+  ]
+}

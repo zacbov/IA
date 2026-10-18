@@ -1,0 +1,14 @@
+{
+  "name": "Dictionnaire français (Wiktionnaire)",
+  "description": "Donne l'article du Wiktionnaire pour un mot français : classe grammaticale (sections {{S|nom|fr}}, {{S|verbe|fr}}…), définitions (lignes commençant par #) et exemples (lignes #*). Le texte est au format wiki : présente-le proprement. Paramètre : le mot exact, en minuscules (ex : ordinateur).",
+  "url": "https://fr.wiktionary.org/w/api.php?action=parse&format=json&formatversion=2&origin=*&prop=wikitext&redirects=1",
+  "method": "GET",
+  "paramName": "page",
+  "test": "ordinateur",
+  "maxChars": 4000,
+  "fields": [
+    "parse.title",
+    "parse.wikitext",
+    "error.info"
+  ]
+}

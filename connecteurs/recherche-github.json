@@ -1,0 +1,19 @@
+{
+  "name": "Recherche de projets GitHub",
+  "description": "Trouve des dépôts open source populaires sur un sujet (exemples, bibliothèques, modèles à copier) : nom, description, étoiles, langage, licence, lien. Limité à 10 recherches par minute. Paramètre : mots-clés en anglais, filtres GitHub possibles (ex : threejs, kanban language:javascript).",
+  "url": "https://api.github.com/search/repositories?per_page=6&sort=stars",
+  "method": "GET",
+  "paramName": "q",
+  "test": "threejs",
+  "maxChars": 4000,
+  "fields": [
+    "total_count",
+    "items.full_name",
+    "items.description",
+    "items.html_url",
+    "items.homepage",
+    "items.stargazers_count",
+    "items.language",
+    "items.license.spdx_id"
+  ]
+}

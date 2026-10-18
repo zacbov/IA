@@ -1,0 +1,16 @@
+{
+  "name": "Palette de couleurs (The Color API)",
+  "description": "Génère une palette harmonieuse de 5 couleurs (hexadécimal, RVB et nom) à partir d'une couleur de base. Paramètre : couleur hexadécimale SANS le # (ex : 2C2B2C).",
+  "url": "https://www.thecolorapi.com/scheme?mode=analogic-complement&count=5&format=json",
+  "method": "GET",
+  "paramName": "hex",
+  "test": "2C2B2C",
+  "maxChars": 2000,
+  "fields": [
+    "mode",
+    "seed.hex.value",
+    "colors.hex.value",
+    "colors.rgb.value",
+    "colors.name.value"
+  ]
+}

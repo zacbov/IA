@@ -1,0 +1,21 @@
+{
+  "name": "Films, musiques & podcasts (iTunes)",
+  "description": "Cherche des films, albums, morceaux, podcasts ou livres audio dans le catalogue Apple : titre, artiste, date, genre, jaquette et extrait audio/vidéo de 30 s. Jaquette haute résolution : remplace « 100x100 » par « 600x600 » dans artworkUrl100. Paramètre : titre ou artiste (ex : Interstellar).",
+  "url": "https://itunes.apple.com/search?country=FR&lang=fr_fr&limit=6",
+  "method": "GET",
+  "paramName": "term",
+  "test": "Interstellar",
+  "maxChars": 4000,
+  "fields": [
+    "resultCount",
+    "results.kind",
+    "results.trackName",
+    "results.collectionName",
+    "results.artistName",
+    "results.releaseDate",
+    "results.primaryGenreName",
+    "results.artworkUrl100",
+    "results.previewUrl",
+    "results.trackViewUrl"
+  ]
+}

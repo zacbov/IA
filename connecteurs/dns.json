@@ -1,0 +1,15 @@
+{
+  "name": "DNS d'un domaine (Google)",
+  "description": "Résout un nom de domaine en adresse(s) IP via le DNS public de Google. Paramètre : nom de domaine seul, sans https:// (ex : github.com).",
+  "url": "https://dns.google/resolve?type=A",
+  "method": "GET",
+  "paramName": "name",
+  "test": "github.com",
+  "maxChars": 1500,
+  "fields": [
+    "Status",
+    "Answer.name",
+    "Answer.data",
+    "Answer.TTL"
+  ]
+}

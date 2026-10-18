@@ -1,0 +1,22 @@
+{
+  "name": "Notices de médicaments (OpenFDA, USA)",
+  "description": "Notice officielle américaine d'un médicament : principe actif, indications, posologie, mises en garde, contre-indications, grossesse. Base américaine en anglais : utilise le nom américain de la molécule (paracétamol = acetaminophen) et traduis la réponse. Ne remplace pas l'avis d'un professionnel de santé. Paramètre : nom générique de la molécule en anglais (ex : acetaminophen, ibuprofen).",
+  "url": "https://api.fda.gov/drug/label.json?limit=1&search=openfda.generic_name:{valeur}",
+  "method": "GET",
+  "paramName": "medicament",
+  "test": "acetaminophen",
+  "maxChars": 6000,
+  "fields": [
+    "results.openfda.generic_name",
+    "results.openfda.brand_name",
+    "results.active_ingredient",
+    "results.purpose",
+    "results.indications_and_usage",
+    "results.dosage_and_administration",
+    "results.contraindications",
+    "results.do_not_use",
+    "results.warnings",
+    "results.pregnancy_or_breast_feeding",
+    "results.adverse_reactions"
+  ]
+}

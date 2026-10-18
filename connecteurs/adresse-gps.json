@@ -1,0 +1,18 @@
+{
+  "name": "Adresse & GPS France (Géoplateforme IGN)",
+  "description": "Convertit une adresse française en adresse normalisée, code postal, ville, code INSEE et coordonnées GPS. Attention : « coordinates » est dans l'ordre [longitude, latitude]. L'API s'appelle aussi directement depuis le HTML généré (autocomplétion d'adresse). Paramètre : l'adresse, même incomplète (ex : 10 rue de la paix paris).",
+  "url": "https://data.geopf.fr/geocodage/search?limit=5",
+  "method": "GET",
+  "paramName": "q",
+  "test": "10 rue de la paix paris",
+  "maxChars": 2500,
+  "fields": [
+    "features.properties.label",
+    "features.properties.postcode",
+    "features.properties.city",
+    "features.properties.citycode",
+    "features.properties.context",
+    "features.properties.score",
+    "features.geometry.coordinates"
+  ]
+}
