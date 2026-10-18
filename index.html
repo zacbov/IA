@@ -50,6 +50,8 @@
   #preview-bar.show{display:flex; gap:8px; align-items:center;}
   #preview-bar img{width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid var(--line);}
   #preview-bar button{background:none; border:1px solid var(--line); color:var(--dim); border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer;}
+  #workfile-bar{display:none; align-items:center; gap:6px; padding:6px 12px 0; flex-shrink:0;}
+  #workfile-bar button{background:none; border:1px solid var(--line); color:var(--dim); border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer; flex-shrink:0;}
   #inputbar{display:flex; gap:8px; padding:10px 12px calc(env(safe-area-inset-bottom,0px) + 10px); border-top:1px solid var(--line); background:var(--bg); flex-shrink:0; align-items:flex-end;}
   #attach{background:none; border:1px solid var(--line); color:var(--dim); width:44px; height:44px; border-radius:10px; font-size:18px; cursor:pointer; flex-shrink:0;}
   #inputbar textarea{flex:1; resize:none; background:var(--panel); border:1px solid var(--line); color:var(--text); border-radius:10px; padding:11px 12px; font-size:15px; font-family:inherit; max-height:110px;}
@@ -124,7 +126,7 @@
     raisonnement/analyse long → Gemini (1M contexte)<br>
     discussion rapide → Groq<br>
     image → Gemini · photo jointe → Gemini Vision<br>
-    fichier .html/.json/.js/... joint → analysé en texte<br>
+    fichier joint → fichier de travail, retouché sans repartir de zéro<br>
     ☰ pour gérer tes conversations.
   </div>
 </div>
@@ -133,6 +135,14 @@
   <img id="preview-img" src="" style="display:none;">
   <span id="preview-name" style="font-size:11px;color:var(--dim);flex:1;" class="mono">photo jointe</span>
   <button id="remove-attach">✕</button>
+</div>
+
+<div id="workfile-bar">
+  <span id="workfile-name" class="mono" style="flex:1; min-width:0; font-size:11px; color:var(--cyan); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="Fichier de travail : chaque demande de modification s'applique à ce fichier"></span>
+  <button id="workfile-undo" title="Revenir à la version précédente">↶</button>
+  <button id="workfile-dl" title="Télécharger la version actuelle">⬇</button>
+  <button id="workfile-view" title="Aperçu">👁</button>
+  <button id="workfile-close" title="Détacher le fichier">✕</button>
 </div>
 
 <div id="engine-bar" style="display:flex; align-items:center; padding:6px 12px 0; flex-shrink:0;">
@@ -430,8 +440,8 @@
   } }, 8000);
 })();
 
-const APP_VERSION = 'v12';
-const APP_BUILD = '2026-09-12 07:45';
+const APP_VERSION = 'v13';
+const APP_BUILD = '2026-10-18 10:30';
 
 // --- Clés intégrées directement (à usage personnel uniquement) ---
 let KEYS = {
@@ -583,10 +593,11 @@ function renameConvo(id, ev){
 }
 function renderMessages(){
   const c = getCurrent();
+  renderWorkfileBar();
   document.getElementById('current-title').textContent = c ? c.title : '';
   messagesEl.innerHTML = '';
   if(!c || c.messages.length===0){
-    messagesEl.innerHTML = `<div id="empty"><b>Prêt</b>Chaque message est classé automatiquement :<br>code → Mistral Codestral / Qwen Coder<br>raisonnement/analyse long → Gemini (1M contexte)<br>discussion rapide → Groq<br>image → Gemini · photo jointe → Gemini Vision<br>fichier .html/.json/.js/... joint → analysé en texte<br>☰ pour gérer tes conversations.</div>`;
+    messagesEl.innerHTML = `<div id="empty"><b>Prêt</b>Chaque message est classé automatiquement :<br>code → Mistral Codestral / Qwen Coder<br>raisonnement/analyse long → Gemini (1M contexte)<br>discussion rapide → Groq<br>image → Gemini · photo jointe → Gemini Vision<br>fichier joint → fichier de travail, retouché sans repartir de zéro<br>☰ pour gérer tes conversations.</div>`;
     return;
   }
   c.messages.forEach((m,i)=> renderMessage(m,i));
@@ -789,7 +800,11 @@ function renderMessage(m, index){
   if(m.tag) tagHtml += `<span class="tag ${m.tagClass||''}">${m.tag}</span>`;
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-  if(m.role === 'bot' && !m.isError){ renderReplyContent(bubble, m.text || ''); }
+  if(m.role === 'bot' && !m.isError){
+    renderReplyContent(bubble, m.text || '');
+    if(m.edits && m.edits.length) bubble.appendChild(buildDiffView(m.edits));
+    if(m.file && m.file.code) bubble.appendChild(buildFileCard({ code:m.file.code, lang:m.file.lang || 'txt', name:m.file.name }, m.file.name));
+  }
   else { bubble.textContent = m.text || ''; }
   wrap.innerHTML = tagHtml;
 
@@ -1315,8 +1330,12 @@ function fitToContext(messages, providerKey, model, reserveOutput){
     const over = messagesTokens(msgs) - budget;
     const cut = Math.min(last.content.length - 500, over * 3.2);
     if(cut > 0){
-      last.content = last.content.slice(0, last.content.length - Math.ceil(cut)) +
-        '\n\n[… contenu tronqué pour tenir dans la fenêtre de ' + win.toLocaleString('fr-FR') + ' tokens de ce modèle]';
+      // on coupe au milieu : le début (le fichier) ET la fin (la consigne) restent visibles
+      const tail = Math.min(2500, Math.floor(last.content.length / 3));
+      const headEnd = Math.max(0, last.content.length - Math.ceil(cut) - tail);
+      last.content = last.content.slice(0, headEnd) +
+        '\n\n[… ' + Math.ceil(cut).toLocaleString('fr-FR') + ' caractères coupés ici pour tenir dans la fenêtre de ' + win.toLocaleString('fr-FR') + ' tokens de ce modèle …]\n\n' +
+        last.content.slice(last.content.length - tail);
       trimmed++;
     }
   }
@@ -2930,8 +2949,15 @@ async function callPollinationsImage(prompt){
   return { text:'', imgSrc:url };
 }
 
+// Les gros blocs de code sont résumés : le fichier complet vit dans le fichier de travail,
+// inutile de le répéter 20 fois dans l'historique (il évinçait tout le reste de la fenêtre).
+function compactForHistory(t){
+  if(!t || t.length < 4000) return t;
+  return t.replace(/```(\w*)\n([\s\S]*?)```/g, (m, lang, code)=> code.length < 3000 ? m
+    : '```' + lang + '\n' + code.slice(0, 800) + '\n… [' + code.length.toLocaleString('fr-FR') + ' caractères omis — version complète dans le fichier de travail]\n```');
+}
 function chatHistoryFor(c){
-  return c.messages.filter(m=>m.text && !m.isError).slice(-20).map(m=>({ role: m.role==='user'?'user':'assistant', content:m.text }));
+  return c.messages.filter(m=>m.text && !m.isError).slice(-20).map(m=>({ role: m.role==='user'?'user':'assistant', content:compactForHistory(m.text) }));
 }
 
 async function updateHistorySummary(c){
@@ -3064,10 +3090,14 @@ function renderReplyContent(bubble, text){
     return;
   }
   if(block.before){ const p=document.createElement('div'); p.innerHTML=renderMarkdown(block.before); p.style.marginBottom='8px'; bubble.appendChild(p); }
+  bubble.appendChild(buildFileCard(block));
+  if(block.after){ const p=document.createElement('div'); p.innerHTML=renderMarkdown(block.after); p.style.marginTop='8px'; bubble.appendChild(p); }
+}
+function buildFileCard(block, name){
   const card = document.createElement('div');
   card.style.cssText = 'border:1px solid var(--line); border-radius:8px; padding:10px; margin:6px 0; background:#0e1512;';
   const ext = EXT_MAP[block.lang] || 'txt';
-  const fname = 'reponse-' + Date.now() + '.' + ext;
+  const fname = name || ('reponse-' + Date.now() + '.' + ext);
   const info = document.createElement('div');
   info.style.cssText = 'font-family:monospace;font-size:11px;color:var(--dim);margin-bottom:6px;';
   info.textContent = '📄 ' + fname + ' · ' + block.code.length + ' caractères';
@@ -3076,7 +3106,7 @@ function renderReplyContent(bubble, text){
   preview.style.cssText = 'max-height:260px;overflow:auto;background:#08110d;border:1px solid var(--line);border-radius:6px;padding:8px;font-size:11.5px;margin-bottom:8px;';
   const previewCode = document.createElement('code');
   previewCode.style.fontFamily = 'monospace';
-  previewCode.innerHTML = highlightCode(block.code, block.lang);
+  previewCode.innerHTML = highlightCode(block.code.length > 20000 ? block.code.slice(0, 20000) + '\n\n… (aperçu limité aux 20 000 premiers caractères — Télécharger ou Copier donnent le fichier entier)' : block.code, block.lang);
   preview.appendChild(previewCode); card.appendChild(preview);
   const btn = document.createElement('button');
   btn.textContent = '⬇ Télécharger';
@@ -3125,8 +3155,10 @@ function renderReplyContent(bubble, text){
       fixBtn.textContent = '🔧 Correction de ' + errors.length + ' erreur' + (errors.length>1?'s':'') + '…';
       const res = await autoRepair(block.code, block.lang || 'html', 'fichier généré précédemment', 2);
       if(res.code !== block.code){
+        const cR = getCurrent();
+        const nv = setWorkfile(cR, res.code, block.lang || 'html', block.name || (cR.lastArtifact && cR.lastArtifact.name), 'réparation');
         pushMessage({ role:'bot', cat:'CODE', tag:'RÉPARÉ', tagClass:'engine-mistral',
-          text: 'Erreurs corrigées :\n' + errors.map(e=>'• '+e).join('\n') + '\n\n```' + (block.lang||'html') + '\n' + res.code + '\n```' });
+          text: 'Erreurs corrigées (v' + nv.v + ') :\n' + errors.map(e=>'• '+e).join('\n'), file:{ name:nv.name, lang:nv.lang, code:nv.code, v:nv.v } });
         persistConvos();
         fixBtn.textContent = '✅ Réparé';
       } else {
@@ -3141,8 +3173,7 @@ function renderReplyContent(bubble, text){
   iterBtn.style.cssText = 'background:none;border:1px solid var(--amber);color:var(--amber);font-weight:700;padding:8px 12px;border-radius:6px;font-size:12px;cursor:pointer;margin-bottom:6px;';
   iterBtn.onclick = ()=> iterateArtifact(block);
   card.appendChild(iterBtn);
-  bubble.appendChild(card);
-  if(block.after){ const p=document.createElement('div'); p.innerHTML=renderMarkdown(block.after); p.style.marginTop='8px'; bubble.appendChild(p); }
+  return card;
 }
 
 const SKILL_LABELS = { get_weather:'météo', convert_currency:'conversion devise', wikipedia_lookup:'recherche Wikipédia', calculate:'calcul', get_timezone:'fuseau horaire', jours_feries_fr:'jours fériés', make_qrcode:'QR code', shorten_link:'raccourcissement de lien', color_palette:'palette de couleurs', color_info:'infos couleur', icon_search:'recherche d\'icônes', texture_search:'recherche de textures/HDRI', search_hf_hub:'recherche Hugging Face Hub', call_hf_space:'appel d\'un Space Hugging Face', github_list_repos:'liste des dépôts GitHub', github_latest_commit:'dernier commit GitHub', github_list_issues:'issues GitHub', generate_3d_model:'génération de modèle 3D (Tripo3D)', generate_music:'génération musicale (MusicGen)', translate_text:'traduction', web_search_real:'recherche web', iss_location:'position ISS', hackernews_top:'Hacker News', french_address_lookup:'recherche d\'adresse', text_to_speech:'synthèse vocale (Hume)', read_project_file:'consultation de la zone de dépôt', remember:'mémorisation' };
@@ -3152,22 +3183,496 @@ function skillLabel(name){
 }
 
 /* Reprend un fichier déjà généré et demande une modification ciblée.
-   Le code courant part comme base : le moteur doit renvoyer le fichier ENTIER
-   modifié, pas un extrait, sinon on ne peut pas le rejouer. */
+   Le fichier devient le fichier de travail, puis passe par l'édition ciblée
+   (blocs SEARCH/REPLACE) : plus besoin que le moteur renvoie le fichier entier. */
 function iterateArtifact(block){
   if(isBusy){ alert('Une génération est déjà en cours.'); return; }
   const instruction = prompt('Que faut-il changer dans ce fichier ?\n(ex : « bouton en vert et police plus grande »)');
   if(!instruction || !instruction.trim()) return;
   const c = getCurrent();
-  c.lastArtifact = { code: block.code, lang: block.lang };
-  const lang = block.lang || 'html';
-  const prompt2 = `Voici un fichier ${lang} existant. Applique EXACTEMENT cette modification : ${instruction.trim()}\n\n`
-    + `Contraintes : ne change rien d'autre, garde le fichier autonome et fonctionnel, `
-    + `et réponds uniquement avec le fichier COMPLET modifié dans un seul bloc \`\`\`${lang}.\n\n`
-    + '```' + lang + '\n' + block.code + '\n```';
-  pushMessage({ role:'user', text:'✏️ Modifier le fichier : ' + instruction.trim(), fullText: prompt2 });
+  const wf = c.lastArtifact;
+  if(!wf || wf.code !== block.code){
+    setWorkfile(c, block.code, block.lang || 'html', block.name || (wf && wf.name) || ('fichier.' + (EXT_MAP[block.lang] || 'html')), 'repris');
+  }
+  pushMessage({ role:'user', text:'✏️ Modifier le fichier : ' + instruction.trim(), fullText: instruction.trim(), instruction: instruction.trim(), baseV: c.lastArtifact.v, baseName: c.lastArtifact.name });
   setBusy(true); currentTurnController = new AbortController();
-  runRequest(prompt2, null, c, null, 'code').finally(()=> setBusy(false));
+  runEditTurn(instruction.trim(), c).finally(()=> setBusy(false));
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   FICHIER DE TRAVAIL + ÉDITION CIBLÉE (comme l'outil « Edit » de Claude)
+   Avant : le fichier était collé dans le message, tronqué par la fin quand il
+   dépassait la fenêtre du modèle (consigne comprise), et on exigeait en retour
+   le fichier COMPLET — impossible au-delà de quelques milliers de tokens de
+   sortie. Résultat : le moteur réécrivait un fichier « à sa façon ».
+   Maintenant :
+     1. le fichier joint devient le fichier de travail de la conversation,
+        versionné (v1, v2…) et annulable ;
+     2. le moteur lit le fichier entier, ou, s'il est trop long pour lui, le
+        plan du fichier + les passages pertinents (comme un grep) ;
+     3. il répond par des blocs SEARCH/REPLACE qu'on applique ici même ;
+     4. un bloc qui ne colle pas lui est renvoyé avec la zone la plus proche,
+        pour qu'il le recale (ce que fait Claude quand un Edit échoue) ;
+     5. le résultat est exécuté dans un bac à sable : seules les NOUVELLES
+        erreurs sont renvoyées au moteur pour correction.
+   ══════════════════════════════════════════════════════════════════════ */
+const EDIT_RE = /(am[ée]lior|modifi|ajout|chang|corrig|supprim|enl[eè]v|retir|remplac|\bmets?\b|\brends?\b|transform|refai|optimis|r[ée][ée]cri|int[eè]gr|impl[ée]ment|r[ée]par|\bfix|tradui|renomm|d[ée]plac|agrandi|r[ée]dui|coloris|adapt|termin|compl[eè]t|finalis|nettoi|nettoy|simplifi|ajust|harmonis|fais en sorte|rajout|ins[eè]re|\bpasse (le|la|les|en)\b|\bcorrect)/i;
+const QUESTION_RE = /^\s*(explique|pourquoi|comment (marche|fonctionne)|qu['’]est|que fait|quel|quelle|est-ce|analyse|r[ée]sume|d[ée]cris|liste|combien|o[uù] )/i;
+const FRESH_RE = /(repar[st]? de z[ée]ro|from scratch|nouveau fichier|nouvelle page|ignore (le|ce) fichier|sans le fichier|autre fichier)/i;
+const FILE_REF_RE = /(fichier|code|script|page|fonction|bouton|html|css|\bjs\b|ligne|bug|erreur|outil|appli|\bapp\b|programme|dedans|marche|fonctionne|section|menu|couleur|police|design|style|interface|version)/i;
+function wantsEdit(text, category){
+  if(FRESH_RE.test(text || '')) return false;
+  return EDIT_RE.test(text || '') || (category === 'code' && !QUESTION_RE.test(text || ''));
+}
+
+function langOfName(name){
+  const ext = String(name || '').split('.').pop().toLowerCase();
+  return ({ htm:'html', mjs:'js', cjs:'js', yml:'yaml' })[ext] || ext || 'txt';
+}
+function isHtmlFile(f){ return /html?/i.test(f.lang || '') || /<html|<!DOCTYPE|<body/i.test(f.code || ''); }
+function fmtSize(n){ return n < 1024 ? n + ' o' : (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' Ko'; }
+function engineInfo(key){
+  if(key === 'gemini') return { tag:'GEMINI', cls:'engine-gemini' };
+  if(key === 'claude') return { tag:'CLAUDE', cls:'engine-claude' };
+  const cfg = OA_PROVIDERS[key];
+  return cfg ? { tag:cfg.tag, cls:cfg.cls } : { tag:String(key || '?').toUpperCase(), cls:'' };
+}
+
+// Enregistre une nouvelle version du fichier de travail de la conversation
+function setWorkfile(c, code, lang, name, origin){
+  const prev = c.lastArtifact;
+  name = name || (prev && prev.name) || ('fichier.' + (EXT_MAP[lang] || 'txt'));
+  c.artifacts = c.artifacts || [];
+  const same = c.artifacts.filter(a => a.name === name);
+  const v = same.length ? Math.max(...same.map(a => a.v || 1)) + 1 : 1;
+  const entry = { code, lang: lang || 'txt', name, v, ts: Date.now(), tag: origin || '' };
+  c.lastArtifact = entry;
+  c.artifacts.push(entry);
+  if(c.artifacts.length > 12) c.artifacts.shift();
+  renderWorkfileBar();
+  return entry;
+}
+function adoptAsWorkfile(c, blob, name){
+  const ex = extractCodeBlock(blob);
+  if(ex && ex.code.trim().length >= 200){ setWorkfile(c, ex.code, ex.lang || 'html', name || 'projet.html', 'pipeline'); c.fileTurn = true; persistConvos(); }
+}
+
+function renderWorkfileBar(){
+  const bar = document.getElementById('workfile-bar'); if(!bar) return;
+  const c = getCurrent(); const wf = c && c.lastArtifact;
+  if(!wf || !wf.code){ bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  document.getElementById('workfile-name').textContent = '🗂 ' + (wf.name || 'fichier') + ' · v' + (wf.v || 1) + ' · ' + fmtSize(wf.code.length) + ' · ' + wf.code.split('\n').length + ' lignes';
+  const hasPrev = (c.artifacts || []).some(a => a.name === wf.name && (a.v || 1) < (wf.v || 1));
+  document.getElementById('workfile-undo').style.display = hasPrev ? '' : 'none';
+  document.getElementById('workfile-view').style.display = isHtmlFile(wf) ? '' : 'none';
+}
+document.getElementById('workfile-dl').onclick = ()=>{ const wf = getCurrent().lastArtifact; if(wf) downloadBlob(wf.name || 'fichier.txt', wf.code); };
+document.getElementById('workfile-view').onclick = ()=>{ const wf = getCurrent().lastArtifact; if(wf) openPreview(wf.code); };
+document.getElementById('workfile-undo').onclick = ()=>{
+  const c = getCurrent(); const wf = c.lastArtifact; if(!wf || isBusy) return;
+  const prev = (c.artifacts || []).filter(a => a.name === wf.name && (a.v || 1) < (wf.v || 1)).sort((a,b)=> (b.v || 1) - (a.v || 1))[0];
+  if(!prev) return;
+  c.lastArtifact = prev;
+  pushMessage({ role:'bot', tag:'FICHIER', tagClass:'', text:'↶ Retour à la **v' + (prev.v || 1) + '** de `' + prev.name + '`. Les prochaines modifications partiront de cette version.' });
+  renderWorkfileBar(); persistConvos();
+};
+document.getElementById('workfile-close').onclick = ()=>{
+  const c = getCurrent(); if(!c.lastArtifact || isBusy) return;
+  if(!confirm('Détacher « ' + (c.lastArtifact.name || 'fichier') + ' » ? Les prochaines demandes ne porteront plus sur ce fichier (ses versions restent dans la conversation).')) return;
+  c.lastArtifact = null; c.fileTurn = false;
+  renderWorkfileBar(); persistConvos();
+};
+
+/* ── Lecture du fichier : entier si possible, sinon plan + passages utiles ── */
+const OUTLINE_RE = /<(section|header|footer|nav|main|aside|article|form|dialog|h[1-3]|style|script|template)\b|<div[^>]*\bid=|^\s*(async\s+)?function\s+[\w$]+|^\s*(const|let|var)\s+[A-Z_][A-Z0-9_]{2,}\s*=|^\s*class\s+[\w$]+|^\s*@media|^\s*def\s+\w+|^\s*\/\*\s*[═=─#*]{3,}/;
+const STOP_WORDS = new Set('les des une un le la du de et en au aux pour par sur dans avec sans que qui quoi est sont pas plus moins tout tous toute toutes mon ma mes ton ta tes son sa ses ce cet cette ces il elle ils elles nous vous je tu on fichier code peux peut faire fais mets rends ajoute modifie change ameliore ameliorer corrige stp merci bien aussi comme mais donc alors etre avoir veux voudrais faut peu tres encore leur leurs the and for with this that from'.split(' '));
+const SYNONYMS = { bouton:['button','btn'], couleur:['color','background'], couleurs:['color','--'], police:['font'], titre:['title','h1','h2'], fond:['background','bg'], lien:['href','link'], menu:['menu','nav'], formulaire:['form','input'], entete:['header'], pied:['footer'], tableau:['table'], liste:['list','ul','li'], fenetre:['modal','overlay','dialog'], parametres:['settings'], reglages:['settings'], envoyer:['send','submit'], envoi:['send'], message:['message','msg'], messages:['message','msg'], conversation:['convo','conversation'], conversations:['convo'], cle:['key','keys'], cles:['key','keys'], image:['image','img'], images:['image','img'], recherche:['search'], fichier:['file'], erreur:['error','err'], erreurs:['error','err'], moteur:['engine','provider'], moteurs:['engine','provider','route'], marge:['margin','padding'], taille:['size','width','height'], animation:['animation','transition','keyframes'], sombre:['dark'], clair:['light'], mobile:['@media','mobile'], vocal:['speech','mic'], micro:['mic','speech'], historique:['history'], memoire:['memory'], projet:['project','pipeline'], apercu:['preview'], telecharger:['download'], copier:['copy','clipboard'] };
+function normTxt(s){ return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+function keywordsOf(q){
+  const set = new Set();
+  for(let w of (normTxt(q).match(/[#.@-]?[a-z0-9_$][a-z0-9_$-]{2,}/g) || [])){
+    w = w.replace(/^[#.]/, '');
+    if(w.length < 3 || STOP_WORDS.has(w)) continue;
+    set.add(w);
+    if(w.length > 6) set.add(w.slice(0, w.length - 2));   // racine : « boutons » trouve « bouton »
+    (SYNONYMS[w] || []).forEach(s => set.add(s));
+  }
+  return [...set].slice(0, 30);
+}
+function fileViewFor(code, query, budget){
+  if(code.length <= budget) return { text: code, full:true, excerpts:0 };
+  const lines = code.split('\n');
+  const N = lines.length;
+  const outline = [];
+  let outlineChars = 0;
+  const outlineMax = Math.min(14000, budget * 0.18);
+  for(let i=0; i<N && outlineChars < outlineMax; i++){
+    if(OUTLINE_RE.test(lines[i])){
+      const entry = 'L' + (i+1) + '  ' + lines[i].trim().slice(0, 100);
+      outline.push(entry); outlineChars += entry.length + 1;
+    }
+  }
+  const exBudget = budget - outlineChars - 1500;
+  const keep = new Uint8Array(N);
+  let used = 0;
+  const take = (s, e)=>{
+    for(let i=Math.max(0,s); i<Math.min(N,e); i++){
+      if(keep[i]) continue;
+      if(used + lines[i].length + 1 > exBudget) return false;
+      keep[i] = 1; used += lines[i].length + 1;
+    }
+    return true;
+  };
+  take(0, 25);                                        // en-tête du fichier
+  if(/design|style|css|couleur|police|font|th[eè]me|joli|beau|moderne|visuel|look|apparence|interface|ui\b|responsive|mobile|animation|sombre|clair/i.test(query)){
+    for(let i=0; i<N; i++){                           // demande visuelle : la feuille de style d'abord
+      if(/<style\b/i.test(lines[i])){
+        let j = i; while(j < N && !/<\/style>/i.test(lines[j])) j++;
+        if(!take(i, j+1)) break;
+        i = j;
+      }
+    }
+  }
+  const kws = keywordsOf(query);
+  if(kws.length){
+    const norm = lines.map(normTxt);
+    const W = 30, STEP = 10, wins = [];
+    for(let s=0; s<N; s+=STEP){
+      let score = 0;
+      for(let i=s; i<Math.min(N, s+W); i++) for(const k of kws) if(norm[i].includes(k)) score += k.length > 6 ? 2 : 1;
+      if(score) wins.push({ s, score });
+    }
+    wins.sort((a,b)=> b.score - a.score);
+    for(const w of wins){ if(!take(w.s - 3, w.s + W + 3)) break; }
+  }
+  take(N - 15, N);                                    // fin du fichier
+  const parts = [];
+  for(let i=0; i<N; ){
+    if(!keep[i]){ i++; continue; }
+    let j = i; while(j < N && keep[j]) j++;
+    parts.push('──── lignes ' + (i+1) + '-' + j + ' ────\n' + lines.slice(i, j).join('\n'));
+    i = j;
+  }
+  const text = '[VUE PARTIELLE — le fichier fait ' + N + ' lignes / ' + code.length + ' caractères, trop pour ce moteur. '
+    + 'Voici son PLAN puis les PASSAGES pertinents pour la demande. Ne modifie que du texte visible ici ; '
+    + 'tes blocs SEARCH doivent le recopier à l\'identique, sans les lignes « ──── lignes … ──── ».]\n\n'
+    + '=== PLAN DU FICHIER ===\n' + outline.join('\n') + '\n\n=== PASSAGES ===\n' + parts.join('\n\n');
+  return { text, full:false, excerpts: parts.length };
+}
+
+/* ── Blocs SEARCH/REPLACE : lecture et application ── */
+function stripFenceLines(t){
+  return String(t).replace(/^[ \t]*```[\w-]*[ \t]*\n/, '').replace(/\n[ \t]*```[ \t]*$/, '');
+}
+function parseEditBlocks(text){
+  const out = [];
+  const re = /<{5,}[ \t]*SEARCH[^\n]*\n([\s\S]*?)(?:^|\n)={5,}[ \t]*\n([\s\S]*?)(?:^|\n)>{5,}[ \t]*REPLACE/gm;
+  let m;
+  while((m = re.exec(text || ''))) out.push({ search: stripFenceLines(m[1]), replace: stripFenceLines(m[2]) });
+  return out;
+}
+function lineOf(code, idx){ return code.slice(0, idx).split('\n').length; }
+function applyOneEdit(code, search, replace){
+  if(!search.trim()) return { ok:false, reason:'bloc SEARCH vide' };
+  if(search === replace) return { ok:false, reason:'SEARCH et REPLACE identiques', noop:true };
+  const removed = search.split('\n').length, added = replace ? replace.split('\n').length : 0;
+  // 1) correspondance exacte, qui doit être unique (même règle que l'outil Edit de Claude)
+  const idx = code.indexOf(search);
+  if(idx !== -1){
+    if(code.indexOf(search, idx + 1) !== -1) return { ok:false, reason:'texte présent plusieurs fois — ajoute des lignes voisines pour le rendre unique' };
+    return { ok:true, code: code.slice(0, idx) + replace + code.slice(idx + search.length), line: lineOf(code, idx), removed, added };
+  }
+  // 2) ligne à ligne en ignorant l'indentation et les espaces (les moteurs les recopient mal)
+  const lines = code.split('\n');
+  let s = search.split('\n');
+  while(s.length && !s[0].trim()) s.shift();
+  while(s.length && !s[s.length-1].trim()) s.pop();
+  if(!s.length) return { ok:false, reason:'bloc SEARCH vide' };
+  const norm = x => x.trim().replace(/\s+/g, ' ');
+  const sn = s.map(norm);
+  const hits = [];
+  for(let i=0; i + sn.length <= lines.length && hits.length < 2; i++){
+    if(norm(lines[i]) !== sn[0]) continue;
+    let ok = true;
+    for(let j=1; j<sn.length; j++){ if(norm(lines[i+j]) !== sn[j]){ ok = false; break; } }
+    if(ok) hits.push(i);
+  }
+  if(hits.length > 1) return { ok:false, reason:'texte présent plusieurs fois — ajoute des lignes voisines pour le rendre unique' };
+  if(!hits.length) return { ok:false, reason:'texte introuvable dans le fichier actuel' };
+  const at = hits[0];
+  // ré-indente le remplacement comme le fichier
+  const fileIndent = (lines[at].match(/^\s*/) || [''])[0];
+  const searchIndent = (s[0].match(/^\s*/) || [''])[0];
+  const rep = replace ? replace.split('\n').map(l => (l.trim() && l.startsWith(searchIndent)) ? fileIndent + l.slice(searchIndent.length) : l) : [];
+  lines.splice(at, s.length, ...rep);
+  return { ok:true, code: lines.join('\n'), line: at + 1, removed: s.length, added: rep.length };
+}
+function applyEditBlocks(code, blocks){
+  let out = code; const applied = [], failed = [];
+  for(const b of blocks){
+    const r = applyOneEdit(out, b.search, b.replace);
+    if(r.ok){ out = r.code; applied.push({ ...b, line:r.line, removed:r.removed, added:r.added }); }
+    else if(!r.noop) failed.push({ ...b, reason:r.reason });
+  }
+  return { code: out, applied, failed };
+}
+// Zone du fichier qui ressemble le plus à un SEARCH raté, pour aider le moteur à se recaler
+function nearestRegion(code, search){
+  const lines = code.split('\n');
+  const toks = new Set(normTxt(search).match(/[a-z0-9_$-]{3,}/g) || []);
+  if(!toks.size) return null;
+  const W = Math.max(4, Math.min(40, search.split('\n').length + 4));
+  const lineToks = lines.map(l => normTxt(l).match(/[a-z0-9_$-]{3,}/g) || []);
+  let best = -1, bestScore = 0;
+  for(let s=0; s<lines.length; s+=2){
+    const seen = new Set();
+    for(let i=s; i<Math.min(lines.length, s+W); i++) for(const t of lineToks[i]) if(toks.has(t)) seen.add(t);
+    if(seen.size > bestScore){ bestScore = seen.size; best = s; }
+  }
+  if(best < 0 || bestScore < Math.min(2, toks.size)) return null;
+  const from = Math.max(0, best - 3), to = Math.min(lines.length, best + W + 3);
+  return { from: from + 1, to, text: lines.slice(from, to).join('\n') };
+}
+// Le moteur a renvoyé le fichier entier au lieu de blocs : on l'accepte s'il n'est visiblement pas tronqué
+function extractFullFile(reply, wf){
+  const s = reply.indexOf('```'), e = reply.lastIndexOf('```');
+  if(s < 0 || e <= s) return null;
+  const code = reply.slice(reply.indexOf('\n', s) + 1, e).replace(/\n$/, '');
+  const min = wf.code.length > 30000 ? 0.85 : 0.5;
+  if(code.length < wf.code.length * min) return null;
+  if(isHtmlFile(wf) && /<\/html>/i.test(wf.code) && !/<\/html>/i.test(code)) return null;
+  return code;
+}
+function editNotes(reply, rewritten){
+  const cut = rewritten ? reply.indexOf('```') : reply.search(/<{5,}[ \t]*SEARCH/);
+  const t = (cut >= 0 ? reply.slice(0, cut) : reply).replace(/```[\w-]*/g, '').trim();
+  return t.slice(0, 1200);
+}
+
+const EDIT_SYSTEM = `Tu es un développeur senior qui MODIFIE un fichier existant, exactement comme Claude Code avec son outil Edit : tu pars du fichier fourni, tu ne le réécris jamais en entier et tu ne repars jamais de zéro.
+
+Chaque changement s'exprime par un bloc de remplacement, au format EXACT :
+<<<<<<< SEARCH
+lignes recopiées à l'identique depuis le fichier actuel (indentation comprise)
+=======
+nouvelles lignes qui les remplacent
+>>>>>>> REPLACE
+
+Règles :
+1. SEARCH est recopié caractère pour caractère depuis le fichier et n'y apparaît qu'UNE seule fois : prends 2 à 12 lignes, assez pour être unique.
+2. Pour AJOUTER du code : SEARCH = une ligne existante qui sert d'ancre (</style>, </body>, l'en-tête d'une fonction…), REPLACE = cette même ligne + le nouveau code avant ou après.
+3. Pour SUPPRIMER : laisse REPLACE vide.
+4. Plusieurs petits blocs valent mieux qu'un gros. Mets-les dans l'ordre du fichier.
+5. Conserve tout ce que la demande ne vise pas : contenu, fonctionnalités, noms, style, langue, commentaires.
+6. Le code ajouté est complet et fonctionnel : pas de « ... », pas de placeholder, pas de TODO.
+7. Commence par 1 à 3 phrases qui disent ce que tu changes et pourquoi, puis les blocs. Rien après le dernier bloc.`;
+
+function buildEditPrompt(wf, view, instruction, opts){
+  return (opts.history ? 'CONTEXTE RÉCENT DE LA CONVERSATION (pour comprendre les références) :\n' + opts.history + '\n\n' : '')
+    + 'DEMANDE DE L\'UTILISATEUR : ' + instruction + '\n\n'
+    + (opts.plan ? 'PLAN DE MODIFICATIONS établi à l\'étape précédente (à suivre) :\n' + opts.plan + '\n\n' : '')
+    + 'FICHIER ACTUEL « ' + (wf.name || 'fichier') + ' » (version ' + (wf.v || 1) + ', ' + wf.code.split('\n').length + ' lignes)' + (view.full ? '' : ' — vue partielle') + ' :\n'
+    + '<<<FICHIER\n' + view.text + '\nFICHIER>>>\n\n'
+    + 'RAPPEL DE LA DEMANDE : ' + instruction + '\n'
+    + 'Réponds avec 1 à 3 phrases de résumé puis tes blocs SEARCH/REPLACE. Ne renvoie surtout pas le fichier entier.';
+}
+function buildRetryPrompt(code, failed, instruction){
+  const parts = failed.slice(0, 6).map((f, i)=>{
+    const near = nearestRegion(code, f.search);
+    return '### Bloc ' + (i+1) + ' — ' + f.reason + '\nTon SEARCH :\n<<<\n' + f.search.slice(0, 1500) + '\n>>>\n'
+      + (near ? 'Zone la plus proche dans le fichier actuel (lignes ' + near.from + '-' + near.to + ') :\n<<<\n' + near.text + '\n>>>' : '(aucune zone ressemblante trouvée)');
+  }).join('\n\n');
+  return 'Certains de tes blocs n\'ont pas pu être appliqués : leur SEARCH ne correspond pas exactement au fichier. '
+    + 'Les autres blocs sont DÉJÀ appliqués, ne les renvoie pas.\n\n' + parts
+    + '\n\nDemande d\'origine : ' + instruction
+    + '\n\nRenvoie UNIQUEMENT les blocs SEARCH/REPLACE corrigés pour ces modifications, en recopiant SEARCH à l\'identique depuis les zones ci-dessus.';
+}
+
+// Ce que chaque moteur peut lire d'un coup (en caractères), marge de sortie comprise
+const EDIT_VIEW_BUDGET = { gemini:900000, claude:500000, 'mistral-code':180000, mistral:100000, 'openrouter-code':90000, openrouter:90000, zai:90000, nvidia:60000, groq:24000, cerebras:24000, hf:30000, llm7:30000 };
+function editRoute(size){
+  const canEdit = k => k === 'gemini' || k === 'claude' || !!OA_PROVIDERS[k];
+  if(forcedEngine && forcedEngine.type === 'text' && canEdit(forcedEngine.key)) return [forcedEngine.key];
+  // gros fichier : les moteurs à grande fenêtre d'abord, ils le voient en entier
+  return size > 150000
+    ? ['gemini','mistral-code','openrouter-code','zai','mistral','nvidia','claude']
+    : ['mistral-code','zai','openrouter-code','gemini','groq','mistral','nvidia','llm7','claude'];
+}
+
+async function editFileWithEngines(wf, instruction, opts){
+  opts = opts || {};
+  const status = opts.onStatus || (()=>{});
+  const journal = opts.journal || [];
+  let route = editRoute(wf.code.length);
+  if(opts.preferKey && route.length > 1) route = [opts.preferKey, ...route.filter(k => k !== opts.preferKey)];
+  let lastErr = null;
+  for(const key of route){
+    const need = healthKeyOf(key);
+    if(!hasKey(need)) continue;
+    if(providerBlockReason(need) && route.length > 1) continue;
+    const label = engineInfo(key).tag;
+    const view = fileViewFor(wf.code, instruction + ' ' + (opts.plan || ''), EDIT_VIEW_BUDGET[key] || 40000);
+    status('📖 ' + label + (view.full ? ' lit le fichier entier…' : ' lit le plan + ' + view.excerpts + ' passages…'));
+    try{
+      const prompt = buildEditPrompt(wf, view, instruction, opts);
+      let reply = await callAgent(key, EDIT_SYSTEM, prompt);
+      bumpUsage(key);
+      let blocks = parseEditBlocks(reply);
+      if(!blocks.length){
+        const full = extractFullFile(reply, wf);
+        if(full && full !== wf.code) return { code: full, applied:[], failed:[], engineKey:key, notes: editNotes(reply, true), rewritten:true };
+        status('↻ ' + label + ' : rappel du format d\'édition…');
+        reply = await callAgent(key, EDIT_SYSTEM, prompt + '\n\nIMPORTANT : ta réponse précédente ne contenait aucun bloc SEARCH/REPLACE exploitable. Réponds UNIQUEMENT au format demandé.');
+        blocks = parseEditBlocks(reply);
+        if(!blocks.length){ journal.push(label + ' : aucun bloc d\'édition exploitable'); lastErr = new Error(label + ' n\'a renvoyé aucune modification exploitable.'); continue; }
+      }
+      const notes = editNotes(reply, false);
+      status('✏️ Application de ' + blocks.length + ' modification' + (blocks.length > 1 ? 's' : '') + '…');
+      let result = applyEditBlocks(wf.code, blocks);
+      // comme quand un Edit de Claude échoue : on montre au moteur ce qui n'a pas collé, il recale
+      for(let round=1; round<=2 && result.failed.length; round++){
+        status('🎯 ' + label + ' recale ' + result.failed.length + ' bloc' + (result.failed.length > 1 ? 's' : '') + ' (passe ' + round + ')…');
+        try{
+          const b2 = parseEditBlocks(await callAgent(key, EDIT_SYSTEM, buildRetryPrompt(result.code, result.failed, instruction)));
+          if(!b2.length) break;
+          const r2 = applyEditBlocks(result.code, b2);
+          result = { code: r2.code, applied: result.applied.concat(r2.applied), failed: r2.failed };
+        }catch(e){ if(/Génération arrêtée/.test(e.message || '')) throw e; break; }
+      }
+      if(!result.applied.length){
+        journal.push(label + ' : ' + result.failed.length + ' bloc(s) introuvable(s) dans le fichier');
+        lastErr = new Error('Aucune modification de ' + label + ' n\'a pu être placée dans le fichier.');
+        continue;
+      }
+      return { ...result, engineKey:key, notes };
+    }catch(err){
+      if(/Génération arrêtée/.test(err.message || '')) throw err;
+      journal.push(label + ' : ' + friendlyError(err));
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('Aucun moteur disponible pour éditer le fichier (clés manquantes ou moteurs en pause).');
+}
+
+function recentContext(c){
+  return c.messages.filter(m => m.text && !m.isError && m.text !== '…').slice(-7, -1)
+    .map(m => (m.role === 'user' ? 'Utilisateur : ' : 'IA : ') + m.text.replace(/```[\s\S]*?(```|$)/g, '[code]').slice(0, 400)).join('\n');
+}
+// les numéros de ligne changent après une modification : on les retire pour comparer les erreurs
+function normErr(e){ return String(e).replace(/\s*@[^\s@]*:\d+\s*$/, '').replace(/:\d+(:\d+)?/g, ''); }
+
+function editSummary(wf, nv, res, applied, testNote, journal){
+  const out = [];
+  const n = applied.length, s = n > 1 ? 's' : '';
+  out.push(res.rewritten
+    ? '✏️ **Fichier réécrit en entier** par le moteur : `' + nv.name + '` · v' + (wf.v || 1) + ' → v' + nv.v
+    : '✏️ **' + n + ' modification' + s + ' appliquée' + s + '** sur `' + nv.name + '` · v' + (wf.v || 1) + ' → v' + nv.v + ' — le reste du fichier est intact.');
+  if(res.notes) out.push(res.notes);
+  if(!res.rewritten && n) out.push(applied.slice(0, 15).map(a => '- ligne ' + a.line + ' : −' + a.removed + ' / +' + a.added + ' ligne' + (a.added > 1 ? 's' : '')).join('\n'));
+  const f = (res.failed || []).length;
+  if(f) out.push('⚠ ' + f + ' bloc' + (f > 1 ? 's' : '') + ' ignoré' + (f > 1 ? 's' : '') + ' : texte introuvable dans le fichier.');
+  if(testNote) out.push(testNote);
+  out.push('📦 ' + fmtSize(wf.code.length) + ' → ' + fmtSize(nv.code.length) + ' · ↶ dans la barre 🗂 pour annuler');
+  if(journal.length) out.push('_' + journal.join(' · ').replace(/[_*`]/g, '') + '_');
+  return out.join('\n\n');
+}
+
+async function runEditTurn(instruction, c, opts){
+  opts = opts || {};
+  pendingVersions = [];
+  currentSystemContext = getSystemContext(c);
+  const wf = c.lastArtifact;
+  c.fileTurn = true;
+  const b = pushMessage({ role:'bot', cat:'ÉDITION', tag:'ÉDITION CIBLÉE', tagClass:'engine-mistral', text:'…' });
+  const bm = c.messages[c.messages.length-1];
+  const think = startThinking(b, '📖 Lecture de ' + (wf.name || 'du fichier') + '…');
+  const journal = [];
+  try{
+    const res = await editFileWithEngines(wf, instruction, { plan: opts.plan, history: recentContext(c), onStatus: l => think.setLabel(l), journal });
+    let finalCode = res.code, applied = res.applied.slice(), testNote = '';
+    if(isHtmlFile(wf)){
+      think.setLabel('🧪 Test d\'exécution dans un bac à sable…');
+      const after = await runAndCollectErrors(finalCode, 6000);
+      if(after.length){
+        const before = (await runAndCollectErrors(wf.code, 6000)).map(normErr);
+        let fresh = after.filter(e => !before.includes(normErr(e)));
+        if(fresh.length){
+          think.setLabel('🔧 Correction de ' + fresh.length + ' nouvelle' + (fresh.length > 1 ? 's' : '') + ' erreur' + (fresh.length > 1 ? 's' : '') + '…');
+          try{
+            const fix = await editFileWithEngines({ ...wf, code: finalCode },
+              'Après les dernières modifications, le navigateur signale ces NOUVELLES erreurs :\n' + fresh.map(e => '• ' + e).join('\n') + '\nCorrige uniquement ces erreurs, sans rien changer d\'autre.',
+              { preferKey: res.engineKey, onStatus: l => think.setLabel(l), journal });
+            finalCode = fix.code;
+            if(!fix.rewritten) applied = applied.concat(fix.applied);
+            fresh = (await runAndCollectErrors(finalCode, 6000)).filter(e => !before.includes(normErr(e)));
+          }catch(e){ if(/Génération arrêtée/.test(e.message || '')) throw e; journal.push('réparation : ' + friendlyError(e)); }
+          testNote = fresh.length
+            ? '⚠ **Test d\'exécution** : ' + fresh.length + ' nouvelle' + (fresh.length > 1 ? 's' : '') + ' erreur' + (fresh.length > 1 ? 's' : '') + ' restante' + (fresh.length > 1 ? 's' : '') + ' — ' + fresh.slice(0, 3).join(' · ').replace(/[`*_]/g, "'")
+            : '✅ **Test d\'exécution** : nouvelles erreurs détectées puis corrigées.';
+        } else testNote = '✅ **Test d\'exécution** : aucune nouvelle erreur (' + after.length + ' déjà présente' + (after.length > 1 ? 's' : '') + ' avant la modification).';
+      } else testNote = '✅ **Test d\'exécution** : aucune erreur.';
+    }
+    think.stop();
+    const info = engineInfo(res.engineKey);
+    const nv = setWorkfile(c, finalCode, wf.lang, wf.name, info.tag);
+    bm.tag = 'ÉDITION · ' + info.tag; bm.tagClass = info.cls;
+    bm.text = editSummary(wf, nv, res, applied, testNote, journal);
+    bm.edits = res.rewritten ? [] : applied.map(a => ({ line:a.line, search:String(a.search).slice(0, 3000), replace:String(a.replace).slice(0, 3000) }));
+    bm.file = { name: nv.name, lang: nv.lang, code: nv.code, v: nv.v };
+  }catch(err){
+    think.stop();
+    bm.text = '⚠ Modification impossible — ' + friendlyError(err) + (journal.length ? '\n\n' + journal.map(j => '• ' + j).join('\n') : '') + '\n\nLe fichier de travail n\'a pas été modifié.';
+    bm.tagClass = 'err'; bm.isError = true;
+  }
+  renderMessages();
+  persistConvos();
+}
+
+// Mode Projet + fichier de travail : un agent lit le fichier et établit le plan, puis édition ciblée
+const PLAN_SYSTEM = "Tu es l'architecte technique d'une équipe. On te donne un fichier EXISTANT et une demande. Lis le fichier, comprends son organisation, puis établis un plan de modifications précis et minimal : une liste numérotée (3 à 12 points) de changements concrets, chacun disant OÙ (section, fonction, sélecteur CSS, id) et QUOI changer. On améliore l'existant en gardant ce qui marche : ne propose jamais de repartir de zéro ni de tout réécrire. Pas de code, pas de bloc ```.";
+async function runProjectEditPipeline(prompt, c){
+  currentSystemContext = getSystemContext(c);
+  const wf = c.lastArtifact;
+  const statusBubble = pushMessage({ role:'bot', cat:'PROJET', tag:'PIPELINE · ÉDITION', tagClass:'engine-mistral', text:'' });
+  const sm = c.messages[c.messages.length-1];
+  const card = document.createElement('div');
+  card.style.cssText = 'border:1px solid var(--line);border-radius:8px;padding:10px 12px;';
+  statusBubble.appendChild(card);
+  const steps = [
+    { id:'plan', label:'Lecture du fichier & plan des modifications', engine:'…', status:'pending' },
+    { id:'edit', label:'Édition ciblée + test d\'exécution', engine:'…', status:'pending' },
+  ];
+  renderProjectStatus(card, steps);
+  let plan = '';
+  try{
+    const view = fileViewFor(wf.code, prompt, 150000);
+    plan = String(await callAgentCascade('plan', PLAN_SYSTEM,
+      'Demande : ' + prompt + '\n\nFichier « ' + (wf.name || 'fichier') + ' » (v' + (wf.v || 1) + ')' + (view.full ? '' : ' — vue partielle') + ' :\n<<<FICHIER\n' + view.text + '\nFICHIER>>>\n\nRappel de la demande : ' + prompt,
+      steps[0], card, steps)).replace(/```[\w-]*/g, '').trim();
+  }catch(err){ /* l'erreur est déjà affichée dans la carte : on édite sans plan */ }
+  steps[1].status = 'running'; steps[1].engine = 'ci-dessous'; renderProjectStatus(card, steps);
+  sm.text = plan ? '🧭 **Plan des modifications** (' + steps[0].engine + ')\n\n' + plan : '🧭 Plan indisponible — édition directe à partir de la demande.';
+  persistConvos();
+  await runEditTurn(prompt, c, { plan });
+}
+
+function buildDiffView(edits){
+  const det = document.createElement('details');
+  det.style.cssText = 'margin:6px 0;border:1px solid var(--line);border-radius:8px;background:#0e1512;';
+  const sum = document.createElement('summary');
+  sum.style.cssText = 'cursor:pointer;padding:6px 10px;font-family:monospace;font-size:11px;color:var(--dim);';
+  sum.textContent = '± Voir les changements (' + edits.length + ')';
+  det.appendChild(sum);
+  const pre = document.createElement('div');
+  pre.style.cssText = 'padding:8px 10px;max-height:320px;overflow:auto;font-size:11.5px;font-family:monospace;white-space:pre;';
+  pre.innerHTML = edits.map(e =>
+    '<div style="color:var(--cyan);">@@ ligne ' + (e.line || '?') + ' @@</div>'
+    + String(e.search || '').split('\n').map(l => '<div style="color:#e8968a;background:#2a1414;">- ' + escapeHtml(l) + '</div>').join('')
+    + (e.replace ? String(e.replace).split('\n').map(l => '<div style="color:#9ad89a;background:#12261a;">+ ' + escapeHtml(l) + '</div>').join('') : '')
+  ).join('<div style="height:8px"></div>');
+  det.appendChild(pre);
+  return det;
 }
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -3243,7 +3748,15 @@ async function autoRepair(code, lang, originalRequest, maxRounds, onStep){
       + `Réponds uniquement avec le fichier COMPLET corrigé dans un seul bloc \`\`\`${lang||'html'}.\n\n`
       + '```' + (lang||'html') + '\n' + current + '\n```';
     let fixed = null;
-    for(const p of ['mistral-code','zai','openrouter-code','groq','gemini']){
+    // gros fichier : réparation par blocs ciblés, les moteurs ne peuvent pas le renvoyer en entier
+    if(current.length > 20000){
+      try{
+        const r = await editFileWithEngines({ code: current, lang: lang || 'html', name: 'fichier', v: 0 },
+          'Ce fichier plante à l\'exécution. Erreurs relevées dans le navigateur :\n' + errors.map(e => '• ' + e).join('\n') + '\nCorrige UNIQUEMENT ces erreurs, sans rien changer d\'autre. Demande d\'origine : ' + originalRequest);
+        if(r.code !== current) fixed = r.code;
+      }catch(e){ /* repli ci-dessous */ }
+    }
+    if(!fixed && current.length <= 60000) for(const p of ['mistral-code','zai','openrouter-code','groq','gemini']){
       const need = p === 'gemini' ? 'gemini' : (OA_PROVIDERS[p] ? (OA_PROVIDERS[p].key || p) : p);
       if(!hasKey(need) || providerBlockReason(need)) continue;
       try{
@@ -3372,10 +3885,24 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
   currentSystemContext = getSystemContext(c);
   const hasAttachment = !!pendingImage;
   const category = forceCategory || await classifySmart(classifyHint || text, hasAttachment);
-  if(category === 'code' && c.lastArtifact && !extractCodeBlock(text)){
-    text = `Fichier actuel à modifier (ta dernière version produite dans cette conversation) :\n\`\`\`${c.lastArtifact.lang||''}\n${c.lastArtifact.code}\n\`\`\`\n\nDemande : ${text}\n\n(Modifie ce fichier existant selon la demande — ne repars pas de zéro sauf si c'est explicitement demandé.)`;
+  const wf = c.lastArtifact;
+  let bigFileQuestion = false;
+  if(wf && wf.code && !pendingImage && ['chat','code','reasoning'].includes(category) && !extractCodeBlock(text)){
+    const instr = classifyHint || text;
+    const fresh = FRESH_RE.test(instr);
+    const refers = category === 'code' || FILE_REF_RE.test(instr);
+    // demande de modification : édition ciblée du fichier de travail, jamais une réécriture de zéro
+    if(!fresh && (refers || c.fileTurn) && wantsEdit(instr, category)){ c.fileJustAttached = false; await runEditTurn(instr, c); return; }
+    if(!fresh && (refers || c.fileJustAttached)){
+      // question sur le fichier : on le montre en entier, ou son plan + les passages utiles s'il est trop long
+      bigFileQuestion = wf.code.length > 60000;
+      const view = fileViewFor(wf.code, instr, bigFileQuestion ? 600000 : 60000);
+      text = `Fichier de travail « ${wf.name || 'fichier'} » (version ${wf.v || 1})${view.full ? '' : ' — vue partielle'} :\n<<<FICHIER\n${view.text}\nFICHIER>>>\n\nDemande de l'utilisateur à propos de ce fichier : ${text}`;
+      c.fileTurn = true;
+    } else c.fileTurn = false;
+    c.fileJustAttached = false;
   }
-  let route = ROUTES[category];
+  let route = (bigFileQuestion && !forcedEngine) ? ROUTES.reasoning : ROUTES[category];
   if(forcedEngine){
     if(forcedEngine.type === 'image' && category === 'image') route = [forcedEngine.key];
     else if(forcedEngine.type === 'text' && ['chat','code','reasoning'].includes(category)) route = [forcedEngine.key];
@@ -3568,11 +4095,11 @@ async function runRequest(text, pendingImage, targetC, classifyHint, forceCatego
           renderMessages();
           if(category === 'code'){
             const extracted = extractCodeBlock(reply);
-            if(extracted && extracted.code.trim().length >= 40){
-              c.lastArtifact = { code: extracted.code, lang: extracted.lang };
-              c.artifacts = c.artifacts || [];
-              c.artifacts.push({ code: extracted.code, lang: extracted.lang, ts: Date.now(), tag });
-              if(c.artifacts.length > 12) c.artifacts.shift();
+            const cur = c.lastArtifact;
+            // un vrai fichier (pas un exemple de 3 lignes) devient le fichier de travail
+            if(extracted && extracted.code.trim().length >= 200 && (!cur || extracted.code.length >= cur.code.length * 0.5)){
+              setWorkfile(c, extracted.code, extracted.lang, cur ? null : 'fichier.' + (EXT_MAP[extracted.lang] || 'txt'), tag);
+              c.fileTurn = true;
             }
           }
           done = true; break;
@@ -3737,6 +4264,7 @@ const PROJECT_ROLES = {
   content: [ { p:'groq', label:'GROQ' }, { p:'mistral', label:'MISTRAL' }, { p:'openrouter', label:'OPENROUTER' }, { p:'gemini', label:'GEMINI' }, { p:'claude', label:'CLAUDE' } ],
   design:  [ { p:'zai', label:'Z.AI GLM' }, { p:'openrouter', label:'OPENROUTER' }, { p:'groq', label:'GROQ' }, { p:'cerebras', label:'CEREBRAS' }, { p:'mistral', label:'MISTRAL' }, { p:'claude', label:'CLAUDE' } ],
   code:    [ { p:'mistral-code', label:'MISTRAL CODESTRAL' }, { p:'zai', label:'Z.AI GLM' }, { p:'openrouter-code', label:'OPENROUTER QWEN CODER' }, { p:'gemini', label:'GEMINI' }, { p:'claude', label:'CLAUDE' } ],
+  plan:    [ { p:'gemini', label:'GEMINI' }, { p:'mistral', label:'MISTRAL' }, { p:'openrouter', label:'OPENROUTER' }, { p:'zai', label:'Z.AI GLM' }, { p:'groq', label:'GROQ' }, { p:'claude', label:'CLAUDE' } ],
   finish:  [ { p:'claude', label:'CLAUDE' } ],
 };
 
@@ -3886,6 +4414,7 @@ async function runProjectPipeline(prompt, c){
       if(finisherOk){
         finalCode = await repairStage(finalCode, prompt, card, steps);
         pushMessage({ role:'bot', cat:'PROJET', tag:'RÉSULTAT FINAL', tagClass:'engine-claude', text: finalCode });
+        adoptAsWorkfile(c, finalCode);
         persistConvos();
         return;
       }
@@ -3910,6 +4439,7 @@ async function runProjectPipeline(prompt, c){
 
     finalCode = await repairStage(finalCode, prompt, card, steps);
     pushMessage({ role:'bot', cat:'PROJET', tag:'RÉSULTAT FINAL', tagClass:'engine-mistral', text: finalCode });
+    adoptAsWorkfile(c, finalCode);
   }catch(err){
     pushMessage({ role:'bot', tag:'ERREUR', tagClass:'err', text:'Le pipeline a échoué : '+friendlyError(err), isError:true });
   }
@@ -3929,7 +4459,15 @@ async function handleSend(){
   let text = rawText;
   let displayText = rawText;
   let forceCategory = null;
-  if(attachedFile){
+  if(attachedFile && !/\.pdf$/i.test(attachedFile.name)){
+    // Comme chez Claude : le fichier joint devient le fichier de travail de la conversation.
+    // Il n'est plus collé dans le message (où il se faisait tronquer) : chaque demande s'applique à lui.
+    const cw = getCurrent();
+    setWorkfile(cw, String(attachedFile.content).replace(/\r\n/g, '\n'), langOfName(attachedFile.name), attachedFile.name, 'joint');
+    cw.fileTurn = true; cw.fileJustAttached = true;
+    text = rawText || 'Analyse ce fichier : à quoi il sert, comment il est organisé, et ce qui pourrait être amélioré.';
+    displayText = (rawText ? rawText + '\n' : '') + '📄 ' + attachedFile.name + ' → fichier de travail';
+  } else if(attachedFile){
     text = `Fichier joint "${attachedFile.name}":\n\`\`\`\n${attachedFile.content}\n\`\`\`\n\n${rawText || 'Analyse ce fichier.'}`;
     displayText = (rawText ? rawText + '\n' : '') + '📄 ' + attachedFile.name;
     const approxTokens = Math.ceil(attachedFile.content.length / 4);
@@ -3938,7 +4476,9 @@ async function handleSend(){
       pushMessage({ role:'bot', tag:'INFO', tagClass:'', text:`📄 Fichier volumineux (~${approxTokens.toLocaleString('fr-FR')} tokens estimés) — seul Gemini (contexte 1M) peut le traiter, les autres moteurs seront ignorés pour cette demande.`, isError:true });
     }
   }
-  pushMessage({ role:'user', text:(displayText||'') + (pendingCodeScan ? (displayText?'\n':'')+'📷 Code à transcrire' : ''), fullText:text, imgSrc:userImgSrc });
+  const wfNow = getCurrent().lastArtifact;
+  pushMessage({ role:'user', text:(displayText||'') + (pendingCodeScan ? (displayText?'\n':'')+'📷 Code à transcrire' : ''), fullText:text, imgSrc:userImgSrc,
+    instruction: rawText, baseV: wfNow ? wfNow.v : undefined, baseName: wfNow ? wfNow.name : undefined });
   setBusy(true); currentTurnController = new AbortController();
 
   const pendingImage = attachedImage;
@@ -3949,7 +4489,10 @@ async function handleSend(){
   if(isCodeScan){
     await runCodeScan(rawText, pendingImage, getCurrent());
   } else if(projectMode){
-    await runProjectPipeline(rawText, getCurrent());
+    const cp = getCurrent();
+    // un fichier de travail existe : on l'améliore au lieu de repartir de zéro
+    if(cp.lastArtifact && cp.lastArtifact.code && !FRESH_RE.test(rawText)) await runProjectEditPipeline(rawText || 'Améliore ce fichier.', cp);
+    else await runProjectPipeline(rawText, cp);
   } else {
     await runRequest(text, pendingImage, undefined, rawText, forceCategory);
   }
@@ -3986,7 +4529,11 @@ async function regenerate(botIndex){
   c.messages.splice(botIndex, cut - botIndex);
   renderMessages();
   setBusy(true); currentTurnController = new AbortController();
-  await runRequest(text, pendingImage, c, userMsg.text);
+  if(userMsg.baseV){
+    const base = (c.artifacts || []).find(a => a.name === userMsg.baseName && a.v === userMsg.baseV);
+    if(base){ c.lastArtifact = base; c.fileTurn = true; renderWorkfileBar(); }
+  }
+  await runRequest(text, pendingImage, c, userMsg.instruction !== undefined ? (userMsg.instruction || text) : userMsg.text);
   setBusy(false);
 }
 
