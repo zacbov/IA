@@ -192,6 +192,14 @@
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; text-transform:none; letter-spacing:normal; cursor:pointer;">
         <input type="checkbox" id="genAIHorde" style="width:auto;"> AI Horde (gratuit, communautaire, NSFW natif)
       </label>
+      <div style="margin-left:22px;">
+        <div style="display:flex; gap:6px; margin-bottom:6px;">
+          <input type="text" id="hordeFilter" placeholder="Filtrer les modèles…" style="font-size:11px; padding:5px 8px; flex:1;">
+          <button type="button" id="hordeRefresh" style="font-size:11px; padding:5px 10px; width:auto;">↻ En ligne</button>
+        </div>
+        <div id="hordeChips" style="display:flex; flex-wrap:wrap; gap:6px; max-height:140px; overflow-y:auto;"></div>
+        <div id="hordeHint" style="font-size:10px; color:#888; margin-top:4px;"></div>
+      </div>
     </div>
   </div>
   <div>
@@ -275,6 +283,14 @@ let genHFSpace = false;
 let hfSpaceId = 'properfool/nsfwadult';
 let genPollination = false;
 let genAIHorde = false;
+const HORDE_DEFAULT_MODELS = [
+  'WAI-NSFW-illustrious-SDXL', 'Hassaku XL (Illustrious)', 'NoobAI XL', 'Pony Diffusion XL',
+  'AlbedoBase XL (SDXL)', 'Juggernaut XL', 'Deliberate', 'Anything Diffusion',
+  'Realistic Vision', 'Dreamshaper', "ICBINP - I Can't Believe It's Not Photography", 'Reliberate'
+];
+let hordeModels = ['WAI-NSFW-illustrious-SDXL'];   // modèles utilisés pour la génération
+let hordeFormSel = ['WAI-NSFW-illustrious-SDXL'];  // sélection en cours dans le formulaire
+let hordeCatalog = HORDE_DEFAULT_MODELS.map(name => ({ name, count: null }));
 let ttsEleven = true;   // comportement historique : ElevenLabs actif par défaut
 let ttsBrowser = false;
 let ttsVoiceName = '';
@@ -322,7 +338,8 @@ function readImageGeneratorsFromForm() {
     hfSpace: document.getElementById('genHFSpace').checked,
     hfSpaceId: document.getElementById('hfSpaceId').value.trim() || 'properfool/nsfwadult',
     pollination: document.getElementById('genPollination').checked,
-    aiHorde: document.getElementById('genAIHorde').checked
+    aiHorde: document.getElementById('genAIHorde').checked,
+    hordeModels: hordeFormSel.slice()
   };
 }
 
@@ -369,6 +386,8 @@ function fillFormFromProfile(name) {
   document.getElementById('hfSpaceId').value = igForm.hfSpaceId || 'properfool/nsfwadult';
   document.getElementById('genPollination').checked = !!igForm.pollination;
   document.getElementById('genAIHorde').checked = !!igForm.aiHorde;
+  hordeFormSel = Array.isArray(igForm.hordeModels) ? igForm.hordeModels.slice() : ['WAI-NSFW-illustrious-SDXL'];
+  renderHordeChips();
   const ttsForm = p.tts || {};
   document.getElementById('ttsEleven').checked = ttsForm.eleven !== false;
   document.getElementById('ttsBrowser').checked = !!ttsForm.browser;
@@ -446,6 +465,7 @@ function activateProfile(name, isSwitch) {
   hfSpaceId = ig.hfSpaceId || 'properfool/nsfwadult';
   genPollination = !!ig.pollination;
   genAIHorde = !!ig.aiHorde;
+  hordeModels = Array.isArray(ig.hordeModels) ? ig.hordeModels.slice() : ['WAI-NSFW-illustrious-SDXL'];
   const ttsCfg = p.tts || {};
   ttsEleven = ttsCfg.eleven !== false;
   ttsBrowser = !!ttsCfg.browser;
@@ -500,6 +520,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
     hfSpaceId = ig.hfSpaceId;
     genPollination = ig.pollination;
     genAIHorde = ig.aiHorde;
+    hordeModels = ig.hordeModels;
     const ttsCfg = readTtsFromForm();
     ttsEleven = ttsCfg.eleven;
     ttsBrowser = ttsCfg.browser;
@@ -1142,7 +1163,7 @@ function buildImagePrompt(botText, maxLen) {
     'masterpiece, best quality, highly detailed explicit erotic scene',
     physicalDescription,
     action,
-    'huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting'
+    'futanari, huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting'
   ].filter(Boolean);
   return parts.join(', ').slice(0, maxLen || 700);
 }
@@ -1153,7 +1174,7 @@ function buildPerchancePrompt(botText, maxLen) {
   const action = extractAction(botText).slice(0, 300);
   const tags = 'futanari, huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting';
   const prefix = 'A casual real-life photograph, ';
-  const suffix = ".(((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. All characters are over 19-years-old. It's a casual photo. Overall it's an actual real-life photograph. It's a casual photo. Overall it's an actual real-life photograph.";
+  const suffix = ". Overall, it's an absolute world-class cinematic masterpiece. It's an aesthetically pleasing cinematic shot with impeccable attention to detail and impressive composition.. It's a casual photo. Overall it's an actual real-life photograph.";
   // La scène du moment est prioritaire : si le budget manque, c'est la description du
   // personnage qu'on raccourcit, jamais la scène ni les tags de style.
   const budget = Math.max((maxLen || 900) - prefix.length - suffix.length - tags.length - 2, 0);
@@ -1294,7 +1315,7 @@ async function generateHFSpaceImage(botText) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-// ========== GÉNÉRATION D'IMAGE via Pollination (gratuit, sans compte, sans clé) ==========
+// ========== GÉNÉRATION D'IMAGE via Pollination (clé POLLI_KEY via le Worker, repli anonyme) ==========
 // Juste une image à charger depuis une URL — pas de popup, pas d'étape en deux temps,
 // pas de vérification anti-bot. Le point le plus simple et le plus fiable des trois.
 function generatePollinationImage(botText) {
@@ -1304,11 +1325,7 @@ function generatePollinationImage(botText) {
   messagesEl.appendChild(loadingDiv);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
-  try {
-    const prompt = buildImagePrompt(botText, 700);
-    const seed = Math.floor(Math.random() * 1000000);
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=512&model=flux&seed=${seed}&nologo=true`;
-
+  const showImage = (src, blobUrl) => {
     const img = new Image();
     img.onload = () => {
       loadingDiv.remove();
@@ -1330,16 +1347,41 @@ function generatePollinationImage(botText) {
       messagesEl.appendChild(errDiv);
       messagesEl.scrollTop = messagesEl.scrollHeight;
     };
-    img.src = url;
-  } catch (err) {
-    loadingDiv.remove();
-    console.error('Erreur Pollination:', err);
-    const errDiv = document.createElement('div');
-    errDiv.className = 'msg image-loading';
-    errDiv.textContent = '❌ Pollination : ' + (err.message || 'génération échouée');
-    messagesEl.appendChild(errDiv);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-  }
+    img.src = src;
+  };
+
+  (async () => {
+    try {
+      const prompt = buildImagePrompt(botText, 700);
+      const seed = Math.floor(Math.random() * 1000000);
+      // 1) Via le Worker : la clé POLLI_KEY reste côté serveur
+      try {
+        const res = await fetch(WORKER_BASE + 'pollinations-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+          body: JSON.stringify({ prompt, width: 768, height: 512, model: 'flux', seed })
+        });
+        if (res.ok) {
+          const blob = await res.blob();
+          if (blob.type.startsWith('image/')) { showImage(URL.createObjectURL(blob)); return; }
+        } else {
+          console.warn('Pollination via Worker : HTTP ' + res.status + ', repli sur l\'accès anonyme');
+        }
+      } catch (e) {
+        console.warn('Pollination via Worker indisponible, repli anonyme :', e);
+      }
+      // 2) Repli : accès anonyme direct, comme avant
+      showImage(`https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=512&model=flux&seed=${seed}&nologo=true`);
+    } catch (err) {
+      loadingDiv.remove();
+      console.error('Erreur Pollination:', err);
+      const errDiv = document.createElement('div');
+      errDiv.className = 'msg image-loading';
+      errDiv.textContent = '❌ Pollination : ' + (err.message || 'génération échouée');
+      messagesEl.appendChild(errDiv);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  })();
 }
 
 // ========== GÉNÉRATION D'IMAGE via AI Horde (gratuit, communautaire, NSFW natif) ==========
@@ -1349,7 +1391,59 @@ function generatePollinationImage(botText) {
 // Passe par le Worker (/proxy/horde/...) plutôt que d'appeler aihorde.net directement
 // depuis le navigateur, pour éviter tout souci de CORS et utiliser la vraie clé AIHORDE_KEY
 // côté serveur (meilleure priorité dans la file que la clé anonyme).
-async function callAIHorde(prompt) {
+function renderHordeChips() {
+  const box = document.getElementById('hordeChips');
+  if (!box) return;
+  const q = (document.getElementById('hordeFilter').value || '').toLowerCase();
+  const names = new Map(hordeCatalog.map(m => [m.name, m.count]));
+  hordeFormSel.forEach(n => { if (!names.has(n)) names.set(n, null); });
+  const items = [...names.entries()]
+    .filter(([n]) => hordeFormSel.includes(n) || n.toLowerCase().includes(q))
+    .slice(0, 80);
+  box.innerHTML = '';
+  items.forEach(([name, count]) => {
+    const on = hordeFormSel.includes(name);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = name + (count != null ? ' (' + count + ')' : '');
+    b.style.cssText = 'width:auto; font-size:11px; padding:4px 10px; border-radius:14px; cursor:pointer; border:1px solid ' +
+      (on ? '#6c5ce7' : '#444') + '; background:' + (on ? '#6c5ce7' : 'transparent') + '; color:' + (on ? '#fff' : '#ccc') + ';' +
+      (count === 0 ? ' opacity:.5;' : '');
+    b.onclick = () => {
+      hordeFormSel = on ? hordeFormSel.filter(n => n !== name) : hordeFormSel.concat(name);
+      renderHordeChips();
+    };
+    box.appendChild(b);
+  });
+  document.getElementById('hordeHint').textContent = hordeFormSel.length
+    ? hordeFormSel.length + ' sélectionné(s) — le premier worker libre qui en propose un prend la tâche. Le nombre entre parenthèses = workers en ligne.'
+    : 'Aucun modèle choisi : Horde prendra n\'importe quel modèle disponible (peut ne pas être NSFW).';
+}
+
+async function refreshHordeModels() {
+  const hint = document.getElementById('hordeHint');
+  hint.textContent = 'Chargement des modèles en ligne…';
+  try {
+    const res = await fetch(WORKER_BASE + 'horde/status/models?type=image&min_count=1', {
+      headers: { 'X-App-Secret': password }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const list = await res.json();
+    if (!Array.isArray(list) || !list.length) throw new Error('liste vide');
+    hordeCatalog = list
+      .map(m => ({ name: m.name, count: m.count || 0 }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    renderHordeChips();
+  } catch (e) {
+    console.warn('Catalogue Horde :', e);
+    hint.textContent = '⚠️ Liste en ligne indisponible (' + e.message + '), liste par défaut affichée.';
+  }
+}
+document.getElementById('hordeFilter').addEventListener('input', renderHordeChips);
+document.getElementById('hordeRefresh').addEventListener('click', refreshHordeModels);
+renderHordeChips();
+
+async function callAIHorde(prompt, onProgress) {
   const submitRes = await fetch(WORKER_BASE + 'horde/generate/async', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
@@ -1359,7 +1453,7 @@ async function callAIHorde(prompt) {
       censor_nsfw: false,
       // Modèle explicitement orienté NSFW : un worker générique peut appliquer son propre
       // filtre local même avec nsfw:true, mieux vaut cibler un worker qui ne censure pas.
-      models: ['WAI-NSFW-illustrious-SDXL'],
+      ...(hordeModels && hordeModels.length ? { models: hordeModels } : {}),
       params: {
         width: 768,
         height: 512,
@@ -1374,7 +1468,7 @@ async function callAIHorde(prompt) {
   const { id } = await submitRes.json();
   if (!id) throw new Error('Pas d\'id de génération reçu');
 
-  const deadline = Date.now() + 90000; // la file bénévole peut être plus lente qu'un service dédié
+  const deadline = Date.now() + 150000; // la file bénévole peut être plus lente qu'un service dédié
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 4000));
     const checkRes = await fetch(WORKER_BASE + 'horde/generate/check/' + id, {
@@ -1383,6 +1477,8 @@ async function callAIHorde(prompt) {
     if (!checkRes.ok) continue;
     const checkData = await checkRes.json();
     if (checkData.faulted) throw new Error('génération en échec côté Horde');
+    if (checkData.is_possible === false) throw new Error('aucun worker en ligne pour ce(s) modèle(s) : choisis-en un avec des workers (bouton ↻ En ligne)');
+    if (onProgress && !checkData.done) onProgress(checkData);
     if (checkData.done) {
       const statusRes = await fetch(WORKER_BASE + 'horde/generate/status/' + id, {
         headers: { 'X-App-Secret': password }
@@ -1406,7 +1502,11 @@ async function generateAIHordeImage(botText) {
 
   try {
     const prompt = buildImagePrompt(botText, 700);
-    const imgUrl = await callAIHorde(prompt);
+    const imgUrl = await callAIHorde(prompt, (c) => {
+      loadingDiv.textContent = '🎨 AI Horde : ' +
+        (c.processing ? 'en cours' : (c.queue_position != null ? 'file ' + c.queue_position : 'en attente')) +
+        (c.wait_time ? ' — ~' + c.wait_time + ' s' : '') + '...';
+    });
     loadingDiv.remove();
     const imgDiv = document.createElement('div');
     imgDiv.className = 'msg bot';
