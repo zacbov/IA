@@ -276,6 +276,69 @@ const ELEVEN_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 let provider = 'groq';
 let model = '';
 let password = '';
+let mediaUnlocked = false;   // vidéos et sons : débloqués seulement si le mot de passe du Worker est accepté
+let verifySeq = 0;
+
+function showMediaToast(msg) {
+  let t = document.getElementById('mediaToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'mediaToast';
+    t.style.cssText = 'position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:#2a1414; color:#f0b4b4; border:1px solid #5a2a2a; padding:8px 14px; border-radius:8px; font-size:12px; z-index:9999; transition:opacity .3s;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._h);
+  t._h = setTimeout(() => { t.style.opacity = '0'; }, 3500);
+}
+
+function requireMedia() {
+  if (mediaUnlocked) return true;
+  showMediaToast('🔒 Médias bloqués : mot de passe du Worker non validé');
+  return false;
+}
+
+// Coupe tout ce qui joue et vide le fond vidéo
+function lockMedia() {
+  mediaUnlocked = false;
+  try {
+    Object.keys(activeLoops).forEach(id => {
+      const l = activeLoops[id];
+      if (l.timer) clearInterval(l.timer);
+      if (l.audio) { l.audio.pause(); l.audio.currentTime = 0; }
+      delete activeLoops[id];
+    });
+    if (moanState) {
+      clearTimeout(moanState.timer);
+      moanState.baseAudio.pause();
+      moanState = null;
+    }
+    document.querySelectorAll('#loopButtons button').forEach(b => {
+      b.style.background = '#1a2a22'; b.style.color = '#e8e8e4'; b.style.borderColor = '#2a3d33';
+    });
+    document.querySelectorAll('#messages audio, .msg audio').forEach(a => a.pause());
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  } catch (e) { console.warn('lockMedia :', e); }
+  const bg = document.getElementById('bgMedia');
+  if (bg) bg.innerHTML = '';
+}
+
+// Le Worker répond 401 si le secret est faux, 404 (route inconnue) s'il est bon
+async function verifyWorkerPassword() {
+  const seq = ++verifySeq;
+  const pw = password;
+  if (!pw) { lockMedia(); return false; }
+  let ok = false;
+  try {
+    const res = await fetch(WORKER_BASE + 'ping', { headers: { 'X-App-Secret': pw } });
+    ok = res.status !== 401 && res.status !== 403 && res.status < 500;
+  } catch (e) { ok = false; }
+  if (seq !== verifySeq) return ok;          // un contrôle plus récent a pris le relais
+  if (ok) { mediaUnlocked = true; playRandomBackground(); }
+  else lockMedia();
+  return ok;
+}
 let systemPrompt = '';
 let physicalDescription = '';
 let genPerchance = true;
@@ -457,6 +520,8 @@ function activateProfile(name, isSwitch) {
   provider = p.provider || 'groq';
   model = p.model || '';
   password = p.password || '';
+  mediaUnlocked = false;
+  verifyWorkerPassword();
   systemPrompt = p.systemPrompt || '';
   physicalDescription = p.physicalDescription || '';
   const ig = p.imageGenerators || {};
@@ -512,6 +577,8 @@ document.getElementById('startBtn').addEventListener('click', () => {
     provider = document.getElementById('provider').value;
     model = mdl;
     password = pw;
+    mediaUnlocked = false;
+    verifyWorkerPassword();
     systemPrompt = document.getElementById('systemPrompt').value.trim();
     physicalDescription = document.getElementById('physicalDescription').value.trim();
     const ig = readImageGeneratorsFromForm();
@@ -634,6 +701,7 @@ const BG_CHANGE_EVERY = 25;
 function playRandomBackground() {
   const container = document.getElementById("bgMedia");
   if (!container || BG_MEDIA.length === 0) return;
+  if (!mediaUnlocked) { container.innerHTML = ""; return; }
 
   container.innerHTML = "";
 
@@ -675,6 +743,7 @@ function extractSpeakableTexts(botText) {
 }
 
 async function speakWithEleven(text) {
+  if (!mediaUnlocked) return;
   try {
     const response = await fetch(WORKER_BASE + "eleven-tts", {
       method: "POST",
@@ -740,6 +809,7 @@ if ('speechSynthesis' in window) {
 }
 
 function speakWithBrowser(text) {
+  if (!mediaUnlocked) return;
   try {
     if (!('speechSynthesis' in window)) {
       console.error("Voix du navigateur non supportée");
@@ -868,6 +938,8 @@ function createLoopButton(sound) {
       return;
     }
 
+    if (!requireMedia()) return;
+
     if (!sound.src) {
       alert("Aucun fichier audio défini");
       return;
@@ -931,6 +1003,8 @@ function createMoanButton() {
       return;
     }
 
+    if (!requireMedia()) return;
+
     const baseAudio = new Audio(MOAN_CONFIG.base);
     baseAudio.loop = true;
     baseAudio.volume = 0.65 * masterVolume;
@@ -939,6 +1013,7 @@ function createMoanButton() {
     const scheduleNext = () => {
       const delay = randomBetween(MOAN_CONFIG.minInterval, MOAN_CONFIG.maxInterval) * 1000;
       moanState.timer = setTimeout(() => {
+        if (!mediaUnlocked || !moanState) return;
         const randomSrc = MOAN_CONFIG.interruptions[
           Math.floor(Math.random() * MOAN_CONFIG.interruptions.length)
         ];
