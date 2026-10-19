@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -1069,11 +1068,70 @@ function getHFSpaceBase() {
   return `https://${slug}.hf.space/gradio_api/call/generate_image`;
 }
 
+// ----- Description de la scène pour les générateurs d'image -----
+// Les modèles d'image comprennent surtout l'anglais : on demande donc au modèle texte du chat
+// de résumer la scène (pose, action, cadrage, expression, tenue) en anglais, une fois par
+// message, puis tous les générateurs réutilisent ce résumé. Si l'appel échoue, on retombe
+// sur l'extraction simple de extractAction().
+const sceneCache = new Map();
+const SCENE_SYSTEM_PROMPT = "You write prompts for an image generator. Read the roleplay exchange and describe only what is visually happening right now: pose and body positions, the physical action, camera angle, facial expression, clothing state and setting. Write it in English as one line of concise comma-separated visual phrases, 45 words maximum. Do not describe the character's fixed appearance (hair, eyes, body type). No dialogue, no names, no explanations, no quotation marks.";
+
+function cleanSceneText(raw) {
+  let s = String(raw || '');
+  // Modèle "réflexion" coupé en plein raisonnement : inutilisable.
+  if (/<think>/i.test(s) && !/<\/think>/i.test(s)) return '';
+  s = s.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/["“”«»*]/g, '').replace(/\s+/g, ' ').trim();
+  if (/^(i['’]?m sorry|i am sorry|i can(not|['’]?t)|sorry|je ne peux|désolé)/i.test(s)) return '';
+  return s.slice(0, 300);
+}
+
+async function prepareScene(botText, userText) {
+  if (sceneCache.has(botText)) return;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const context = (userText && userText !== '__init__')
+      ? 'Previous message from the user: ' + userText.slice(0, 300) + '\n\n'
+      : '';
+    const res = await fetch(WORKER_BASE + provider, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: SCENE_SYSTEM_PROMPT },
+          { role: 'user', content: context + 'Character message:\n' + botText.slice(0, 1500) }
+        ],
+        stream: false,
+        temperature: 0.3,
+        max_tokens: 150
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const scene = cleanSceneText(data?.choices?.[0]?.message?.content);
+    if (scene) {
+      sceneCache.set(botText, scene);
+      if (sceneCache.size > 30) sceneCache.delete(sceneCache.keys().next().value);
+    }
+  } catch (err) {
+    console.error('Résumé de scène indisponible, repli sur l\'extraction simple :', err);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function extractAction(botText) {
-  const actions = [...botText.matchAll(/\*([^*]+)\*/g)].map(m => m[1].trim()).filter(Boolean);
-  if (actions.length) return actions.join(', ');
-  // Pas d'action entre astérisques dans ce message : on retombe sur un extrait court du texte.
-  return botText.replace(/"/g, '').slice(0, 150).trim();
+  const cached = sceneCache.get(botText);
+  if (cached) return cached;
+  const actions = [...botText.matchAll(/\*([^*]+)\*/g)]
+    .map(m => m[1].trim().replace(/[.!?…]+$/, ''))
+    .filter(Boolean);
+  if (actions.length) return actions.join(', ').slice(0, 300);
+  // Pas d'action entre astérisques : on retire les dialogues (non visuels) avant de couper.
+  const narration = botText.replace(/"[^"]*"/g, '').replace(/\s+/g, ' ').trim();
+  return (narration || botText).slice(0, 200).trim();
 }
 
 // Prompt partagé par les trois générateurs : description physique du personnage (profil)
@@ -1084,7 +1142,7 @@ function buildImagePrompt(botText, maxLen) {
     'masterpiece, best quality, highly detailed explicit erotic scene',
     physicalDescription,
     action,
-    'futanari, huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting'
+    'huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting'
   ].filter(Boolean);
   return parts.join(', ').slice(0, maxLen || 700);
 }
@@ -1092,20 +1150,36 @@ function buildImagePrompt(botText, maxLen) {
 // Perchance répond mieux à ce cadrage précis (constaté à l'usage) : la phrase d'ouverture
 // et la phrase de clôture ne sont jamais tronquées, seul le contenu variable l'est si besoin.
 function buildPerchancePrompt(botText, maxLen) {
-  const action = extractAction(botText);
-  const core = [physicalDescription, action, 'futanari, huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting']
-    .filter(Boolean)
-    .join(', ');
+  const action = extractAction(botText).slice(0, 300);
+  const tags = 'futanari, huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting';
   const prefix = 'A casual real-life photograph, ';
-  const suffix = ". (((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. All characters are over 19-years-old. It's a casual photo. Overall it's an actual real-life photograph. It's a casual photo. Overall it's an actual real-life photograph.";
-  const budget = Math.max((maxLen || 1900) - prefix.length - suffix.length, 0);
-  return prefix + core.slice(0, budget) + suffix;
+  const suffix = ".(((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. All characters are over 19-years-old. It's a casual photo. Overall it's an actual real-life photograph. It's a casual photo. Overall it's an actual real-life photograph.";
+  // La scène du moment est prioritaire : si le budget manque, c'est la description du
+  // personnage qu'on raccourcit, jamais la scène ni les tags de style.
+  const budget = Math.max((maxLen || 900) - prefix.length - suffix.length - tags.length - 2, 0);
+  const descPart = physicalDescription.slice(0, Math.max(budget - action.length - 2, 0));
+  const variable = [descPart, action].filter(Boolean).join(', ');
+  return prefix + (variable ? variable + ', ' : '') + tags + suffix;
 }
 
 // Isole chaque appel de générateur : une erreur synchrone dans l'un ne peut plus jamais
 // empêcher les suivants de se déclencher (c'est ce qui s'est passé avec Pollination).
 function safeTrigger(fn) {
   try { fn(); } catch (err) { console.error('Erreur déclenchement générateur:', err); }
+}
+
+// Prépare une seule fois le résumé de scène (si au moins un générateur est actif), puis lance
+// tous les générateurs cochés. Appelée sans await : elle ne retarde pas le bouton Envoyer.
+async function launchImageGenerators(text, userText, popup, closePopup) {
+  if (!(genPerchance || genHFSpace || genPollination || genAIHorde)) {
+    closePopup();
+    return;
+  }
+  await prepareScene(text, userText);
+  if (genPerchance) safeTrigger(() => generateNSFWImage(text, popup)); else closePopup();
+  if (genHFSpace) safeTrigger(() => generateHFSpaceImage(text));
+  if (genPollination) safeTrigger(() => generatePollinationImage(text));
+  if (genAIHorde) safeTrigger(() => generateAIHordeImage(text));
 }
 
 async function callHFSpace(dataArray, timeoutMs) {
@@ -1402,10 +1476,7 @@ async function sendToWorker(userText, userTs) {
       finalizeHistory(userText, botText, isInit, userTs);
       if (botText.length > 20) {
         speakQuotedText(botText);
-        if (genPerchance) safeTrigger(() => generateNSFWImage(botText, imagePopup)); else closeUnusedPopup();
-        if (genHFSpace) safeTrigger(() => generateHFSpaceImage(botText));
-        if (genPollination) safeTrigger(() => generatePollinationImage(botText));
-        if (genAIHorde) safeTrigger(() => generateAIHordeImage(botText));
+        launchImageGenerators(botText, userText, imagePopup, closeUnusedPopup);
       } else {
         closeUnusedPopup();
       }
@@ -1449,10 +1520,7 @@ async function sendToWorker(userText, userTs) {
 
     if (fullText && fullText.length > 20) {
       speakQuotedText(fullText);
-      if (genPerchance) safeTrigger(() => generateNSFWImage(fullText, imagePopup)); else closeUnusedPopup();
-      if (genHFSpace) safeTrigger(() => generateHFSpaceImage(fullText));
-      if (genPollination) safeTrigger(() => generatePollinationImage(fullText));
-      if (genAIHorde) safeTrigger(() => generateAIHordeImage(fullText));
+      launchImageGenerators(fullText, userText, imagePopup, closeUnusedPopup);
     } else {
       closeUnusedPopup();
     }
