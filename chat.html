@@ -867,7 +867,7 @@ const LOOP_SOUNDS = [
 ];
 
 const MOAN_CONFIG = {
-  base: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Young_female_Bubbly__4.mp3",
+  base: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/moan-long.mp3",
   interruptions: [
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/defonce.mp3",
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/suce.mp3",
@@ -877,7 +877,6 @@ const MOAN_CONFIG = {
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/baisemoi.mp3",
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/enculemoi.mp3",
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/han-continue.mp3",
-    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/moan-long.mp3",
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/defoncemoi.mp3",
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/oui-top2.mp3",
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/puai-encore2.mp3",
@@ -1249,7 +1248,7 @@ function buildPerchancePrompt(botText, maxLen) {
   const action = extractAction(botText).slice(0, 300);
   const tags = 'detailed anatomy, cinematic lighting';
   const prefix = 'A casual real-life photograph, ';
-  const suffix = ". (((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens";
+  const suffix = ". (((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. It's a casual photo. Overall it's an actual real-life photograph";
   // La scène du moment est prioritaire : si le budget manque, c'est la description du
   // personnage qu'on raccourcit, jamais la scène ni les tags de style.
   const budget = Math.max((maxLen || 900) - prefix.length - suffix.length - tags.length - 2, 0);
