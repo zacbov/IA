@@ -110,6 +110,10 @@
     border-radius: 10px; padding: 11px 12px; font-size: 15px; font-family: inherit; max-height: 100px;
   }
   #send { background: #e0a34a; border: none; color: #1a1208; font-weight: 700; width: 46px; border-radius: 10px; font-size: 18px; cursor: pointer; flex-shrink: 0; }
+  #mic { background: #1a2a22; border: 1px solid #2a3d33; color: #e8e8e4; width: 46px; border-radius: 10px; font-size: 18px; cursor: pointer; flex-shrink: 0; }
+  #mic.rec { background: #8a2a2a; border-color: #c44; animation: micPulse 1s infinite; }
+  #mic:disabled { opacity: .5; }
+  @keyframes micPulse { 50% { box-shadow: 0 0 0 4px rgba(204,68,68,.35); } }
   #send:disabled { background: #3a3a34; color: #777; }
   .typing { align-self: flex-start; color: #777; font-size: 13px; font-style: italic; padding: 4px 4px; }
 </style>
@@ -192,8 +196,65 @@
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; text-transform:none; letter-spacing:normal; cursor:pointer;">
         <input type="checkbox" id="genAIHorde" style="width:auto;"> AI Horde (gratuit, communautaire, NSFW natif)
       </label>
-      <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; text-transform:none; letter-spacing:normal; cursor:pointer;">
-        <input type="checkbox" id="genVenice" style="width:auto;"> Venice AI
+      <div style="margin-left:22px;">
+        <div style="display:flex; gap:6px; margin-bottom:6px;">
+          <input type="text" id="hordeFilter" placeholder="Filtrer les modèles…" style="font-size:11px; padding:5px 8px; flex:1;">
+          <button type="button" id="hordeRefresh" style="font-size:11px; padding:5px 10px; width:auto;">↻ En ligne</button>
+        </div>
+        <div id="hordeChips" style="display:flex; flex-wrap:wrap; gap:6px; max-height:140px; overflow-y:auto;"></div>
+        <div id="hordeHint" style="font-size:10px; color:#888; margin-top:4px;"></div>
+        <details style="margin-top:8px;">
+          <summary style="font-size:11px; color:#aaa; cursor:pointer;">⚙️ Réglages avancés AI Horde</summary>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; margin-top:8px; font-size:11px; color:#aaa;">
+            <label>Taille
+              <select id="hAdvSize" style="width:100%; font-size:11px;">
+                <option value="512x512">512 × 512 (SD 1.5)</option>
+                <option value="768x512">768 × 512 paysage</option>
+                <option value="512x768">512 × 768 portrait</option>
+                <option value="1024x1024">1024 × 1024 (SDXL)</option>
+                <option value="832x1216">832 × 1216 portrait (SDXL)</option>
+                <option value="1216x832">1216 × 832 paysage (SDXL)</option>
+              </select>
+            </label>
+            <label>Sampler
+              <select id="hAdvSampler" style="width:100%; font-size:11px;">
+                <option value="k_euler_a">k_euler_a</option>
+                <option value="k_euler">k_euler</option>
+                <option value="k_dpmpp_2m">k_dpmpp_2m</option>
+                <option value="k_dpmpp_sde">k_dpmpp_sde</option>
+                <option value="k_dpmpp_2s_a">k_dpmpp_2s_a</option>
+                <option value="k_heun">k_heun</option>
+                <option value="DDIM">DDIM</option>
+              </select>
+            </label>
+            <label>Étapes (steps)
+              <input type="number" id="hAdvSteps" min="1" max="100" step="1" style="width:100%; font-size:11px;">
+            </label>
+            <label>CFG (fidélité au prompt)
+              <input type="number" id="hAdvCfg" min="1" max="30" step="0.5" style="width:100%; font-size:11px;">
+            </label>
+            <label>Clip skip
+              <input type="number" id="hAdvClip" min="1" max="12" step="1" style="width:100%; font-size:11px;">
+            </label>
+            <label>Seed (vide = aléatoire)
+              <input type="number" id="hAdvSeed" step="1" style="width:100%; font-size:11px;">
+            </label>
+            <label style="grid-column:1/3;">Prompt négatif
+              <textarea id="hAdvNeg" rows="2" style="width:100%; font-size:11px;" placeholder="lowres, bad anatomy, extra fingers, watermark, text…"></textarea>
+            </label>
+            <label><input type="checkbox" id="hAdvKarras"> Karras</label>
+            <label><input type="checkbox" id="hAdvSlow"> Workers lents autorisés</label>
+            <label><input type="checkbox" id="hAdvTrusted"> Workers de confiance seulement</label>
+            <button type="button" id="hAdvReset" style="font-size:11px; padding:5px 10px; width:auto;">Réinitialiser</button>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center; margin-top:8px;">
+            <button type="button" id="hordeCheckKey" style="font-size:11px; padding:5px 10px; width:auto;">🔑 Vérifier la clé Horde du Worker</button>
+            <span id="hordeKeyInfo" style="font-size:10px; color:#888;"></span>
+          </div>
+        </details>
+      </div>
+      <label style="display:flex; gap:8px; align-items:center; font-size:12px; margin-top:10px;">
+        <input type="checkbox" id="genTranslate" style="width:auto;"> 🌐 Traduire en anglais la description physique et la scène (si elles sont en français)
       </label>
     </div>
   </div>
@@ -206,6 +267,9 @@
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; text-transform:none; letter-spacing:normal; cursor:pointer;">
         <input type="checkbox" id="ttsBrowser" style="width:auto;"> Voix du navigateur (gratuit, local)
       </label>
+      <select id="ttsVoiceSelect" style="margin-left:22px; font-size:11px; padding:5px 8px;">
+        <option value="">Automatique (meilleure voix dispo)</option>
+      </select>
     </div>
   </div>
 
@@ -255,6 +319,7 @@
 
 <div id="inputbar" class="hidden">
   <textarea id="input" rows="1" placeholder="Écris ton message..."></textarea>
+  <button id="mic" type="button" title="Dictée vocale (clique pour démarrer / arrêter)">🎤</button>
   <button id="send">➤</button>
 </div>
 
@@ -268,6 +333,69 @@ const ELEVEN_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 let provider = 'groq';
 let model = '';
 let password = '';
+let mediaUnlocked = false;   // vidéos et sons : débloqués seulement si le mot de passe du Worker est accepté
+let verifySeq = 0;
+
+function showMediaToast(msg) {
+  let t = document.getElementById('mediaToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'mediaToast';
+    t.style.cssText = 'position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:#2a1414; color:#f0b4b4; border:1px solid #5a2a2a; padding:8px 14px; border-radius:8px; font-size:12px; z-index:9999; transition:opacity .3s;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._h);
+  t._h = setTimeout(() => { t.style.opacity = '0'; }, 3500);
+}
+
+function requireMedia() {
+  if (mediaUnlocked) return true;
+  showMediaToast('🔒 Médias bloqués : mot de passe du Worker non validé');
+  return false;
+}
+
+// Coupe tout ce qui joue et vide le fond vidéo
+function lockMedia() {
+  mediaUnlocked = false;
+  try {
+    Object.keys(activeLoops).forEach(id => {
+      const l = activeLoops[id];
+      if (l.timer) clearInterval(l.timer);
+      if (l.audio) { l.audio.pause(); l.audio.currentTime = 0; }
+      delete activeLoops[id];
+    });
+    if (moanState) {
+      clearTimeout(moanState.timer);
+      moanState.baseAudio.pause();
+      moanState = null;
+    }
+    document.querySelectorAll('#loopButtons button').forEach(b => {
+      b.style.background = '#1a2a22'; b.style.color = '#e8e8e4'; b.style.borderColor = '#2a3d33';
+    });
+    document.querySelectorAll('#messages audio, .msg audio').forEach(a => a.pause());
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  } catch (e) { console.warn('lockMedia :', e); }
+  const bg = document.getElementById('bgMedia');
+  if (bg) bg.innerHTML = '';
+}
+
+// Le Worker répond 401 si le secret est faux, 404 (route inconnue) s'il est bon
+async function verifyWorkerPassword() {
+  const seq = ++verifySeq;
+  const pw = password;
+  if (!pw) { lockMedia(); return false; }
+  let ok = false;
+  try {
+    const res = await fetch(WORKER_BASE + 'ping', { headers: { 'X-App-Secret': pw } });
+    ok = res.status !== 401 && res.status !== 403 && res.status < 500;
+  } catch (e) { ok = false; }
+  if (seq !== verifySeq) return ok;          // un contrôle plus récent a pris le relais
+  if (ok) { mediaUnlocked = true; playRandomBackground(); }
+  else lockMedia();
+  return ok;
+}
 let systemPrompt = '';
 let physicalDescription = '';
 let genPerchance = true;
@@ -275,9 +403,23 @@ let genHFSpace = false;
 let hfSpaceId = 'properfool/nsfwadult';
 let genPollination = false;
 let genAIHorde = false;
-let genVenice = false;
+let translatePrompts = true;   // traduction FR → EN des éléments du prompt d'image
+const HORDE_DEFAULT_MODELS = [
+  'WAI-NSFW-illustrious-SDXL', 'Hassaku XL (Illustrious)', 'NoobAI XL', 'Pony Diffusion XL',
+  'AlbedoBase XL (SDXL)', 'Juggernaut XL', 'Deliberate', 'Anything Diffusion',
+  'Realistic Vision', 'Dreamshaper', "ICBINP - I Can't Believe It's Not Photography", 'Reliberate'
+];
+let hordeModels = ['WAI-NSFW-illustrious-SDXL'];   // modèles utilisés pour la génération
+let hordeFormSel = ['WAI-NSFW-illustrious-SDXL'];  // sélection en cours dans le formulaire
+const HORDE_ADV_DEFAULT = {
+  size: '768x512', steps: 25, cfg: 7, sampler: 'k_euler_a', clipSkip: 1, seed: '',
+  negative: '', karras: true, slow: true, trusted: false
+};
+let hordeAdv = { ...HORDE_ADV_DEFAULT };
+let hordeCatalog = HORDE_DEFAULT_MODELS.map(name => ({ name, count: null }));
 let ttsEleven = true;   // comportement historique : ElevenLabs actif par défaut
 let ttsBrowser = false;
+let ttsVoiceName = '';
 let profileName = '';
 let sampling = {};
 let history = [];
@@ -316,6 +458,39 @@ function writeSamplingToForm(s) {
   document.getElementById('p_max_tokens').value = s.max_tokens ?? 800;
 }
 
+function readHordeAdvFromForm() {
+  const D = HORDE_ADV_DEFAULT;
+  const num = (id, def, min, max) => {
+    const v = parseFloat(document.getElementById(id).value);
+    return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : def;
+  };
+  return {
+    size: document.getElementById('hAdvSize').value || D.size,
+    steps: Math.round(num('hAdvSteps', D.steps, 1, 100)),
+    cfg: num('hAdvCfg', D.cfg, 1, 30),
+    sampler: document.getElementById('hAdvSampler').value || D.sampler,
+    clipSkip: Math.round(num('hAdvClip', D.clipSkip, 1, 12)),
+    seed: document.getElementById('hAdvSeed').value.trim(),
+    negative: document.getElementById('hAdvNeg').value.trim(),
+    karras: document.getElementById('hAdvKarras').checked,
+    slow: document.getElementById('hAdvSlow').checked,
+    trusted: document.getElementById('hAdvTrusted').checked
+  };
+}
+function fillHordeAdvForm(a) {
+  const v = { ...HORDE_ADV_DEFAULT, ...(a || {}) };
+  document.getElementById('hAdvSize').value = v.size;
+  document.getElementById('hAdvSteps').value = v.steps;
+  document.getElementById('hAdvCfg').value = v.cfg;
+  document.getElementById('hAdvSampler').value = v.sampler;
+  document.getElementById('hAdvClip').value = v.clipSkip;
+  document.getElementById('hAdvSeed').value = v.seed;
+  document.getElementById('hAdvNeg').value = v.negative;
+  document.getElementById('hAdvKarras').checked = !!v.karras;
+  document.getElementById('hAdvSlow').checked = !!v.slow;
+  document.getElementById('hAdvTrusted').checked = !!v.trusted;
+}
+
 function readImageGeneratorsFromForm() {
   return {
     perchance: document.getElementById('genPerchance').checked,
@@ -323,14 +498,17 @@ function readImageGeneratorsFromForm() {
     hfSpaceId: document.getElementById('hfSpaceId').value.trim() || 'properfool/nsfwadult',
     pollination: document.getElementById('genPollination').checked,
     aiHorde: document.getElementById('genAIHorde').checked,
-    venice: document.getElementById('genVenice').checked
+    translate: document.getElementById('genTranslate').checked,
+    hordeModels: hordeFormSel.slice(),
+    hordeAdv: readHordeAdvFromForm()
   };
 }
 
 function readTtsFromForm() {
   return {
     eleven: document.getElementById('ttsEleven').checked,
-    browser: document.getElementById('ttsBrowser').checked
+    browser: document.getElementById('ttsBrowser').checked,
+    voiceName: document.getElementById('ttsVoiceSelect').value
   };
 }
 
@@ -369,10 +547,14 @@ function fillFormFromProfile(name) {
   document.getElementById('hfSpaceId').value = igForm.hfSpaceId || 'properfool/nsfwadult';
   document.getElementById('genPollination').checked = !!igForm.pollination;
   document.getElementById('genAIHorde').checked = !!igForm.aiHorde;
-  document.getElementById('genVenice').checked = !!igForm.venice;
+  document.getElementById('genTranslate').checked = igForm.translate !== false;
+  hordeFormSel = Array.isArray(igForm.hordeModels) ? igForm.hordeModels.slice() : ['WAI-NSFW-illustrious-SDXL'];
+  fillHordeAdvForm(igForm.hordeAdv);
+  renderHordeChips();
   const ttsForm = p.tts || {};
   document.getElementById('ttsEleven').checked = ttsForm.eleven !== false;
   document.getElementById('ttsBrowser').checked = !!ttsForm.browser;
+  document.getElementById('ttsVoiceSelect').value = ttsForm.voiceName || '';
   writeSamplingToForm(p.sampling);
 }
 
@@ -438,6 +620,8 @@ function activateProfile(name, isSwitch) {
   provider = p.provider || 'groq';
   model = p.model || '';
   password = p.password || '';
+  mediaUnlocked = false;
+  verifyWorkerPassword();
   systemPrompt = p.systemPrompt || '';
   physicalDescription = p.physicalDescription || '';
   const ig = p.imageGenerators || {};
@@ -446,10 +630,13 @@ function activateProfile(name, isSwitch) {
   hfSpaceId = ig.hfSpaceId || 'properfool/nsfwadult';
   genPollination = !!ig.pollination;
   genAIHorde = !!ig.aiHorde;
-  genVenice = !!ig.venice;
+  translatePrompts = ig.translate !== false;
+  hordeModels = Array.isArray(ig.hordeModels) ? ig.hordeModels.slice() : ['WAI-NSFW-illustrious-SDXL'];
+  hordeAdv = { ...HORDE_ADV_DEFAULT, ...(ig.hordeAdv || {}) };
   const ttsCfg = p.tts || {};
   ttsEleven = ttsCfg.eleven !== false;
   ttsBrowser = !!ttsCfg.browser;
+  ttsVoiceName = ttsCfg.voiceName || '';
   sampling = p.sampling || {};
   history = p.history || [];
   localStorage.setItem(LAST_PROFILE_KEY, profileName);
@@ -492,6 +679,8 @@ document.getElementById('startBtn').addEventListener('click', () => {
     provider = document.getElementById('provider').value;
     model = mdl;
     password = pw;
+    mediaUnlocked = false;
+    verifyWorkerPassword();
     systemPrompt = document.getElementById('systemPrompt').value.trim();
     physicalDescription = document.getElementById('physicalDescription').value.trim();
     const ig = readImageGeneratorsFromForm();
@@ -500,10 +689,13 @@ document.getElementById('startBtn').addEventListener('click', () => {
     hfSpaceId = ig.hfSpaceId;
     genPollination = ig.pollination;
     genAIHorde = ig.aiHorde;
-    genVenice = ig.venice;
+    translatePrompts = ig.translate !== false;
+    hordeModels = ig.hordeModels;
+    hordeAdv = ig.hordeAdv;
     const ttsCfg = readTtsFromForm();
     ttsEleven = ttsCfg.eleven;
     ttsBrowser = ttsCfg.browser;
+    ttsVoiceName = ttsCfg.voiceName || '';
     sampling = readSamplingFromForm();
     history = [];
     messagesEl.innerHTML = '';
@@ -613,6 +805,7 @@ const BG_CHANGE_EVERY = 25;
 function playRandomBackground() {
   const container = document.getElementById("bgMedia");
   if (!container || BG_MEDIA.length === 0) return;
+  if (!mediaUnlocked) { container.innerHTML = ""; return; }
 
   container.innerHTML = "";
 
@@ -654,6 +847,7 @@ function extractSpeakableTexts(botText) {
 }
 
 async function speakWithEleven(text) {
+  if (!mediaUnlocked) return;
   try {
     const response = await fetch(WORKER_BASE + "eleven-tts", {
       method: "POST",
@@ -684,7 +878,42 @@ async function speakWithEleven(text) {
   }
 }
 
+// Les voix "Natural"/"Online"/"Neural" de Windows (voix neurales Microsoft, à installer dans
+// Paramètres → Heure et langue → Voix) sonnent bien moins robotiques que les voix SAPI5 de base.
+const NATURAL_VOICE_RE = /natural|online|neural/i;
+
+function getFrenchVoices() {
+  if (!('speechSynthesis' in window)) return [];
+  return window.speechSynthesis.getVoices().filter(v => v.lang && v.lang.toLowerCase().startsWith('fr'));
+}
+
+function pickBestFrenchVoice() {
+  const voices = getFrenchVoices();
+  if (voices.length === 0) return null;
+  return voices.find(v => NATURAL_VOICE_RE.test(v.name)) || voices[0];
+}
+
+function populateVoiceSelect() {
+  const select = document.getElementById('ttsVoiceSelect');
+  if (!select) return;
+  const previous = select.value;
+  select.innerHTML = '<option value="">Automatique (meilleure voix dispo)</option>';
+  getFrenchVoices().forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v.name;
+    opt.textContent = v.name + (NATURAL_VOICE_RE.test(v.name) ? ' ⭐' : '');
+    select.appendChild(opt);
+  });
+  select.value = previous;
+}
+
+if ('speechSynthesis' in window) {
+  window.speechSynthesis.onvoiceschanged = populateVoiceSelect;
+  window.addEventListener('DOMContentLoaded', populateVoiceSelect);
+}
+
 function speakWithBrowser(text) {
+  if (!mediaUnlocked) return;
   try {
     if (!('speechSynthesis' in window)) {
       console.error("Voix du navigateur non supportée");
@@ -692,6 +921,10 @@ function speakWithBrowser(text) {
     }
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'fr-FR';
+    utter.rate = 0.95;
+    utter.pitch = 1.0;
+    const chosen = (ttsVoiceName && getFrenchVoices().find(v => v.name === ttsVoiceName)) || pickBestFrenchVoice();
+    if (chosen) utter.voice = chosen;
     window.speechSynthesis.speak(utter);
   } catch (err) {
     console.error("Erreur voix navigateur:", err);
@@ -738,7 +971,7 @@ const LOOP_SOUNDS = [
 ];
 
 const MOAN_CONFIG = {
-  base: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/Young_female_Bubbly__4.mp3",
+  base: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/moan-long.mp3",
   interruptions: [
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/defonce.mp3",
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/suce.mp3",
@@ -809,6 +1042,8 @@ function createLoopButton(sound) {
       return;
     }
 
+    if (!requireMedia()) return;
+
     if (!sound.src) {
       alert("Aucun fichier audio défini");
       return;
@@ -872,6 +1107,8 @@ function createMoanButton() {
       return;
     }
 
+    if (!requireMedia()) return;
+
     const baseAudio = new Audio(MOAN_CONFIG.base);
     baseAudio.loop = true;
     baseAudio.volume = 0.65 * masterVolume;
@@ -880,6 +1117,7 @@ function createMoanButton() {
     const scheduleNext = () => {
       const delay = randomBetween(MOAN_CONFIG.minInterval, MOAN_CONFIG.maxInterval) * 1000;
       moanState.timer = setTimeout(() => {
+        if (!mediaUnlocked || !moanState) return;
         const randomSrc = MOAN_CONFIG.interruptions[
           Math.floor(Math.random() * MOAN_CONFIG.interruptions.length)
         ];
@@ -964,15 +1202,36 @@ async function generateNSFWImage(botText, popup) {
   messagesEl.appendChild(loadingDiv);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
-  const prompt = buildImagePrompt(botText, 600);
+  const prompt = buildPerchancePrompt(botText, 900);
   const baseOpts = {
     resolution: '768x512',
     guidanceScale: 7,
     negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark'
   };
 
-  // Une tentative = un nouvel id + une nouvelle navigation du même onglet (nouvel embed,
-  // donc un nouveau widget anti-bot — utile si le précédent a planté sans raison particulière).
+  function addImageMessage(url) {
+    const imgDiv = document.createElement('div');
+    imgDiv.className = 'msg bot';
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'Image générée (Perchance)';
+    img.style.cssText = 'max-width:100%; border-radius:10px;';
+    imgDiv.appendChild(img);
+    messagesEl.appendChild(imgDiv);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // L'URL peut arriver sous plusieurs noms selon la version de l'API Perchance
+  function pickUrl(r) {
+    if (!r) return '';
+    const u = r.url || r.imageUrl || r.src || r.image || r.dataUrl || '';
+    return typeof u === 'string' ? u : '';
+  }
+
+  // Une tentative = un nouvel id + une navigation du même onglet. On attend LONGTEMPS :
+  // Perchance peut demander de résoudre un test anti-bot dans l'onglet, et relancer pendant
+  // que tu le résous annulait le résultat (c'est ce qui coupait le retour automatique).
+  // On ne relance que si Perchance répond explicitement par un échec.
   function attempt(timeoutMs) {
     return new Promise((resolve) => {
       const id = Math.random().toString(36).slice(2);
@@ -982,14 +1241,22 @@ async function generateNSFWImage(botText, popup) {
       } catch (e) {
         // Le popup a pu être fermé entre-temps par l'utilisateur.
       }
+      const hint = setTimeout(() => {
+        loadingDiv.textContent = '🎨 Perchance : en attente de l\'onglet ouvert (résous le test anti-bot s\'il s\'affiche)...';
+      }, 25000);
+      const closedWatch = setInterval(() => {
+        if (popup.closed) { cleanup(); resolve(null); }
+      }, 1000);
       const timeout = setTimeout(() => { cleanup(); resolve(null); }, timeoutMs);
       function cleanup() {
-        clearTimeout(timeout);
+        clearTimeout(timeout); clearTimeout(hint); clearInterval(closedWatch);
         window.removeEventListener('message', onMessage);
       }
       function onMessage(e) {
         const d = e.data || {};
-        if (d.api !== 'perchance-image-api' || !d.result || d.result.id !== id) return;
+        if (d.api !== 'perchance-image-api') return;
+        console.log('[Perchance] message reçu', e.origin, d);
+        if (!d.result || d.result.id !== id) return;
         cleanup();
         resolve(d.result);
       }
@@ -997,23 +1264,34 @@ async function generateNSFWImage(botText, popup) {
     });
   }
 
-  let result = await attempt(25000);
-  if ((!result || !result.ok) && popup && !popup.closed) {
-    result = await attempt(25000); // deuxième essai avant d'abandonner
+  let result = await attempt(240000);
+  // Échec explicite de Perchance (et non simple attente) : un deuxième essai
+  if (result && !pickUrl(result) && popup && !popup.closed) {
+    result = await attempt(240000);
   }
 
   loadingDiv.remove();
 
-  if (result && result.ok && result.url) {
+  const imgUrl = pickUrl(result);
+  if (imgUrl) {
     try { popup.close(); } catch (e) {}
-    const imgDiv = document.createElement('div');
-    imgDiv.className = 'msg bot';
-    imgDiv.innerHTML = `<img src="${result.url}" alt="Image générée" style="max-width:100%; border-radius:10px;">`;
-    messagesEl.appendChild(imgDiv);
+    addImageMessage(imgUrl);
   } else {
     const errDiv = document.createElement('div');
     errDiv.className = 'msg image-loading';
-    errDiv.textContent = '⏳ Pas de retour automatique — l\'image est visible directement dans l\'onglet Perchance resté ouvert.';
+    errDiv.textContent = '⏳ Pas de retour automatique de Perchance. ';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '📎 Coller l\'URL de l\'image';
+    btn.style.cssText = 'margin-left:6px; padding:4px 10px; border-radius:8px; border:1px solid #2a3d33; background:#1a2a22; color:#e8e8e4; cursor:pointer; font-size:12px;';
+    btn.onclick = () => {
+      const u = (prompt('Colle ici l\'URL de l\'image affichée dans l\'onglet Perchance :') || '').trim();
+      if (!/^(https?:\/\/|data:image\/)/i.test(u)) { if (u) alert('URL non valide'); return; }
+      addImageMessage(u);
+      errDiv.remove();
+      try { popup.close(); } catch (e) {}
+    };
+    errDiv.appendChild(btn);
     messagesEl.appendChild(errDiv);
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -1030,11 +1308,122 @@ function getHFSpaceBase() {
   return `https://${slug}.hf.space/gradio_api/call/generate_image`;
 }
 
+// ----- Description de la scène pour les générateurs d'image -----
+// Les modèles d'image comprennent surtout l'anglais : on demande donc au modèle texte du chat
+// de résumer la scène (pose, action, cadrage, expression, tenue) en anglais, une fois par
+// message, puis tous les générateurs réutilisent ce résumé. Si l'appel échoue, on retombe
+// sur l'extraction simple de extractAction().
+const sceneCache = new Map();
+const SCENE_SYSTEM_PROMPT = "You write prompts for an image generator. Read the roleplay exchange and describe only what is visually happening right now: pose and body positions, the physical action, camera angle, facial expression, clothing state and setting. Write it in English as one line of concise comma-separated visual phrases, 45 words maximum. Do not describe the character's fixed appearance (hair, eyes, body type). No dialogue, no names, no explanations, no quotation marks.";
+
+function cleanSceneText(raw) {
+  let s = String(raw || '');
+  // Modèle "réflexion" coupé en plein raisonnement : inutilisable.
+  if (/<think>/i.test(s) && !/<\/think>/i.test(s)) return '';
+  s = s.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/["“”«»*]/g, '').replace(/\s+/g, ' ').trim();
+  if (/^(i['’]?m sorry|i am sorry|i can(not|['’]?t)|sorry|je ne peux|désolé)/i.test(s)) return '';
+  return s.slice(0, 300);
+}
+
+async function prepareScene(botText, userText) {
+  if (sceneCache.has(botText)) return;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const context = (userText && userText !== '__init__')
+      ? 'Previous message from the user: ' + userText.slice(0, 300) + '\n\n'
+      : '';
+    const res = await fetch(WORKER_BASE + provider, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: SCENE_SYSTEM_PROMPT },
+          { role: 'user', content: context + 'Character message:\n' + botText.slice(0, 1500) }
+        ],
+        stream: false,
+        temperature: 0.3,
+        max_tokens: 150
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const scene = cleanSceneText(data?.choices?.[0]?.message?.content);
+    if (scene) {
+      sceneCache.set(botText, scene);
+      if (sceneCache.size > 30) sceneCache.delete(sceneCache.keys().next().value);
+    }
+  } catch (err) {
+    console.error('Résumé de scène indisponible, repli sur l\'extraction simple :', err);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ----- Traduction FR → EN (Worker : Workers AI m2m100) -----
+// Le résumé de scène est déjà demandé en anglais au modèle du chat ; ce qui reste en
+// français, c'est la description physique du profil et, si le résumé échoue, l'extraction
+// brute du message. Chaque texte n'est traduit qu'une fois (cache mémoire + localStorage).
+const translateCache = new Map((() => { try { return JSON.parse(localStorage.getItem('imgTranslateCache') || '[]'); } catch (e) { return []; } })());
+const looksFrench = (t) => /[àâäçéèêëîïôöùûüÿœ]|\b(le|la|les|un|une|des|du|de|et|elle|il|ses|son|sa|dans|avec|sur|aux|au|qui|est|sont|cheveux|yeux|peau|seins|corps)\b/i.test(t);
+
+async function toEnglish(text) {
+  const t = (text || '').trim();
+  if (!t || !translatePrompts || !looksFrench(t)) return t;
+  if (translateCache.has(t)) return translateCache.get(t);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(WORKER_BASE + 'translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      signal: controller.signal,
+      body: JSON.stringify({ text: t.slice(0, 1500), source_lang: 'french', target_lang: 'english' })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const out = ((await res.json()).translated_text || '').trim();
+    if (!out) throw new Error('réponse vide');
+    translateCache.set(t, out);
+    if (translateCache.size > 60) translateCache.delete(translateCache.keys().next().value);
+    try { localStorage.setItem('imgTranslateCache', JSON.stringify([...translateCache])); } catch (e) {}
+    return out;
+  } catch (err) {
+    console.warn('Traduction indisponible, texte d\'origine conservé :', err);
+    return t;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Description physique prête pour le prompt : version traduite si elle existe déjà
+function physDescForImage() {
+  return translatePrompts ? (translateCache.get((physicalDescription || '').trim()) || physicalDescription) : physicalDescription;
+}
+
+// Appelée une fois par message, avant le déclenchement des générateurs
+async function prepareTranslations(botText) {
+  if (!translatePrompts) return;
+  await toEnglish(physicalDescription);
+  if (!sceneCache.has(botText)) await toEnglish(extractActionRaw(botText));
+}
+
+function extractActionRaw(botText) {
+  const actions = [...botText.matchAll(/\*([^*]+)\*/g)]
+    .map(m => m[1].trim().replace(/[.!?…]+$/, ''))
+    .filter(Boolean);
+  if (actions.length) return actions.join(', ').slice(0, 300);
+  // Pas d'action entre astérisques : on retire les dialogues (non visuels) avant de couper.
+  const narration = botText.replace(/"[^"]*"/g, '').replace(/\s+/g, ' ').trim();
+  return (narration || botText).slice(0, 200).trim();
+}
+
 function extractAction(botText) {
-  const actions = [...botText.matchAll(/\*([^*]+)\*/g)].map(m => m[1].trim()).filter(Boolean);
-  if (actions.length) return actions.join(', ');
-  // Pas d'action entre astérisques dans ce message : on retombe sur un extrait court du texte.
-  return botText.replace(/"/g, '').slice(0, 150).trim();
+  const cached = sceneCache.get(botText);
+  if (cached) return cached;
+  const raw = extractActionRaw(botText);
+  return translatePrompts ? (translateCache.get(raw) || raw) : raw;
 }
 
 // Prompt partagé par les trois générateurs : description physique du personnage (profil)
@@ -1043,17 +1432,47 @@ function buildImagePrompt(botText, maxLen) {
   const action = extractAction(botText);
   const parts = [
     'masterpiece, best quality, highly detailed explicit erotic scene',
-    physicalDescription,
+    physDescForImage(),
     action,
     'futanari, huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting'
   ].filter(Boolean);
   return parts.join(', ').slice(0, maxLen || 700);
 }
 
+// Perchance répond mieux à ce cadrage précis (constaté à l'usage) : la phrase d'ouverture
+// et la phrase de clôture ne sont jamais tronquées, seul le contenu variable l'est si besoin.
+function buildPerchancePrompt(botText, maxLen) {
+  const action = extractAction(botText).slice(0, 300);
+  const tags = 'futanari, huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting';
+  const prefix = 'A casual real-life photograph, ';
+  const suffix = ". (((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. It's a casual photo. Overall it's an actual real-life photograph";
+  // La scène du moment est prioritaire : si le budget manque, c'est la description du
+  // personnage qu'on raccourcit, jamais la scène ni les tags de style.
+  const budget = Math.max((maxLen || 900) - prefix.length - suffix.length - tags.length - 2, 0);
+  const descPart = physDescForImage().slice(0, Math.max(budget - action.length - 2, 0));
+  const variable = [descPart, action].filter(Boolean).join(', ');
+  return prefix + (variable ? variable + ', ' : '') + tags + suffix;
+}
+
 // Isole chaque appel de générateur : une erreur synchrone dans l'un ne peut plus jamais
 // empêcher les suivants de se déclencher (c'est ce qui s'est passé avec Pollination).
 function safeTrigger(fn) {
   try { fn(); } catch (err) { console.error('Erreur déclenchement générateur:', err); }
+}
+
+// Prépare une seule fois le résumé de scène (si au moins un générateur est actif), puis lance
+// tous les générateurs cochés. Appelée sans await : elle ne retarde pas le bouton Envoyer.
+async function launchImageGenerators(text, userText, popup, closePopup) {
+  if (!(genPerchance || genHFSpace || genPollination || genAIHorde)) {
+    closePopup();
+    return;
+  }
+  await prepareScene(text, userText);
+  await prepareTranslations(text);
+  if (genPerchance) safeTrigger(() => generateNSFWImage(text, popup)); else closePopup();
+  if (genHFSpace) safeTrigger(() => generateHFSpaceImage(text));
+  if (genPollination) safeTrigger(() => generatePollinationImage(text));
+  if (genAIHorde) safeTrigger(() => generateAIHordeImage(text));
 }
 
 async function callHFSpace(dataArray, timeoutMs) {
@@ -1168,52 +1587,85 @@ async function generateHFSpaceImage(botText) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-// ========== GÉNÉRATION D'IMAGE via Pollination (gratuit, sans compte, sans clé) ==========
+// ========== GÉNÉRATION D'IMAGE via Pollination (clé POLLI_KEY via le Worker, repli anonyme) ==========
 // Juste une image à charger depuis une URL — pas de popup, pas d'étape en deux temps,
 // pas de vérification anti-bot. Le point le plus simple et le plus fiable des trois.
-function generatePollinationImage(botText) {
+async function generatePollinationImage(botText) {
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
   loadingDiv.textContent = '🎨 Génération de l\'image en cours (Pollination)...';
   messagesEl.appendChild(loadingDiv);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
-  try {
-    const prompt = buildImagePrompt(botText, 700);
-    const seed = Math.floor(Math.random() * 1000000);
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=768&height=512&model=flux&seed=${seed}&nologo=true`;
+  // Mêmes réglages que Perchance : même prompt (personnage + scène + tags de style),
+  // même résolution, même guidance, même prompt négatif.
+  const prompt = buildPerchancePrompt(botText, 900);
+  const opts = {
+    width: 768,
+    height: 512,
+    guidance_scale: 7,
+    negative_prompt: 'blurry, low quality, deformed, bad anatomy, text, watermark'
+  };
 
-    const img = new Image();
-    img.onload = () => {
-      loadingDiv.remove();
-      const imgDiv = document.createElement('div');
-      imgDiv.className = 'msg bot';
-      img.alt = 'Image générée (Pollination)';
-      img.style.maxWidth = '100%';
-      img.style.borderRadius = '10px';
-      img.style.display = 'block';
-      imgDiv.appendChild(img);
-      messagesEl.appendChild(imgDiv);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    };
-    img.onerror = () => {
-      loadingDiv.remove();
-      const errDiv = document.createElement('div');
-      errDiv.className = 'msg image-loading';
-      errDiv.textContent = '⚠️ Pollination : image non chargée.';
-      messagesEl.appendChild(errDiv);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    };
-    img.src = url;
-  } catch (err) {
-    loadingDiv.remove();
-    console.error('Erreur Pollination:', err);
+  // Une tentative = un nouveau seed + un délai maximal, comme les essais de Perchance.
+  // 1) via le Worker (clé POLLI_KEY côté serveur), 2) accès anonyme direct en secours.
+  async function attempt(timeoutMs) {
+    const seed = Math.floor(Math.random() * 1000000);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      try {
+        const res = await fetch(WORKER_BASE + 'pollinations-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+          body: JSON.stringify({ prompt, model: 'flux', seed, ...opts }),
+          signal: ctrl.signal
+        });
+        if (res.ok) {
+          const blob = await res.blob();
+          if (blob.type.startsWith('image/')) return URL.createObjectURL(blob);
+        } else {
+          console.warn('Pollination via Worker : HTTP ' + res.status);
+        }
+      } catch (e) {
+        if (ctrl.signal.aborted) return null;
+        console.warn('Pollination via Worker indisponible :', e);
+      }
+      // Secours anonyme : on charge l'image dans un <img> pour savoir si elle arrive vraiment
+      const q = new URLSearchParams({
+        width: opts.width, height: opts.height, model: 'flux', seed,
+        nologo: 'true', negative_prompt: opts.negative_prompt
+      });
+      const direct = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?' + q;
+      return await new Promise((resolve) => {
+        const test = new Image();
+        const t = setTimeout(() => { test.src = ''; resolve(null); }, timeoutMs);
+        test.onload = () => { clearTimeout(t); resolve(direct); };
+        test.onerror = () => { clearTimeout(t); resolve(null); };
+        test.src = direct;
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  let url = await attempt(60000);
+  if (!url) url = await attempt(60000); // deuxième essai avant d'abandonner
+
+  loadingDiv.remove();
+
+  if (url) {
+    const imgDiv = document.createElement('div');
+    imgDiv.className = 'msg bot';
+    imgDiv.innerHTML = `<img src="${url}" alt="Image générée (Pollination)" style="max-width:100%; border-radius:10px;">`;
+    messagesEl.appendChild(imgDiv);
+  } else {
     const errDiv = document.createElement('div');
     errDiv.className = 'msg image-loading';
-    errDiv.textContent = '❌ Pollination : ' + (err.message || 'génération échouée');
+    errDiv.textContent = '⚠️ Pollination : pas d\'image après deux essais (file saturée ou clé refusée).';
     messagesEl.appendChild(errDiv);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
   }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
 // ========== GÉNÉRATION D'IMAGE via AI Horde (gratuit, communautaire, NSFW natif) ==========
@@ -1223,29 +1675,117 @@ function generatePollinationImage(botText) {
 // Passe par le Worker (/proxy/horde/...) plutôt que d'appeler aihorde.net directement
 // depuis le navigateur, pour éviter tout souci de CORS et utiliser la vraie clé AIHORDE_KEY
 // côté serveur (meilleure priorité dans la file que la clé anonyme).
-async function callAIHorde(prompt) {
+function renderHordeChips() {
+  const box = document.getElementById('hordeChips');
+  if (!box) return;
+  const q = (document.getElementById('hordeFilter').value || '').toLowerCase();
+  const names = new Map(hordeCatalog.map(m => [m.name, m.count]));
+  hordeFormSel.forEach(n => { if (!names.has(n)) names.set(n, null); });
+  const items = [...names.entries()]
+    .filter(([n]) => hordeFormSel.includes(n) || n.toLowerCase().includes(q))
+    .slice(0, 80);
+  box.innerHTML = '';
+  items.forEach(([name, count]) => {
+    const on = hordeFormSel.includes(name);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = name + (count != null ? ' (' + count + ')' : '');
+    b.style.cssText = 'width:auto; font-size:11px; padding:4px 10px; border-radius:14px; cursor:pointer; border:1px solid ' +
+      (on ? '#6c5ce7' : '#444') + '; background:' + (on ? '#6c5ce7' : 'transparent') + '; color:' + (on ? '#fff' : '#ccc') + ';' +
+      (count === 0 ? ' opacity:.5;' : '');
+    b.onclick = () => {
+      hordeFormSel = on ? hordeFormSel.filter(n => n !== name) : hordeFormSel.concat(name);
+      renderHordeChips();
+    };
+    box.appendChild(b);
+  });
+  document.getElementById('hordeHint').textContent = hordeFormSel.length
+    ? hordeFormSel.length + ' sélectionné(s) — le premier worker libre qui en propose un prend la tâche. Le nombre entre parenthèses = workers en ligne.'
+    : 'Aucun modèle choisi : Horde prendra n\'importe quel modèle disponible (peut ne pas être NSFW).';
+}
+
+async function refreshHordeModels() {
+  const hint = document.getElementById('hordeHint');
+  hint.textContent = 'Chargement des modèles en ligne…';
+  try {
+    const res = await fetch(WORKER_BASE + 'horde/status/models?type=image&min_count=1', {
+      headers: { 'X-App-Secret': password }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const list = await res.json();
+    if (!Array.isArray(list) || !list.length) throw new Error('liste vide');
+    hordeCatalog = list
+      .map(m => ({ name: m.name, count: m.count || 0 }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    renderHordeChips();
+  } catch (e) {
+    console.warn('Catalogue Horde :', e);
+    hint.textContent = '⚠️ Liste en ligne indisponible (' + e.message + '), liste par défaut affichée.';
+  }
+}
+document.getElementById('hAdvReset').addEventListener('click', () => fillHordeAdvForm(HORDE_ADV_DEFAULT));
+document.getElementById('hordeCheckKey').addEventListener('click', async () => {
+  const info = document.getElementById('hordeKeyInfo');
+  info.textContent = 'Vérification…';
+  try {
+    const res = await fetch(WORKER_BASE + 'horde/find_user', { headers: { 'X-App-Secret': password } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const u = await res.json();
+    const anon = /anonymous/i.test(u.username || '');
+    info.textContent = anon
+      ? '⚠️ Compte anonyme : le Worker n\'a pas de clé Horde (secret AIHORDE_KEY absent ou invalide).'
+      : '✅ ' + u.username + ' — ' + Math.round(u.kudos || 0) + ' kudos';
+  } catch (e) {
+    info.textContent = '❌ ' + e.message;
+  }
+});
+document.getElementById('hordeFilter').addEventListener('input', renderHordeChips);
+document.getElementById('hordeRefresh').addEventListener('click', refreshHordeModels);
+fillHordeAdvForm(HORDE_ADV_DEFAULT);
+renderHordeChips();
+
+async function cancelHordeJob(id) {
+  // Libère la file côté Horde ; sans importance si ça échoue
+  try {
+    await fetch(WORKER_BASE + 'horde/generate/status/' + id, {
+      method: 'DELETE', headers: { 'X-App-Secret': password }
+    });
+  } catch (e) {}
+}
+
+async function callAIHorde(prompt, onProgress) {
+  const adv = { ...HORDE_ADV_DEFAULT, ...(hordeAdv || {}) };
+  const [w, h] = String(adv.size).split('x').map(Number);
+  const fullPrompt = adv.negative ? prompt + ' ### ' + adv.negative : prompt;
+  const params = {
+    width: w || 768,
+    height: h || 512,
+    steps: adv.steps,
+    cfg_scale: adv.cfg,
+    sampler_name: adv.sampler,
+    clip_skip: adv.clipSkip,
+    karras: !!adv.karras,
+    n: 1
+  };
+  if (adv.seed !== '' && adv.seed != null) params.seed = String(adv.seed);
   const submitRes = await fetch(WORKER_BASE + 'horde/generate/async', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
     body: JSON.stringify({
-      prompt,
+      prompt: fullPrompt,
       nsfw: true,
       censor_nsfw: false,
-      params: {
-        width: 768,
-        height: 512,
-        steps: 25,
-        cfg_scale: 7,
-        sampler_name: 'k_euler_a',
-        n: 1
-      }
+      slow_workers: !!adv.slow,
+      trusted_workers: !!adv.trusted,
+      ...(hordeModels && hordeModels.length ? { models: hordeModels } : {}),
+      params
     })
   });
   if (!submitRes.ok) throw new Error('Soumission refusée (' + submitRes.status + ')');
   const { id } = await submitRes.json();
   if (!id) throw new Error('Pas d\'id de génération reçu');
 
-  const deadline = Date.now() + 90000; // la file bénévole peut être plus lente qu'un service dédié
+  const deadline = Date.now() + 150000; // la file bénévole peut être plus lente qu'un service dédié
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 4000));
     const checkRes = await fetch(WORKER_BASE + 'horde/generate/check/' + id, {
@@ -1254,6 +1794,8 @@ async function callAIHorde(prompt) {
     if (!checkRes.ok) continue;
     const checkData = await checkRes.json();
     if (checkData.faulted) throw new Error('génération en échec côté Horde');
+    if (checkData.is_possible === false) { cancelHordeJob(id); throw new Error('aucun worker en ligne pour ce(s) modèle(s) : choisis-en un avec des workers (bouton ↻ En ligne)'); }
+    if (onProgress && !checkData.done) onProgress(checkData);
     if (checkData.done) {
       const statusRes = await fetch(WORKER_BASE + 'horde/generate/status/' + id, {
         headers: { 'X-App-Secret': password }
@@ -1265,6 +1807,7 @@ async function callAIHorde(prompt) {
       throw new Error('aucune image dans le résultat');
     }
   }
+  cancelHordeJob(id);
   throw new Error('délai dépassé (file d\'attente trop longue)');
 }
 
@@ -1277,7 +1820,11 @@ async function generateAIHordeImage(botText) {
 
   try {
     const prompt = buildImagePrompt(botText, 700);
-    const imgUrl = await callAIHorde(prompt);
+    const imgUrl = await callAIHorde(prompt, (c) => {
+      loadingDiv.textContent = '🎨 AI Horde : ' +
+        (c.processing ? 'en cours' : (c.queue_position != null ? 'file ' + c.queue_position : 'en attente')) +
+        (c.wait_time ? ' — ~' + c.wait_time + ' s' : '') + '...';
+    });
     loadingDiv.remove();
     const imgDiv = document.createElement('div');
     imgDiv.className = 'msg bot';
@@ -1289,62 +1836,6 @@ async function generateAIHordeImage(botText) {
     const errDiv = document.createElement('div');
     errDiv.className = 'msg image-loading';
     errDiv.textContent = '❌ AI Horde : ' + (err.message || 'génération échouée');
-    messagesEl.appendChild(errDiv);
-  }
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-}
-
-// ========== GÉNÉRATION D'IMAGE via Venice AI ==========
-// Point d'accès compatible OpenAI (/images/generations), réponse en base64 directement
-// utilisable. Passe par le Worker (VENICE_KEY reste côté serveur).
-async function generateVeniceImage(botText) {
-  const loadingDiv = document.createElement('div');
-  loadingDiv.className = 'msg image-loading';
-  loadingDiv.textContent = '🎨 Génération de l\'image en cours (Venice)...';
-  messagesEl.appendChild(loadingDiv);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
-
-  try {
-    const prompt = buildImagePrompt(botText, 1400);
-    const res = await fetch(WORKER_BASE + 'venice-images', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
-      body: JSON.stringify({
-        prompt,
-        model: 'venice-sd35',
-        n: 1,
-        size: '768x512',
-        response_format: 'b64_json',
-        moderation: 'low'
-      })
-    });
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error('Erreur ' + res.status + ' : ' + errText.slice(0, 150));
-    }
-    const data = await res.json();
-    const first = (data?.data && data.data[0]) || (data?.images && data.images[0]) || null;
-    const b64 = (first && (first.b64_json || (typeof first === 'string' ? first : null))) || null;
-
-    loadingDiv.remove();
-
-    if (!b64) {
-      const errDiv = document.createElement('div');
-      errDiv.className = 'msg image-loading';
-      errDiv.textContent = '⚠️ Venice : image non récupérée.';
-      messagesEl.appendChild(errDiv);
-    } else {
-      const imgDiv = document.createElement('div');
-      imgDiv.className = 'msg bot';
-      imgDiv.innerHTML = `<img src="data:image/png;base64,${b64}" alt="Image générée (Venice)" style="max-width:100%; border-radius:10px;">`;
-      messagesEl.appendChild(imgDiv);
-    }
-  } catch (err) {
-    loadingDiv.remove();
-    console.error('Erreur Venice:', err);
-    const errDiv = document.createElement('div');
-    errDiv.className = 'msg image-loading';
-    errDiv.textContent = '❌ Venice : ' + (err.message || 'génération échouée');
     messagesEl.appendChild(errDiv);
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -1403,11 +1894,7 @@ async function sendToWorker(userText, userTs) {
       finalizeHistory(userText, botText, isInit, userTs);
       if (botText.length > 20) {
         speakQuotedText(botText);
-        if (genPerchance) safeTrigger(() => generateNSFWImage(botText, imagePopup)); else closeUnusedPopup();
-        if (genHFSpace) safeTrigger(() => generateHFSpaceImage(botText));
-        if (genPollination) safeTrigger(() => generatePollinationImage(botText));
-        if (genAIHorde) safeTrigger(() => generateAIHordeImage(botText));
-        if (genVenice) safeTrigger(() => generateVeniceImage(botText));
+        launchImageGenerators(botText, userText, imagePopup, closeUnusedPopup);
       } else {
         closeUnusedPopup();
       }
@@ -1451,11 +1938,7 @@ async function sendToWorker(userText, userTs) {
 
     if (fullText && fullText.length > 20) {
       speakQuotedText(fullText);
-      if (genPerchance) safeTrigger(() => generateNSFWImage(fullText, imagePopup)); else closeUnusedPopup();
-      if (genHFSpace) safeTrigger(() => generateHFSpaceImage(fullText));
-      if (genPollination) safeTrigger(() => generatePollinationImage(fullText));
-      if (genAIHorde) safeTrigger(() => generateAIHordeImage(fullText));
-      if (genVenice) safeTrigger(() => generateVeniceImage(fullText));
+      launchImageGenerators(fullText, userText, imagePopup, closeUnusedPopup);
     } else {
       closeUnusedPopup();
     }
@@ -1486,6 +1969,73 @@ function handleSend() {
 }
 
 sendBtn.addEventListener('click', handleSend);
+
+// ----- Dictée vocale : micro → Worker /proxy/groq-stt (Whisper sur Groq) → texte dans la zone de saisie -----
+const micBtn = document.getElementById('mic');
+let micRecorder = null, micStream = null, micChunks = [], micTimer = null;
+
+function micReset() {
+  clearTimeout(micTimer);
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  micStream = null; micRecorder = null; micChunks = [];
+  micBtn.classList.remove('rec');
+  micBtn.textContent = '🎤';
+}
+
+async function transcribe(blob, ext) {
+  micBtn.disabled = true;
+  micBtn.textContent = '…';
+  try {
+    const fd = new FormData();
+    fd.append('file', blob, 'audio.' + ext);
+    fd.append('language', 'fr');
+    const res = await fetch(WORKER_BASE + 'groq-stt', {
+      method: 'POST',
+      headers: { 'X-App-Secret': password },
+      body: fd
+    });
+    if (!res.ok) throw new Error(res.status === 401 ? 'mot de passe ou clé GROQ refusé' : 'HTTP ' + res.status);
+    const text = ((await res.json()).text || '').trim();
+    if (!text) { showMediaToast('🎤 Rien compris, réessaie'); return; }
+    input.value = (input.value ? input.value.replace(/\s+$/, '') + ' ' : '') + text;
+    input.dispatchEvent(new Event('input'));
+    input.focus();
+  } catch (err) {
+    console.error('Dictée :', err);
+    showMediaToast('🎤 Transcription impossible : ' + err.message);
+  } finally {
+    micBtn.disabled = false;
+    micBtn.textContent = '🎤';
+  }
+}
+
+micBtn.addEventListener('click', async () => {
+  if (micRecorder && micRecorder.state === 'recording') { micRecorder.stop(); return; }
+  if (!password) { showMediaToast('🎤 Entre d\'abord le mot de passe du Worker'); return; }
+  if (!navigator.mediaDevices || !window.MediaRecorder) { showMediaToast('🎤 Micro non pris en charge par ce navigateur'); return; }
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    showMediaToast('🎤 Accès au micro refusé');
+    return;
+  }
+  // Safari/iOS n'enregistre pas en webm
+  const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(m => MediaRecorder.isTypeSupported(m)) || '';
+  const ext = mime.includes('mp4') ? 'm4a' : 'webm';
+  micRecorder = new MediaRecorder(micStream, mime ? { mimeType: mime } : undefined);
+  micChunks = [];
+  micRecorder.ondataavailable = (e) => { if (e.data.size) micChunks.push(e.data); };
+  micRecorder.onstop = () => {
+    const blob = new Blob(micChunks, { type: micRecorder.mimeType || 'audio/webm' });
+    micReset();
+    if (blob.size < 2000) { showMediaToast('🎤 Enregistrement trop court'); return; }
+    transcribe(blob, ext);
+  };
+  micRecorder.start();
+  micBtn.classList.add('rec');
+  micBtn.textContent = '⏹';
+  micTimer = setTimeout(() => { if (micRecorder && micRecorder.state === 'recording') micRecorder.stop(); }, 120000);
+});
 input.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
 });
