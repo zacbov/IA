@@ -1187,15 +1187,6 @@ window.addEventListener("DOMContentLoaded", initAudioLooper);
 // dedans (secours manuel, plus besoin de copier-coller à la main dans la plupart des cas).
 
 async function generateNSFWImage(botText, popup) {
-  if (!popup || popup.closed) {
-    const errDiv = document.createElement('div');
-    errDiv.className = 'msg image-loading';
-    errDiv.textContent = '⚠️ Le navigateur a bloqué l\'onglet de génération — autorise les popups pour ce site.';
-    messagesEl.appendChild(errDiv);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
-    return;
-  }
-
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
   loadingDiv.textContent = '🎨 Génération de l\'image en cours (Perchance)...';
@@ -1237,6 +1228,7 @@ async function generateNSFWImage(botText, popup) {
       const id = Math.random().toString(36).slice(2);
       const params = new URLSearchParams({ prompt, format: 'html', id, ...baseOpts });
       try {
+        if (!popup || popup.closed) { resolve(null); return; }
         popup.location.href = 'https://perchance.org/perchance-ai-api?' + params.toString();
       } catch (e) {
         // Le popup a pu être fermé entre-temps par l'utilisateur.
@@ -1244,12 +1236,9 @@ async function generateNSFWImage(botText, popup) {
       const hint = setTimeout(() => {
         loadingDiv.textContent = '🎨 Perchance : en attente de l\'onglet ouvert (résous le test anti-bot s\'il s\'affiche)...';
       }, 25000);
-      const closedWatch = setInterval(() => {
-        if (popup.closed) { cleanup(); resolve(null); }
-      }, 1000);
       const timeout = setTimeout(() => { cleanup(); resolve(null); }, timeoutMs);
       function cleanup() {
-        clearTimeout(timeout); clearTimeout(hint); clearInterval(closedWatch);
+        clearTimeout(timeout); clearTimeout(hint);
         window.removeEventListener('message', onMessage);
       }
       function onMessage(e) {
@@ -1264,17 +1253,57 @@ async function generateNSFWImage(botText, popup) {
     });
   }
 
-  let result = await attempt(240000);
-  // Échec explicite de Perchance (et non simple attente) : un deuxième essai
-  if (result && !pickUrl(result) && popup && !popup.closed) {
-    result = await attempt(240000);
+  // Voie 1 : cadre intégré dans le chat. Un onglet ouvert vers un autre site perd souvent
+  // son lien avec la page (politique COOP), donc aucun message ne revient ; un cadre, lui,
+  // peut toujours renvoyer son résultat à la page.
+  function attemptFrame(timeoutMs) {
+    return new Promise((resolve) => {
+      const id = Math.random().toString(36).slice(2);
+      const params = new URLSearchParams({ prompt, format: 'html', id, ...baseOpts });
+      const card = document.createElement('div');
+      card.className = 'msg image-loading';
+      card.innerHTML = '<div style="margin-bottom:6px;">🎨 Perchance : génération en cours (si un test anti-bot s\'affiche, résous-le ici)…</div>';
+      const frame = document.createElement('iframe');
+      frame.src = 'https://perchance.org/perchance-ai-api?' + params.toString();
+      frame.style.cssText = 'width:100%; height:340px; border:0; border-radius:10px; background:#111;';
+      frame.setAttribute('allow', 'clipboard-write');
+      card.appendChild(frame);
+      messagesEl.appendChild(card);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      const timeout = setTimeout(() => { cleanup(); resolve(null); }, timeoutMs);
+      function cleanup() {
+        clearTimeout(timeout);
+        window.removeEventListener('message', onMessage);
+        card.remove();
+      }
+      function onMessage(e) {
+        const d = e.data || {};
+        if (d.api !== 'perchance-image-api') return;
+        console.log('[Perchance/cadre] message reçu', e.origin, d);
+        if (!d.result || d.result.id !== id) return;
+        cleanup();
+        resolve(d.result);
+      }
+      window.addEventListener('message', onMessage);
+    });
+  }
+
+  let result = await attemptFrame(60000);
+
+  // Voie 2 (secours) : l'onglet ouvert au clic
+  if (!pickUrl(result) && popup && !popup.closed) {
+    result = await attempt(120000);
+    // Échec explicite de Perchance (et non simple attente) : un deuxième essai
+    if (result && !pickUrl(result) && popup && !popup.closed) {
+      result = await attempt(120000);
+    }
   }
 
   loadingDiv.remove();
 
   const imgUrl = pickUrl(result);
   if (imgUrl) {
-    try { popup.close(); } catch (e) {}
+    try { if (popup) popup.close(); } catch (e) {}
     addImageMessage(imgUrl);
   } else {
     const errDiv = document.createElement('div');
@@ -1289,7 +1318,7 @@ async function generateNSFWImage(botText, popup) {
       if (!/^(https?:\/\/|data:image\/)/i.test(u)) { if (u) alert('URL non valide'); return; }
       addImageMessage(u);
       errDiv.remove();
-      try { popup.close(); } catch (e) {}
+      try { if (popup) popup.close(); } catch (e) {}
     };
     errDiv.appendChild(btn);
     messagesEl.appendChild(errDiv);
@@ -1382,7 +1411,10 @@ async function toEnglish(text) {
       signal: controller.signal,
       body: JSON.stringify({ text: t.slice(0, 1500), source_lang: 'french', target_lang: 'english' })
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => '')).slice(0, 300);
+      throw new Error('HTTP ' + res.status + (detail ? ' — ' + detail : ''));
+    }
     const out = ((await res.json()).translated_text || '').trim();
     if (!out) throw new Error('réponse vide');
     translateCache.set(t, out);
