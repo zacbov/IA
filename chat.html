@@ -116,6 +116,22 @@
   @keyframes micPulse { 50% { box-shadow: 0 0 0 4px rgba(204,68,68,.35); } }
   #send:disabled { background: #3a3a34; color: #777; }
   .typing { align-self: flex-start; color: #777; font-size: 13px; font-style: italic; padding: 4px 4px; }
+
+  /* ----- Galerie + visionneuse ----- */
+  #gallery, #lightbox { position: fixed; inset: 0; z-index: 9000; display: flex; flex-direction: column; background: rgba(8,10,9,.97); color: #e8e8e4; }
+  #lightbox { z-index: 9100; background: rgba(0,0,0,.95); align-items: center; justify-content: center; }
+  #gallery.hidden, #lightbox.hidden { display: none; }
+  #gHead, #lbBar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; flex-wrap: wrap; }
+  #gHead { border-bottom: 1px solid #2a3d33; }
+  #gHead .gt { font-weight: 700; flex: 1; min-width: 120px; }
+  #gHead label { font-size: 12px; display: flex; gap: 5px; align-items: center; cursor: pointer; }
+  #gHead button, #lbBar button { background: #1a2a22; border: 1px solid #2a3d33; color: #e8e8e4; border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; width: auto; }
+  #gGrid { flex: 1; overflow-y: auto; padding: 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; align-content: start; }
+  #gGrid img { width: 100%; aspect-ratio: 3/2; object-fit: cover; border-radius: 8px; cursor: zoom-in; background: #111; display: block; }
+  #gEmpty { padding: 40px 16px; text-align: center; color: #888; font-size: 13px; }
+  #lbBar { position: absolute; top: 0; left: 0; right: 0; justify-content: space-between; background: linear-gradient(#000c, transparent); z-index: 2; }
+  #lbCaption { font-size: 11px; color: #bbb; flex: 1; min-width: 100px; max-height: 3.6em; overflow: hidden; }
+  #lbImg { max-width: 96vw; max-height: 88vh; object-fit: contain; border-radius: 6px; }
 </style>
 </head>
 <body>
@@ -186,6 +202,10 @@
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; text-transform:none; letter-spacing:normal; cursor:pointer;">
         <input type="checkbox" id="genPerchance" checked style="width:auto;"> Perchance (onglet)
       </label>
+      <div style="margin-left:22px; margin-bottom:6px;">
+        <input type="text" id="perchanceGen" placeholder="Nom de ton générateur Perchance (vide = perchance-ai-api)" style="font-size:11px; padding:5px 8px; width:100%;">
+        <div style="font-size:10px; color:#888; margin-top:3px;">Optionnel : un générateur à toi qui renvoie l'image au chat automatiquement (voir perchance-bridge.txt).</div>
+      </div>
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; text-transform:none; letter-spacing:normal; cursor:pointer;">
         <input type="checkbox" id="genHFSpace" style="width:auto;"> Space Hugging Face
       </label>
@@ -218,6 +238,14 @@
         <details style="margin-top:8px;">
           <summary style="font-size:11px; color:#aaa; cursor:pointer;">⚙️ Réglages avancés AI Horde</summary>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; margin-top:8px; font-size:11px; color:#aaa;">
+            <label style="grid-column:1/3;">Préréglage (remplit les champs ci-dessous)
+              <select id="hAdvPreset" style="width:100%; font-size:11px;">
+                <option value="">— choisir —</option>
+                <option value="photoSD15">📷 Photoréaliste SD 1.5 (Realistic Vision, ICBINP…)</option>
+                <option value="photoSDXL">📷 Photoréaliste SDXL (Juggernaut XL, AlbedoBase XL…)</option>
+                <option value="animeSDXL">🎨 Anime SDXL (WAI / Illustrious, Pony…)</option>
+              </select>
+            </label>
             <label>Taille
               <select id="hAdvSize" style="width:100%; font-size:11px;">
                 <option value="512x512">512 × 512 (SD 1.5)</option>
@@ -319,9 +347,34 @@
   <button id="startBtn">Démarrer la conversation</button>
 </div>
 
+<div id="gallery" class="hidden">
+  <div id="gHead">
+    <span class="gt">🖼️ Galerie <span id="gCount" style="font-weight:400; color:#888;"></span></span>
+    <label><input type="checkbox" id="gAll"> Tous les profils</label>
+    <button id="gClear" type="button">🗑 Tout supprimer</button>
+    <button id="gClose" type="button">✕ Fermer</button>
+  </div>
+  <div id="gGrid"></div>
+</div>
+<div id="lightbox" class="hidden">
+  <div id="lbBar">
+    <span id="lbCaption"></span>
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      <button id="lbPrev" type="button">‹</button>
+      <button id="lbNext" type="button">›</button>
+      <button id="lbDownload" type="button" title="Télécharger">⬇</button>
+      <button id="lbCopy" type="button" title="Copier le prompt">📋</button>
+      <button id="lbDelete" type="button" title="Supprimer de la galerie">🗑</button>
+      <button id="lbClose" type="button">✕</button>
+    </div>
+  </div>
+  <img id="lbImg" alt="">
+</div>
+
 <div id="topbar" class="hidden">
   <select id="quickSwitch"></select>
   <div class="actions">
+    <button id="galleryBtn" title="Galerie des images générées">🖼️</button>
     <button id="resetBtn">↺ Vider</button>
     <button id="backBtn">⚙ Config</button>
   </div>
@@ -418,15 +471,23 @@ let pollModel = 'flux';
 let genAIHorde = false;
 let translatePrompts = true;   // traduction FR → EN des éléments du prompt d'image
 const HORDE_DEFAULT_MODELS = [
-  'WAI-NSFW-illustrious-SDXL', 'Hassaku XL (Illustrious)', 'NoobAI XL', 'Pony Diffusion XL',
-  'AlbedoBase XL (SDXL)', 'Juggernaut XL', 'Deliberate', 'Anything Diffusion',
-  'Realistic Vision', 'Dreamshaper', "ICBINP - I Can't Believe It's Not Photography", 'Reliberate'
+  // Photoréalistes d'abord (↻ En ligne montre ceux qui ont des workers)
+  'Realistic Vision', "ICBINP - I Can't Believe It's Not Photography", 'Juggernaut XL', 'AlbedoBase XL (SDXL)',
+  'Deliberate', 'Dreamshaper', 'Reliberate',
+  // Plutôt illustrés / anime
+  'WAI-NSFW-illustrious-SDXL', 'Hassaku XL (Illustrious)', 'NoobAI XL', 'Pony Diffusion XL', 'Anything Diffusion'
 ];
+const HORDE_REAL_NEG = 'anime, cartoon, illustration, drawing, painting, 3d render, cgi, digital art, lowres, blurry, bad anatomy, deformed, extra fingers, text, watermark';
+const HORDE_PRESETS = {
+  photoSD15: { size: '512x768',  steps: 30, cfg: 6, sampler: 'k_dpmpp_2m', clipSkip: 1, karras: true,  negative: HORDE_REAL_NEG },
+  photoSDXL: { size: '832x1216', steps: 30, cfg: 5, sampler: 'k_dpmpp_2m', clipSkip: 1, karras: true,  negative: HORDE_REAL_NEG },
+  animeSDXL: { size: '832x1216', steps: 28, cfg: 6, sampler: 'k_euler_a',  clipSkip: 2, karras: false, negative: 'lowres, bad anatomy, bad hands, text, watermark, worst quality, jpeg artifacts' }
+};
 let hordeModels = ['WAI-NSFW-illustrious-SDXL'];   // modèles utilisés pour la génération
 let hordeFormSel = ['WAI-NSFW-illustrious-SDXL'];  // sélection en cours dans le formulaire
 const HORDE_ADV_DEFAULT = {
   size: '768x512', steps: 25, cfg: 7, sampler: 'k_euler_a', clipSkip: 1, seed: '',
-  negative: '', karras: true, slow: true, trusted: false
+  negative: HORDE_REAL_NEG, karras: true, slow: true, trusted: false
 };
 let hordeAdv = { ...HORDE_ADV_DEFAULT };
 let hordeCatalog = HORDE_DEFAULT_MODELS.map(name => ({ name, count: null }));
@@ -1208,6 +1269,217 @@ window.addEventListener("DOMContentLoaded", initAudioLooper);
 // on referme l'onglet automatiquement ; sinon l'onglet reste ouvert avec l'image visible
 // dedans (secours manuel, plus besoin de copier-coller à la main dans la plupart des cas).
 
+// ========== GALERIE PERSISTANTE (IndexedDB) ==========
+// Chaque image générée est copiée en local (blob) pour survivre au rechargement et aux liens
+// qui expirent (Horde : 30 min). Si la copie est impossible, on garde au moins l'URL.
+const GALLERY_MAX = 300; // par profil
+let galleryDbP = null;
+function galleryDb() {
+  if (!galleryDbP) {
+    galleryDbP = new Promise((resolve, reject) => {
+      const req = indexedDB.open('chatGallery', 1);
+      req.onupgradeneeded = () => {
+        const st = req.result.createObjectStore('images', { keyPath: 'id', autoIncrement: true });
+        st.createIndex('profile', 'profile');
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  return galleryDbP;
+}
+const idbDone = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+
+async function gallerySave(rec) {
+  const db = await galleryDb();
+  const tx = db.transaction('images', 'readwrite');
+  const st = tx.objectStore('images');
+  await idbDone(st.add(rec));
+  const keys = await idbDone(st.index('profile').getAllKeys(rec.profile));
+  if (keys.length > GALLERY_MAX) {
+    keys.sort((a, b) => a - b).slice(0, keys.length - GALLERY_MAX).forEach(k => st.delete(k));
+  }
+}
+async function galleryList(allProfiles) {
+  const db = await galleryDb();
+  const st = db.transaction('images', 'readonly').objectStore('images');
+  const rows = allProfiles ? await idbDone(st.getAll()) : await idbDone(st.index('profile').getAll(profileName || ''));
+  return rows.sort((a, b) => b.ts - a.ts);
+}
+async function galleryDelete(id) {
+  const db = await galleryDb();
+  await idbDone(db.transaction('images', 'readwrite').objectStore('images').delete(id));
+}
+async function galleryClear(allProfiles) {
+  const rows = await galleryList(allProfiles);
+  const db = await galleryDb();
+  const st = db.transaction('images', 'readwrite').objectStore('images');
+  rows.forEach(r => st.delete(r.id));
+}
+
+// Copie de l'image : accès direct, puis via le Worker (liens R2/HF sans CORS)
+async function fetchImageBlob(url) {
+  try { const r = await fetch(url); if (r.ok) return await r.blob(); } catch (e) {}
+  if (/^https?:/i.test(url)) {
+    try {
+      const r = await fetch(WORKER_BASE + 'fetch-image?url=' + encodeURIComponent(url), { headers: { 'X-App-Secret': password } });
+      if (r.ok) return await r.blob();
+    } catch (e) {}
+  }
+  return null;
+}
+async function archiveImage({ url, source, prompt }) {
+  try {
+    const blob = await fetchImageBlob(url);
+    await gallerySave({
+      profile: profileName || '', ts: Date.now(), source: source || '',
+      prompt: String(prompt || '').slice(0, 1500),
+      blob: blob, url: blob ? '' : (url.startsWith('blob:') ? '' : url)
+    });
+  } catch (e) { console.warn('Galerie : sauvegarde impossible', e); }
+}
+
+// Affiche une image dans la conversation (cliquable → visionneuse) et l'archive
+function showGeneratedImage({ url, source, prompt, onError }) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg bot';
+  const img = document.createElement('img');
+  img.alt = 'Image générée (' + source + ')';
+  img.style.cssText = 'max-width:100%; border-radius:10px; cursor:zoom-in; display:block;';
+  img.onclick = () => openLightbox([{ src: img.src, caption: source + (prompt ? ' — ' + prompt : ''), prompt }], 0);
+  img.onload = () => archiveImage({ url, source, prompt });
+  img.onerror = () => {
+    if (onError) return onError(wrap, url);
+    wrap.className = 'msg image-loading';
+    wrap.textContent = '⚠️ ' + source + ' : l\'image n\'a pas pu être chargée.';
+  };
+  img.src = url;
+  wrap.appendChild(img);
+  messagesEl.appendChild(wrap);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return wrap;
+}
+
+// ----- Visionneuse -----
+let lbItems = [], lbIdx = 0, lbDeletable = false;
+function lbRender() {
+  const it = lbItems[lbIdx];
+  if (!it) return closeLightbox();
+  document.getElementById('lbImg').src = it.src;
+  document.getElementById('lbCaption').textContent = (lbItems.length > 1 ? (lbIdx + 1) + '/' + lbItems.length + ' · ' : '') + (it.caption || '');
+  const multi = lbItems.length > 1;
+  document.getElementById('lbPrev').style.display = multi ? '' : 'none';
+  document.getElementById('lbNext').style.display = multi ? '' : 'none';
+  document.getElementById('lbDelete').style.display = lbDeletable && it.id != null ? '' : 'none';
+  document.getElementById('lbCopy').style.display = it.prompt ? '' : 'none';
+}
+function openLightbox(items, index, deletable) {
+  lbItems = items; lbIdx = index || 0; lbDeletable = !!deletable;
+  document.getElementById('lightbox').classList.remove('hidden');
+  lbRender();
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.add('hidden');
+  document.getElementById('lbImg').src = '';
+}
+function lbStep(d) {
+  if (lbItems.length < 2) return;
+  lbIdx = (lbIdx + d + lbItems.length) % lbItems.length;
+  lbRender();
+}
+document.getElementById('lbClose').onclick = closeLightbox;
+document.getElementById('lbPrev').onclick = () => lbStep(-1);
+document.getElementById('lbNext').onclick = () => lbStep(1);
+document.getElementById('lightbox').addEventListener('click', (e) => {
+  if (e.target.id === 'lightbox') closeLightbox();
+});
+document.getElementById('lbDownload').onclick = () => {
+  const it = lbItems[lbIdx]; if (!it) return;
+  const a = document.createElement('a');
+  a.href = it.src;
+  a.download = 'image-' + (it.ts || Date.now()) + '.' + (/png/i.test(it.mime || '') ? 'png' : /webp/i.test(it.mime || '') ? 'webp' : 'jpg');
+  a.target = '_blank';
+  document.body.appendChild(a); a.click(); a.remove();
+};
+document.getElementById('lbCopy').onclick = async () => {
+  const it = lbItems[lbIdx]; if (!it || !it.prompt) return;
+  try { await navigator.clipboard.writeText(it.prompt); showMediaToast('📋 Prompt copié'); }
+  catch (e) { window.prompt('Prompt :', it.prompt); }
+};
+document.getElementById('lbDelete').onclick = async () => {
+  const it = lbItems[lbIdx]; if (!it || it.id == null) return;
+  if (!confirm('Supprimer cette image de la galerie ?')) return;
+  await galleryDelete(it.id);
+  const keep = lbIdx;
+  const items = await renderGallery();
+  if (!items.length) return closeLightbox();
+  openLightbox(items, Math.min(keep, items.length - 1), true);
+};
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('lightbox').classList.contains('hidden')) {
+    if (e.key === 'Escape' && !document.getElementById('gallery').classList.contains('hidden')) closeGallery();
+    return;
+  }
+  if (e.key === 'Escape') closeLightbox();
+  else if (e.key === 'ArrowLeft') lbStep(-1);
+  else if (e.key === 'ArrowRight') lbStep(1);
+});
+
+// ----- Galerie (grille de miniatures) -----
+let galleryUrls = [];
+async function renderGallery() {
+  galleryUrls.forEach(u => URL.revokeObjectURL(u));
+  galleryUrls = [];
+  const grid = document.getElementById('gGrid');
+  const rows = await galleryList(document.getElementById('gAll').checked);
+  document.getElementById('gCount').textContent = '(' + rows.length + ')';
+  grid.innerHTML = '';
+  const items = rows.map(r => {
+    let src = r.url;
+    if (r.blob) { src = URL.createObjectURL(r.blob); galleryUrls.push(src); }
+    const when = new Date(r.ts).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+    return { id: r.id, src, ts: r.ts, mime: r.blob ? r.blob.type : '', prompt: r.prompt,
+             caption: [r.source, when, r.profile && document.getElementById('gAll').checked ? r.profile : '', r.prompt].filter(Boolean).join(' · ') };
+  });
+  if (!items.length) {
+    grid.innerHTML = '<div id="gEmpty" style="grid-column:1/-1;">Aucune image pour le moment. Elles sont enregistrées ici automatiquement à chaque génération.</div>';
+    return items;
+  }
+  items.forEach((it, i) => {
+    const img = document.createElement('img');
+    img.src = it.src; img.loading = 'lazy'; img.alt = it.caption;
+    img.onclick = () => openLightbox(items, i, true);
+    grid.appendChild(img);
+  });
+  return items;
+}
+async function openGallery() {
+  document.getElementById('gallery').classList.remove('hidden');
+  try { await renderGallery(); } catch (e) { document.getElementById('gGrid').textContent = 'Galerie indisponible : ' + e.message; }
+}
+function closeGallery() {
+  closeLightbox();
+  document.getElementById('gallery').classList.add('hidden');
+  galleryUrls.forEach(u => URL.revokeObjectURL(u));
+  galleryUrls = [];
+  document.getElementById('gGrid').innerHTML = '';
+}
+document.getElementById('galleryBtn').onclick = openGallery;
+document.getElementById('gClose').onclick = closeGallery;
+document.getElementById('gAll').onchange = () => renderGallery();
+document.getElementById('gClear').onclick = async () => {
+  const all = document.getElementById('gAll').checked;
+  if (!confirm(all ? 'Supprimer TOUTES les images de tous les profils ?' : 'Supprimer toutes les images de ce profil ?')) return;
+  await galleryClear(all);
+  renderGallery();
+};
+
+// Nom du générateur Perchance utilisé (le tien s'il renvoie le résultat au chat, sinon l'officiel)
+function perchanceGenName() {
+  const v = (localStorage.getItem('perchanceGen') || '').trim();
+  return /^[a-z0-9][a-z0-9-]{1,60}$/i.test(v) ? v : 'perchance-ai-api';
+}
+
 async function generateNSFWImage(botText, popup) {
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
@@ -1229,15 +1501,7 @@ async function generateNSFWImage(botText, popup) {
   };
 
   function addImageMessage(url) {
-    const imgDiv = document.createElement('div');
-    imgDiv.className = 'msg bot';
-    const img = document.createElement('img');
-    img.src = url;
-    img.alt = 'Image générée (Perchance)';
-    img.style.cssText = 'max-width:100%; border-radius:10px;';
-    imgDiv.appendChild(img);
-    messagesEl.appendChild(imgDiv);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    showGeneratedImage({ url, source: 'Perchance', prompt });
   }
 
   // L'URL peut arriver sous plusieurs noms selon la version de l'API Perchance
@@ -1257,19 +1521,23 @@ async function generateNSFWImage(botText, popup) {
       const params = new URLSearchParams({ prompt, format: 'html', id, ...baseOpts });
       try {
         if (!popup || popup.closed) { resolve(null); return; }
-        popup.location.href = 'https://perchance.org/perchance-ai-api?' + params.toString();
+        popup.location.href = 'https://perchance.org/' + perchanceGenName() + '?' + params.toString();
       } catch (e) {
         // Le popup a pu être fermé entre-temps par l'utilisateur.
       }
-      loadingDiv.textContent = '🎨 Perchance : onglet ouvert — résous le test anti-bot s\'il s\'affiche, puis COPIE l\'URL de l\'image et reviens ici : elle s\'affichera toute seule.';
+      loadingDiv.textContent = perchanceGenName() !== 'perchance-ai-api'
+        ? '🎨 Perchance : onglet ouvert — résous le test anti-bot s\'il s\'affiche ; l\'image arrivera ici toute seule.'
+        : '🎨 Perchance : onglet ouvert — résous le test anti-bot s\'il s\'affiche, puis COPIE l\'URL de l\'image et reviens ici : elle s\'affichera toute seule.';
       const hint = null;
       // Perchance interdit l'intégration en cadre (X-Frame-Options) et l'onglet ouvert ne peut
       // souvent plus renvoyer de message à cette page : on lit donc l'URL copiée au retour.
       const seen = (window.__perchanceSeen = window.__perchanceSeen || new Set());
       let initialClip = '';
-      try { navigator.clipboard.readText().then(t => { initialClip = (t || '').trim(); }).catch(() => {}); } catch (e) {}
+      let initialRead = Promise.resolve();
+      try { initialRead = navigator.clipboard.readText().then(t => { initialClip = (t || '').trim(); }).catch(() => {}); } catch (e) {}
       async function checkClipboard() {
         try {
+          await initialRead;
           const t = ((await navigator.clipboard.readText()) || '').trim();
           if (t && t !== initialClip && !seen.has(t) && /^https?:\/\/\S+\.(jpe?g|png|webp)(\?\S*)?$/i.test(t)) {
             seen.add(t);
@@ -1318,7 +1586,7 @@ async function generateNSFWImage(botText, popup) {
     btn.textContent = '📎 Coller l\'URL de l\'image';
     btn.style.cssText = 'margin-left:6px; padding:4px 10px; border-radius:8px; border:1px solid #2a3d33; background:#1a2a22; color:#e8e8e4; cursor:pointer; font-size:12px;';
     btn.onclick = () => {
-      const u = (prompt('Colle ici l\'URL de l\'image affichée dans l\'onglet Perchance :') || '').trim();
+      const u = (window.prompt('Colle ici l\'URL de l\'image affichée dans l\'onglet Perchance :') || '').trim();
       if (!/^(https?:\/\/|data:image\/)/i.test(u)) { if (u) alert('URL non valide'); return; }
       addImageMessage(u);
       errDiv.remove();
@@ -1610,19 +1878,14 @@ async function generateHFSpaceImage(botText) {
     loadingDiv.remove();
 
     if (imageUrl) {
-      const imgDiv = document.createElement('div');
-      imgDiv.className = 'msg bot';
-      const img = document.createElement('img');
-      img.alt = 'Image générée (Space)';
-      img.style.cssText = 'max-width:100%; border-radius:10px;';
-      img.onerror = () => {
-        console.error('[Space HF] image non chargeable :', imageUrl);
-        imgDiv.className = 'msg image-loading';
-        imgDiv.innerHTML = '⚠️ Space HF : l\'image n\'a pas pu être chargée. <a href="' + imageUrl + '" target="_blank" style="color:#e0a34a;">Ouvrir le lien</a>';
-      };
-      img.src = imageUrl;
-      imgDiv.appendChild(img);
-      messagesEl.appendChild(imgDiv);
+      showGeneratedImage({
+        url: imageUrl, source: 'Space HF', prompt,
+        onError: (wrap, u) => {
+          console.error('[Space HF] image non chargeable :', u);
+          wrap.className = 'msg image-loading';
+          wrap.innerHTML = '⚠️ Space HF : l\'image n\'a pas pu être chargée. <a href="' + u + '" target="_blank" style="color:#e0a34a;">Ouvrir le lien</a>';
+        }
+      });
     } else {
       const errDiv = document.createElement('div');
       errDiv.className = 'msg image-loading';
@@ -1710,10 +1973,7 @@ async function generatePollinationImage(botText) {
   loadingDiv.remove();
 
   if (url) {
-    const imgDiv = document.createElement('div');
-    imgDiv.className = 'msg bot';
-    imgDiv.innerHTML = `<img src="${url}" alt="Image générée (Pollination)" style="max-width:100%; border-radius:10px;">`;
-    messagesEl.appendChild(imgDiv);
+    showGeneratedImage({ url, source: 'Pollination (' + model + ')', prompt });
   } else {
     const errDiv = document.createElement('div');
     errDiv.className = 'msg image-loading';
@@ -1803,6 +2063,16 @@ document.getElementById('pollRefresh').addEventListener('click', async () => {
     btn.disabled = false;
   }
 });
+(function () {
+  const f = document.getElementById('perchanceGen');
+  f.value = localStorage.getItem('perchanceGen') || '';
+  f.addEventListener('input', () => localStorage.setItem('perchanceGen', f.value.trim()));
+})();
+document.getElementById('hAdvPreset').addEventListener('change', (e) => {
+  const pr = HORDE_PRESETS[e.target.value];
+  if (pr) fillHordeAdvForm({ ...readHordeAdvFromForm(), ...pr });
+  e.target.value = '';
+});
 document.getElementById('hAdvReset').addEventListener('click', () => fillHordeAdvForm(HORDE_ADV_DEFAULT));
 document.getElementById('hordeCheckKey').addEventListener('click', async () => {
   const info = document.getElementById('hordeKeyInfo');
@@ -1836,7 +2106,10 @@ async function cancelHordeJob(id) {
 async function callAIHorde(prompt, onProgress) {
   const adv = { ...HORDE_ADV_DEFAULT, ...(hordeAdv || {}) };
   const [w, h] = String(adv.size).split('x').map(Number);
-  const fullPrompt = adv.negative ? prompt + ' ### ' + adv.negative : prompt;
+  // Horde limite le prompt à ~1000 caractères (positif + négatif) : le négatif cède en premier
+  let pos = prompt.slice(0, 990);
+  let neg = (adv.negative || '').slice(0, Math.max(0, 995 - pos.length - 5));
+  const fullPrompt = neg ? pos + ' ### ' + neg : pos;
   const params = {
     width: w || 768,
     height: h || 512,
@@ -1899,17 +2172,17 @@ async function generateAIHordeImage(botText) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   try {
-    const prompt = buildImagePrompt(botText, 700);
+    // Même prompt « photo » que Perchance et Pollination (le prompt à tags de buildImagePrompt
+    // donnait un rendu illustré)
+    const prompt = buildPerchancePrompt(botText, 700);
+    console.log('[Horde] modèles :', hordeModels, '— prompt :', prompt);
     const imgUrl = await callAIHorde(prompt, (c) => {
       loadingDiv.textContent = '🎨 AI Horde : ' +
         (c.processing ? 'en cours' : (c.queue_position != null ? 'file ' + c.queue_position : 'en attente')) +
         (c.wait_time ? ' — ~' + c.wait_time + ' s' : '') + '...';
     });
     loadingDiv.remove();
-    const imgDiv = document.createElement('div');
-    imgDiv.className = 'msg bot';
-    imgDiv.innerHTML = `<img src="${imgUrl}" alt="Image générée (AI Horde)" style="max-width:100%; border-radius:10px;">`;
-    messagesEl.appendChild(imgDiv);
+    showGeneratedImage({ url: imgUrl, source: 'AI Horde' + (hordeModels && hordeModels.length ? ' (' + hordeModels[0] + ')' : ''), prompt });
   } catch (err) {
     loadingDiv.remove();
     console.error('Erreur AI Horde:', err);
