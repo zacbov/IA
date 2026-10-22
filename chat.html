@@ -389,6 +389,22 @@
 </div>
 
 <script>
+// Instance « retour » : si ce chat vient d'être rouvert par le générateur Perchance (#perchance=…),
+// on transmet l'URL à l'onglet d'origine puis on s'efface, sans démarrer l'application.
+(function () {
+  const m = location.hash.match(/^#perchance=(.+)$/);
+  if (!m) return;
+  try {
+    const d = JSON.parse(decodeURIComponent(m[1]));
+    const bc = new BroadcastChannel('perchance-result');
+    bc.postMessage(d);
+    setTimeout(() => bc.close(), 500);
+  } catch (e) {}
+  history.replaceState(null, '', location.pathname);
+  document.body.innerHTML = '<p style="font-family:sans-serif;color:#ddd;padding:24px">✅ Image envoyée au chat — tu peux fermer cet onglet.</p>';
+  setTimeout(() => { try { window.close(); } catch (e) {} }, 800);
+  throw new Error('perchance-return');
+})();
 const WORKER_BASE = 'https://routeur-ia-proxy.zacharybov.workers.dev/proxy/';
 const HISTORY_WINDOW = 8;
 const STORAGE_KEY = 'chat_profiles_v2';
@@ -1517,8 +1533,11 @@ async function generateNSFWImage(botText, popup) {
   // On ne relance que si Perchance répond explicitement par un échec.
   function attempt(timeoutMs) {
     return new Promise((resolve) => {
-      const id = Math.random().toString(36).slice(2);
+      // id long et imprévisible : il sert aussi de « clé » pour la boîte aux lettres du Worker
+      const id = Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2, '0')).join('');
       const params = new URLSearchParams({ prompt, format: 'html', id, ...baseOpts });
+      params.set('return', location.origin + location.pathname);
+      params.set('relay', WORKER_BASE);
       try {
         if (!popup || popup.closed) { resolve(null); return; }
         popup.location.href = 'https://perchance.org/' + perchanceGenName() + '?' + params.toString();
@@ -1550,21 +1569,52 @@ async function generateNSFWImage(botText, popup) {
       window.addEventListener('focus', checkClipboard);
       document.addEventListener('visibilitychange', onVisible);
       const timeout = setTimeout(() => { cleanup(); resolve(null); }, timeoutMs);
-      function cleanup() {
+      var cleanup = function () {
         clearTimeout(timeout); clearTimeout(hint);
         window.removeEventListener('message', onMessage);
         window.removeEventListener('focus', checkClipboard);
         document.removeEventListener('visibilitychange', onVisible);
-      }
+      };
       function onMessage(e) {
         const d = e.data || {};
         if (d.api !== 'perchance-image-api') return;
         console.log('[Perchance] message reçu', e.origin, d);
         if (!d.result || d.result.id !== id) return;
+        if (!d.result.url) console.warn('[Perchance] résultat sans URL :', d.result);
         cleanup();
         resolve(d.result);
       }
       window.addEventListener('message', onMessage);
+
+      // Canal de retour n°2 : le générateur peut rouvrir CE chat dans l'onglet avec l'URL dans
+      // l'adresse (#perchance=…) ; cet onglet-là diffuse alors le résultat à celui-ci.
+      let bc = null;
+      try {
+        bc = new BroadcastChannel('perchance-result');
+        bc.onmessage = (ev) => {
+          const d = ev.data || {};
+          console.log('[Perchance] retour par BroadcastChannel', d);
+          if (d.id !== id || !d.url) return;
+          cleanup();
+          resolve({ ok: true, id, url: d.url });
+        };
+      } catch (e) {}
+      // Canal de retour n°3 (automatique) : le générateur dépose l'URL dans la boîte aux
+      // lettres du Worker ; on la relève toutes les 2 s.
+      const relayTimer = setInterval(async () => {
+        try {
+          const r = await fetch(WORKER_BASE + 'relay-get?id=' + encodeURIComponent(id), { headers: { 'X-App-Secret': password } });
+          if (!r.ok) return;
+          const d = await r.json();
+          if (d && d.url) {
+            console.log('[Perchance] retour par le relais du Worker', d.url);
+            cleanup();
+            resolve({ ok: true, id, url: d.url });
+          }
+        } catch (e) {}
+      }, 2000);
+      const origCleanup = cleanup;
+      cleanup = function () { origCleanup(); clearInterval(relayTimer); try { if (bc) bc.close(); } catch (e) {} };
     });
   }
 
