@@ -132,6 +132,9 @@
   #lbBar { position: absolute; top: 0; left: 0; right: 0; justify-content: space-between; background: linear-gradient(#000c, transparent); z-index: 2; }
   #lbCaption { font-size: 11px; color: #bbb; flex: 1; min-width: 100px; max-height: 3.6em; overflow: hidden; }
   #lbImg { max-width: 96vw; max-height: 88vh; object-fit: contain; border-radius: 6px; }
+
+  .cursor { display: inline-block; color: #e0a34a; animation: cursorBlink 1s steps(2, start) infinite; }
+  @keyframes cursorBlink { to { visibility: hidden; } }
 </style>
 </head>
 <body>
@@ -205,6 +208,10 @@
       <div style="margin-left:22px; margin-bottom:6px;">
         <input type="text" id="perchanceGen" placeholder="Nom de ton générateur Perchance (vide = perchance-ai-api)" style="font-size:11px; padding:5px 8px; width:100%;">
         <div style="font-size:10px; color:#888; margin-top:3px;">Optionnel : un générateur à toi qui renvoie l'image au chat automatiquement (voir perchance-bridge.txt).</div>
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:6px; cursor:pointer;">
+          <input type="checkbox" id="perchancePersistent" style="width:auto;"> Mode permanent : 2 images, sans popup à chaque message
+        </label>
+        <button type="button" id="perchanceOpenDaemon" style="font-size:11px; padding:5px 10px; width:auto; margin-top:4px;">🪟 Ouvrir le générateur permanent</button>
       </div>
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; text-transform:none; letter-spacing:normal; cursor:pointer;">
         <input type="checkbox" id="genHFSpace" style="width:auto;"> Space Hugging Face
@@ -293,6 +300,22 @@
           </div>
         </details>
       </div>
+      <div style="margin-top:12px; padding:10px; border:1px solid #2a3d33; border-radius:8px;">
+        <div style="font-size:12px; color:#ccc; margin-bottom:6px;">🧬 Cohérence du personnage (même visage d'une image à l'autre)</div>
+        <label style="font-size:11px; color:#aaa;">Ancre visuelle (en anglais) — placée en tête de chaque prompt et jamais raccourcie</label>
+        <textarea id="charAnchor" rows="3" placeholder="ex: 28 year old woman, long copper-red hair with bangs, green eyes, freckles, pale skin, athletic build" style="width:100%; font-size:12px;"></textarea>
+        <div style="display:flex; gap:8px; align-items:center; margin:4px 0 8px;">
+          <button type="button" id="charAnchorGen" style="font-size:11px; padding:5px 10px; width:auto;">✨ Générer depuis la description physique</button>
+          <span id="charAnchorInfo" style="font-size:10px; color:#888;"></span>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
+          <label style="display:flex; gap:6px; align-items:center; font-size:12px; cursor:pointer;"><input type="checkbox" id="charSeedLock" style="width:auto;"> 🔒 Verrouiller le seed</label>
+          <input type="number" id="charSeed" step="1" placeholder="seed" style="width:130px; font-size:12px;">
+          <button type="button" id="charSeedRoll" style="font-size:11px; padding:5px 10px; width:auto;" title="Tirer un nouveau seed">🎲</button>
+        </div>
+        <label style="font-size:11px; color:#aaa;">Image de référence (URL publique) — utilisée par Pollination avec kontext, gptimage, nanobanana, seedream</label>
+        <input type="text" id="charRef" placeholder="https://… (⭐ dans la visionneuse pour en choisir une)" style="width:100%; font-size:12px;">
+      </div>
       <label style="display:flex; gap:8px; align-items:center; font-size:12px; margin-top:10px;">
         <input type="checkbox" id="genTranslate" style="width:auto;"> 🌐 Traduire en anglais la description physique et la scène (si elles sont en français)
       </label>
@@ -363,6 +386,7 @@
       <button id="lbPrev" type="button">‹</button>
       <button id="lbNext" type="button">›</button>
       <button id="lbDownload" type="button" title="Télécharger">⬇</button>
+      <button id="lbRef" type="button" title="Définir comme image de référence du personnage">⭐</button>
       <button id="lbCopy" type="button" title="Copier le prompt">📋</button>
       <button id="lbDelete" type="button" title="Supprimer de la galerie">🗑</button>
       <button id="lbClose" type="button">✕</button>
@@ -485,6 +509,7 @@ let hfSpaceId = 'properfool/nsfwadult';
 let genPollination = false;
 let pollModel = 'flux';
 let genAIHorde = false;
+let charAnchor = '', charSeedLock = false, charSeed = null, charRef = '';
 let translatePrompts = true;   // traduction FR → EN des éléments du prompt d'image
 const HORDE_DEFAULT_MODELS = [
   // Photoréalistes d'abord (↻ En ligne montre ceux qui ont des workers)
@@ -590,6 +615,10 @@ function readImageGeneratorsFromForm() {
     pollModel: document.getElementById('pollModel').value,
     aiHorde: document.getElementById('genAIHorde').checked,
     translate: document.getElementById('genTranslate').checked,
+    charAnchor: document.getElementById('charAnchor').value.trim(),
+    charSeedLock: document.getElementById('charSeedLock').checked,
+    charSeed: document.getElementById('charSeed').value.trim(),
+    charRef: document.getElementById('charRef').value.trim(),
     hordeModels: hordeFormSel.slice(),
     hordeAdv: readHordeAdvFromForm()
   };
@@ -645,6 +674,10 @@ function fillFormFromProfile(name) {
   })();
   document.getElementById('genAIHorde').checked = !!igForm.aiHorde;
   document.getElementById('genTranslate').checked = igForm.translate !== false;
+  document.getElementById('charAnchor').value = igForm.charAnchor || '';
+  document.getElementById('charSeedLock').checked = !!igForm.charSeedLock;
+  document.getElementById('charSeed').value = igForm.charSeed ?? '';
+  document.getElementById('charRef').value = igForm.charRef || '';
   hordeFormSel = Array.isArray(igForm.hordeModels) ? igForm.hordeModels.slice() : ['WAI-NSFW-illustrious-SDXL'];
   fillHordeAdvForm(igForm.hordeAdv);
   renderHordeChips();
@@ -729,6 +762,7 @@ function activateProfile(name, isSwitch) {
   pollModel = ig.pollModel || 'flux';
   genAIHorde = !!ig.aiHorde;
   translatePrompts = ig.translate !== false;
+  charAnchor = (ig.charAnchor || '').trim(); charSeedLock = !!ig.charSeedLock; charSeed = ig.charSeed ?? null; charRef = (ig.charRef || '').trim();
   hordeModels = Array.isArray(ig.hordeModels) ? ig.hordeModels.slice() : ['WAI-NSFW-illustrious-SDXL'];
   hordeAdv = { ...HORDE_ADV_DEFAULT, ...(ig.hordeAdv || {}) };
   const ttsCfg = p.tts || {};
@@ -789,6 +823,7 @@ document.getElementById('startBtn').addEventListener('click', () => {
     pollModel = ig.pollModel || 'flux';
     genAIHorde = ig.aiHorde;
     translatePrompts = ig.translate !== false;
+    charAnchor = (ig.charAnchor || '').trim(); charSeedLock = !!ig.charSeedLock; charSeed = ig.charSeed ?? null; charRef = (ig.charRef || '').trim();
     hordeModels = ig.hordeModels;
     hordeAdv = ig.hordeAdv;
     const ttsCfg = readTtsFromForm();
@@ -1350,7 +1385,8 @@ async function archiveImage({ url, source, prompt }) {
     await gallerySave({
       profile: profileName || '', ts: Date.now(), source: source || '',
       prompt: String(prompt || '').slice(0, 1500),
-      blob: blob, url: blob ? '' : (url.startsWith('blob:') ? '' : url)
+      blob: blob, url: blob ? '' : (url.startsWith('blob:') ? '' : url),
+      pubUrl: /^https:\/\//i.test(url) ? url : ''
     });
   } catch (e) { console.warn('Galerie : sauvegarde impossible', e); }
 }
@@ -1362,7 +1398,7 @@ function showGeneratedImage({ url, source, prompt, onError }) {
   const img = document.createElement('img');
   img.alt = 'Image générée (' + source + ')';
   img.style.cssText = 'max-width:100%; border-radius:10px; cursor:zoom-in; display:block;';
-  img.onclick = () => openLightbox([{ src: img.src, caption: source + (prompt ? ' — ' + prompt : ''), prompt }], 0);
+  img.onclick = () => openLightbox([{ src: img.src, caption: source + (prompt ? ' — ' + prompt : ''), prompt, pubUrl: /^https:\/\//i.test(url) ? url : '' }], 0);
   img.onload = () => archiveImage({ url, source, prompt });
   img.onerror = () => {
     if (onError) return onError(wrap, url);
@@ -1388,6 +1424,7 @@ function lbRender() {
   document.getElementById('lbNext').style.display = multi ? '' : 'none';
   document.getElementById('lbDelete').style.display = lbDeletable && it.id != null ? '' : 'none';
   document.getElementById('lbCopy').style.display = it.prompt ? '' : 'none';
+  document.getElementById('lbRef').style.display = it.pubUrl ? '' : 'none';
 }
 function openLightbox(items, index, deletable) {
   lbItems = items; lbIdx = index || 0; lbDeletable = !!deletable;
@@ -1416,6 +1453,21 @@ document.getElementById('lbDownload').onclick = () => {
   a.download = 'image-' + (it.ts || Date.now()) + '.' + (/png/i.test(it.mime || '') ? 'png' : /webp/i.test(it.mime || '') ? 'webp' : 'jpg');
   a.target = '_blank';
   document.body.appendChild(a); a.click(); a.remove();
+};
+document.getElementById('lbRef').onclick = () => {
+  const it = lbItems[lbIdx]; if (!it || !it.pubUrl) return;
+  charRef = it.pubUrl;
+  const f = document.getElementById('charRef'); if (f) f.value = it.pubUrl;
+  try { // sauvegarde immédiate dans le profil courant
+    const ps = loadProfiles();
+    if (profileName && ps[profileName]) {
+      ps[profileName].imageGenerators = { ...(ps[profileName].imageGenerators || {}), charRef: it.pubUrl };
+      saveProfiles(ps);
+    }
+  } catch (e) {}
+  showMediaToast(/r2\.cloudflarestorage|aihorde/i.test(it.pubUrl)
+    ? '⭐ Référence définie (lien Horde temporaire : il expirera)'
+    : '⭐ Image de référence définie pour ce profil');
 };
 document.getElementById('lbCopy').onclick = async () => {
   const it = lbItems[lbIdx]; if (!it || !it.prompt) return;
@@ -1454,7 +1506,7 @@ async function renderGallery() {
     let src = r.url;
     if (r.blob) { src = URL.createObjectURL(r.blob); galleryUrls.push(src); }
     const when = new Date(r.ts).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
-    return { id: r.id, src, ts: r.ts, mime: r.blob ? r.blob.type : '', prompt: r.prompt,
+    return { id: r.id, src, ts: r.ts, mime: r.blob ? r.blob.type : '', prompt: r.prompt, pubUrl: r.pubUrl || '',
              caption: [r.source, when, r.profile && document.getElementById('gAll').checked ? r.profile : '', r.prompt].filter(Boolean).join(' · ') };
   });
   if (!items.length) {
@@ -1490,6 +1542,114 @@ document.getElementById('gClear').onclick = async () => {
   renderGallery();
 };
 
+// ========== PERCHANCE PERMANENT : un onglet générateur reste ouvert et traite une file de travaux ==========
+const PERCHANCE_VARIANTS = 2; // images par message
+const hex24 = () => Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2, '0')).join('');
+function perchanceToken() {
+  let t = localStorage.getItem('perchanceToken') || '';
+  if (!/^[a-f0-9]{24}$/.test(t)) { t = hex24(); localStorage.setItem('perchanceToken', t); }
+  return t;
+}
+function perchancePersistentOn() {
+  return localStorage.getItem('perchancePersistent') === '1' && perchanceGenName() !== 'perchance-ai-api';
+}
+function openPerchanceDaemon() {
+  const u = 'https://perchance.org/' + perchanceGenName() + '?' + new URLSearchParams({ mode: 'daemon', token: perchanceToken(), relay: WORKER_BASE }).toString();
+  return window.open(u, 'perchanceDaemon', 'width=520,height=720');
+}
+(function () {
+  const cb = document.getElementById('perchancePersistent');
+  cb.checked = localStorage.getItem('perchancePersistent') === '1';
+  cb.addEventListener('change', () => localStorage.setItem('perchancePersistent', cb.checked ? '1' : '0'));
+  document.getElementById('perchanceOpenDaemon').addEventListener('click', openPerchanceDaemon);
+})();
+
+async function generatePerchanceViaDaemon(botText) {
+  const card = document.createElement('div');
+  card.className = 'msg image-loading';
+  const label = document.createElement('span');
+  card.appendChild(label);
+  const openBtn = document.createElement('button');
+  openBtn.type = 'button';
+  openBtn.textContent = '🪟 Ouvrir le générateur';
+  openBtn.style.cssText = 'display:none; margin-left:8px; padding:4px 10px; border-radius:8px; border:1px solid #2a3d33; background:#1a2a22; color:#e8e8e4; cursor:pointer; font-size:12px;';
+  openBtn.onclick = openPerchanceDaemon;
+  card.appendChild(openBtn);
+  messagesEl.appendChild(card);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  label.textContent = '🎨 Perchance : travail envoyé au générateur permanent…';
+
+  const prompt = buildPerchancePrompt(botText, 900);
+  console.log('[Perchance permanent] prompt :', prompt);
+  const token = perchanceToken();
+  const id = hex24();
+  const N = PERCHANCE_VARIANTS;
+  const ids = Array.from({ length: N }, (_, i) => id + String.fromCharCode(97 + i)); // …a, …b
+  const headers = { 'Content-Type': 'application/json', 'X-App-Secret': password };
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  try {
+    const res = await fetch(WORKER_BASE + 'perchance-job', {
+      method: 'POST', headers,
+      body: JSON.stringify({
+        token, id, prompt, count: N, seed: charSeedValue() ?? Math.floor(Math.random() * 1e9),
+        resolution: '768x512', guidanceScale: 7,
+        negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark'
+      })
+    });
+    if (!res.ok) throw new Error('Worker HTTP ' + res.status);
+  } catch (e) {
+    label.textContent = '⚠️ Perchance : travail non envoyé (' + e.message + ')';
+    return;
+  }
+
+  const got = new Set();
+  const t0 = Date.now();
+  while (got.size < N && Date.now() - t0 < 300000) {
+    await sleep(2000);
+    let alive = null;
+    try {
+      const st = await fetch(WORKER_BASE + 'perchance-status?token=' + token, { headers });
+      if (st.ok) alive = !!(await st.json()).alive;
+    } catch (e) {}
+    for (let i = 0; i < N; i++) {
+      if (got.has(ids[i])) continue;
+      try {
+        const r = await fetch(WORKER_BASE + 'relay-get?id=' + ids[i], { headers });
+        if (!r.ok) continue;
+        const d = await r.json();
+        if (d && d.url) {
+          got.add(ids[i]);
+          console.log('[Perchance permanent] image ' + (i + 1) + ' reçue :', d.url);
+          showGeneratedImage({ url: d.url, source: 'Perchance #' + (i + 1), prompt });
+        }
+      } catch (e) {}
+    }
+    if (got.size < N) {
+      if (alive === false && got.size === 0) {
+        label.textContent = '⚠️ Générateur permanent inactif — ouvre-le (laisse-le ouvert) :';
+        openBtn.style.display = '';
+      } else {
+        label.textContent = '🎨 Perchance : génération en cours (' + got.size + '/' + N + ')…';
+        openBtn.style.display = 'none';
+      }
+    }
+  }
+  if (got.size === 0) {
+    label.textContent = '⏳ Perchance : aucune image reçue. Le générateur permanent est-il ouvert et démarré ?';
+    openBtn.style.display = '';
+  } else {
+    card.remove();
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+// Seed verrouillé du personnage (null = aléatoire)
+function charSeedValue() {
+  const n = Number(charSeed);
+  return (charSeedLock && charSeed !== '' && charSeed !== null && Number.isFinite(n)) ? Math.trunc(n) : null;
+}
+
 // Nom du générateur Perchance utilisé (le tien s'il renvoie le résultat au chat, sinon l'officiel)
 function perchanceGenName() {
   const v = (localStorage.getItem('perchanceGen') || '').trim();
@@ -1497,6 +1657,7 @@ function perchanceGenName() {
 }
 
 async function generateNSFWImage(botText, popup) {
+  if (perchancePersistentOn()) return generatePerchanceViaDaemon(botText);
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
   loadingDiv.textContent = '🎨 Génération de l\'image en cours (Perchance)...';
@@ -1513,7 +1674,8 @@ async function generateNSFWImage(botText, popup) {
   const baseOpts = {
     resolution: '768x512',
     guidanceScale: 7,
-    negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark'
+    negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark',
+    ...(charSeedValue() !== null ? { seed: String(charSeedValue()) } : {})
   };
 
   function addImageMessage(url) {
@@ -1560,8 +1722,8 @@ async function generateNSFWImage(botText, popup) {
           const t = ((await navigator.clipboard.readText()) || '').trim();
           if (t && t !== initialClip && !seen.has(t) && /^https?:\/\/\S+\.(jpe?g|png|webp)(\?\S*)?$/i.test(t)) {
             seen.add(t);
-            cleanup();
             resolve({ ok: true, id, url: t });
+            try { cleanup(); } catch (e) { console.warn('[Perchance] nettoyage :', e); }
           }
         } catch (e) { /* permission refusée : le bouton "Coller l'URL" prend le relais */ }
       }
@@ -1581,8 +1743,8 @@ async function generateNSFWImage(botText, popup) {
         console.log('[Perchance] message reçu', e.origin, d);
         if (!d.result || d.result.id !== id) return;
         if (!d.result.url) console.warn('[Perchance] résultat sans URL :', d.result);
-        cleanup();
         resolve(d.result);
+        try { cleanup(); } catch (e) { console.warn('[Perchance] nettoyage :', e); }
       }
       window.addEventListener('message', onMessage);
 
@@ -1595,8 +1757,8 @@ async function generateNSFWImage(botText, popup) {
           const d = ev.data || {};
           console.log('[Perchance] retour par BroadcastChannel', d);
           if (d.id !== id || !d.url) return;
-          cleanup();
           resolve({ ok: true, id, url: d.url });
+          try { cleanup(); } catch (e) { console.warn('[Perchance] nettoyage :', e); }
         };
       } catch (e) {}
       // Canal de retour n°3 (automatique) : le générateur dépose l'URL dans la boîte aux
@@ -1608,8 +1770,8 @@ async function generateNSFWImage(botText, popup) {
           const d = await r.json();
           if (d && d.url) {
             console.log('[Perchance] retour par le relais du Worker', d.url);
-            cleanup();
             resolve({ ok: true, id, url: d.url });
+            try { cleanup(); } catch (e) { console.warn('[Perchance] nettoyage :', e); }
           }
         } catch (e) {}
       }, 2000);
@@ -1619,15 +1781,29 @@ async function generateNSFWImage(botText, popup) {
   }
 
   let result = await attempt(300000);
+  console.log('[Perchance] résultat reçu par la génération :', result);
 
-  loadingDiv.remove();
+  try { loadingDiv.remove(); } catch (e) {}
 
   const imgUrl = pickUrl(result);
+  let shown = false;
   if (imgUrl) {
     try { if (popup) popup.close(); } catch (e) {}
-    (window.__perchanceSeen = window.__perchanceSeen || new Set()).add(imgUrl);
-    addImageMessage(imgUrl);
-  } else {
+    try {
+      (window.__perchanceSeen = window.__perchanceSeen || new Set()).add(imgUrl);
+      addImageMessage(imgUrl);
+      shown = true;
+      console.log('[Perchance] image ajoutée à la conversation :', imgUrl);
+    } catch (e) {
+      console.error('[Perchance] échec de l\'affichage de l\'image :', e);
+      const errDiv = document.createElement('div');
+      errDiv.className = 'msg image-loading';
+      errDiv.textContent = '⚠️ Perchance : image reçue mais affichage impossible (' + (e && e.message || e) + ') — ' + imgUrl;
+      messagesEl.appendChild(errDiv);
+      shown = true;
+    }
+  }
+  if (!shown) {
     const errDiv = document.createElement('div');
     errDiv.className = 'msg image-loading';
     errDiv.textContent = '⏳ Pas de retour automatique de Perchance. ';
@@ -1753,6 +1929,7 @@ async function toEnglish(text) {
 
 // Description physique prête pour le prompt : version traduite si elle existe déjà
 function physDescForImage() {
+  if (charAnchor) return charAnchor; // ancre fixe : prioritaire sur la description libre
   return translatePrompts ? (translateCache.get((physicalDescription || '').trim()) || physicalDescription) : physicalDescription;
 }
 
@@ -1803,8 +1980,16 @@ function buildPerchancePrompt(botText, maxLen) {
   // La scène du moment est prioritaire : si le budget manque, c'est la description du
   // personnage qu'on raccourcit, jamais la scène ni les tags de style.
   const budget = Math.max((maxLen || 900) - prefix.length - suffix.length - tags.length - 2, 0);
-  const descPart = physDescForImage().slice(0, Math.max(budget - action.length - 2, 0));
-  const variable = [descPart, action].filter(Boolean).join(', ');
+  // Avec une ancre visuelle, c'est elle qu'on garde entière (elle fait le visage) et la scène
+  // qui cède en premier ; sans ancre, comportement d'origine.
+  let descPart, actionPart = action;
+  if (charAnchor) {
+    descPart = charAnchor.slice(0, 260);
+    actionPart = action.slice(0, Math.max(budget - descPart.length - 2, 80));
+  } else {
+    descPart = physDescForImage().slice(0, Math.max(budget - action.length - 2, 0));
+  }
+  const variable = [descPart, actionPart].filter(Boolean).join(', ');
   return prefix + (variable ? variable + ', ' : '') + tags + suffix;
 }
 
@@ -1967,6 +2152,9 @@ async function generatePollinationImage(botText) {
   // même résolution, même guidance, même prompt négatif.
   const prompt = buildPerchancePrompt(botText, 900);
   const model = pollModel || 'flux';
+  // Image de référence : seulement pour les modèles « édition / référence »
+  const refImage = (/^https:\/\//i.test(charRef) && /kontext|gptimage|nanobanana|seedream/i.test(model)) ? charRef : '';
+  if (refImage) console.log('[Pollination] image de référence :', refImage);
   console.log('[Pollination] modèle :', model, '— prompt :', prompt);
   const opts = {
     width: 768,
@@ -1978,7 +2166,7 @@ async function generatePollinationImage(botText) {
   // Une tentative = un nouveau seed + un délai maximal, comme les essais de Perchance.
   // 1) via le Worker (clé POLLI_KEY côté serveur), 2) accès anonyme direct en secours.
   async function attempt(timeoutMs) {
-    const seed = Math.floor(Math.random() * 1000000);
+    const seed = charSeedValue() ?? Math.floor(Math.random() * 1000000);
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
@@ -1986,7 +2174,7 @@ async function generatePollinationImage(botText) {
         const res = await fetch(WORKER_BASE + 'pollinations-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
-          body: JSON.stringify({ prompt, model, seed, ...opts }),
+          body: JSON.stringify({ prompt, model, seed, ...opts, ...(refImage ? { image: refImage } : {}) }),
           signal: ctrl.signal
         });
         if (res.ok) {
@@ -2002,7 +2190,8 @@ async function generatePollinationImage(botText) {
       // Secours anonyme : on charge l'image dans un <img> pour savoir si elle arrive vraiment
       const q = new URLSearchParams({
         width: opts.width, height: opts.height, model, seed,
-        nologo: 'true', negative_prompt: opts.negative_prompt
+        nologo: 'true', negative_prompt: opts.negative_prompt,
+        ...(refImage ? { image: refImage } : {})
       });
       const direct = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?' + q;
       return await new Promise((resolve) => {
@@ -2076,7 +2265,7 @@ async function refreshHordeModels() {
     const res = await fetch(WORKER_BASE + 'horde/status/models?type=image&min_count=1', {
       headers: { 'X-App-Secret': password }
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) throw new Error(await hordeErr(res));
     const list = await res.json();
     if (!Array.isArray(list) || !list.length) throw new Error('liste vide');
     hordeCatalog = list
@@ -2123,13 +2312,53 @@ document.getElementById('hAdvPreset').addEventListener('change', (e) => {
   if (pr) fillHordeAdvForm({ ...readHordeAdvFromForm(), ...pr });
   e.target.value = '';
 });
+document.getElementById('charSeedRoll').addEventListener('click', () => {
+  document.getElementById('charSeed').value = Math.floor(Math.random() * 1e9);
+  document.getElementById('charSeedLock').checked = true;
+});
+document.getElementById('charAnchorGen').addEventListener('click', async () => {
+  const info = document.getElementById('charAnchorInfo');
+  const desc = (document.getElementById('physicalDescription').value || '').trim();
+  if (!desc) { info.textContent = 'Remplis d\'abord la description physique du profil.'; return; }
+  info.textContent = 'Génération…';
+  const pw = (document.getElementById('password').value || password || '');
+  const prov = document.getElementById('provider').value || provider;
+  const mdl = (document.getElementById('model').value || model || '').trim();
+  let out = '';
+  try {
+    const res = await fetch(WORKER_BASE + prov, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': pw },
+      body: JSON.stringify({
+        model: mdl || 'auto', stream: false, temperature: 0.2, max_tokens: 160,
+        messages: [
+          { role: 'system', content: 'You turn a character\'s appearance notes (any language) into ONE compact English visual anchor for text-to-image models: apparent age, build, face, hair (colour, length, style), eyes, skin, distinctive features, usual outfit if stated. Comma-separated phrases, at most 220 characters. Output only the anchor, nothing else.' },
+          { role: 'user', content: desc }
+        ]
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    out = stripThink((d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '').replace(/^["'\s]+|["'\s]+$/g, '').replace(/\s+/g, ' ');
+  } catch (e) { console.warn('Ancre : modèle de chat indisponible', e); }
+  // Repli : simple traduction de la description si le modèle a échoué ou refusé
+  if (!out || out.length < 15) {
+    const prevT = translatePrompts; translatePrompts = true;
+    try { out = (await toEnglish(desc)).trim(); } catch (e) { out = desc; }
+    translatePrompts = prevT;
+    info.textContent = 'Modèle indisponible : description traduite à la place (modifiable).';
+  } else {
+    info.textContent = 'Ancre générée — relis-la, modifie-la au besoin, puis enregistre le profil.';
+  }
+  document.getElementById('charAnchor').value = out.slice(0, 260);
+});
 document.getElementById('hAdvReset').addEventListener('click', () => fillHordeAdvForm(HORDE_ADV_DEFAULT));
 document.getElementById('hordeCheckKey').addEventListener('click', async () => {
   const info = document.getElementById('hordeKeyInfo');
   info.textContent = 'Vérification…';
   try {
     const res = await fetch(WORKER_BASE + 'horde/find_user', { headers: { 'X-App-Secret': password } });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) throw new Error(await hordeErr(res));
     const u = await res.json();
     const anon = /anonymous/i.test(u.username || '');
     info.textContent = anon
@@ -2144,12 +2373,33 @@ document.getElementById('hordeRefresh').addEventListener('click', refreshHordeMo
 fillHordeAdvForm(HORDE_ADV_DEFAULT);
 renderHordeChips();
 
-async function cancelHordeJob(id) {
-  // Libère la file côté Horde ; sans importance si ça échoue
+// ----- AI Horde : accès, erreurs, soumission -----
+// Message lisible à partir d'une réponse d'erreur de Horde : statut + message + code (rc)
+async function hordeErr(res) {
+  let txt = '';
+  try { txt = await res.text(); } catch (e) {}
+  let msg = txt;
   try {
-    await fetch(WORKER_BASE + 'horde/generate/status/' + id, {
-      method: 'DELETE', headers: { 'X-App-Secret': password }
-    });
+    const j = JSON.parse(txt);
+    msg = [j.message, j.rc ? '(' + j.rc + ')' : ''].filter(Boolean).join(' ') || txt;
+  } catch (e) {}
+  return res.status + (msg ? ' — ' + String(msg).slice(0, 250) : '');
+}
+// Deux chemins d'accès : le Worker (avec ta clé) ou, en secours, directement depuis ce navigateur
+// en anonyme (Horde refuse parfois les requêtes venant de l'adresse IP du Worker).
+const HORDE_DIRECT = {
+  base: 'https://aihorde.net/api/v2/',
+  headers: { 'apikey': '0000000000', 'Client-Agent': 'chat-perso-zacbov:1:chat.html' }
+};
+function hordeViaWorker() {
+  return { base: WORKER_BASE + 'horde/', headers: { 'X-App-Secret': password } };
+}
+
+async function cancelHordeJob(id, net) {
+  // Libère la file côté Horde ; sans importance si ça échoue
+  net = net || hordeViaWorker();
+  try {
+    await fetch(net.base + 'generate/status/' + id, { method: 'DELETE', headers: net.headers });
   } catch (e) {}
 }
 
@@ -2160,7 +2410,7 @@ async function callAIHorde(prompt, onProgress) {
   let pos = prompt.slice(0, 990);
   let neg = (adv.negative || '').slice(0, Math.max(0, 995 - pos.length - 5));
   const fullPrompt = neg ? pos + ' ### ' + neg : pos;
-  const params = {
+  const full = {
     width: w || 768,
     height: h || 512,
     steps: adv.steps,
@@ -2170,47 +2420,76 @@ async function callAIHorde(prompt, onProgress) {
     karras: !!adv.karras,
     n: 1
   };
-  if (adv.seed !== '' && adv.seed != null) params.seed = String(adv.seed);
-  const submitRes = await fetch(WORKER_BASE + 'horde/generate/async', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
-    body: JSON.stringify({
-      prompt: fullPrompt,
-      nsfw: true,
-      censor_nsfw: false,
-      slow_workers: !!adv.slow,
-      trusted_workers: !!adv.trusted,
-      ...(hordeModels && hordeModels.length ? { models: hordeModels } : {}),
-      params
-    })
+  if (adv.seed !== '' && adv.seed != null) full.seed = String(adv.seed);
+  else if (charSeedValue() !== null) full.seed = String(charSeedValue());
+  // Paramètres allégés : certaines limites (taille, steps) s'appliquent aux comptes anonymes
+  const light = { ...full, width: (h > w) ? 512 : 768, height: (h > w) ? 768 : 512, steps: Math.min(adv.steps || 25, 25) };
+  const body = (params) => JSON.stringify({
+    prompt: fullPrompt,
+    nsfw: true,
+    censor_nsfw: false,
+    slow_workers: !!adv.slow,
+    trusted_workers: !!adv.trusted,
+    ...(hordeModels && hordeModels.length ? { models: hordeModels } : {}),
+    params
   });
-  if (!submitRes.ok) throw new Error('Soumission refusée (' + submitRes.status + ')');
-  const { id } = await submitRes.json();
-  if (!id) throw new Error('Pas d\'id de génération reçu');
+
+  const attempts = [
+    { net: hordeViaWorker(), params: full,  label: 'Worker' },
+    { net: hordeViaWorker(), params: light, label: 'Worker (paramètres allégés)' },
+    { net: HORDE_DIRECT,     params: light, label: 'accès direct anonyme' }
+  ];
+  let net = null, id = null, lastErr = '';
+  for (const a of attempts) {
+    let res;
+    try {
+      res = await fetch(a.net.base + 'generate/async', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...a.net.headers },
+        body: body(a.params)
+      });
+    } catch (e) {
+      lastErr = a.label + ' : ' + e.message;
+      console.warn('[Horde] échec réseau —', lastErr);
+      continue;
+    }
+    if (res.ok) {
+      const d = await res.json();
+      if (d.id) {
+        net = a.net; id = d.id;
+        if (a.label !== 'Worker') console.log('[Horde] demande acceptée via :', a.label);
+        break;
+      }
+      lastErr = a.label + ' : pas d\'id reçu';
+      continue;
+    }
+    lastErr = a.label + ' : ' + await hordeErr(res);
+    console.warn('[Horde] demande refusée —', lastErr);
+    // Seuls les refus 401/403 tiennent au compte ou à l'adresse : on réessaie autrement.
+    // Les autres (modèle inconnu, prompt, trop de requêtes) échoueraient partout.
+    if (res.status !== 403 && res.status !== 401) break;
+  }
+  if (!id) throw new Error('Soumission refusée — ' + lastErr);
 
   const deadline = Date.now() + 150000; // la file bénévole peut être plus lente qu'un service dédié
   while (Date.now() < deadline) {
     await new Promise(r => setTimeout(r, 4000));
-    const checkRes = await fetch(WORKER_BASE + 'horde/generate/check/' + id, {
-      headers: { 'X-App-Secret': password }
-    });
+    const checkRes = await fetch(net.base + 'generate/check/' + id, { headers: net.headers });
     if (!checkRes.ok) continue;
     const checkData = await checkRes.json();
     if (checkData.faulted) throw new Error('génération en échec côté Horde');
-    if (checkData.is_possible === false) { cancelHordeJob(id); throw new Error('aucun worker en ligne pour ce(s) modèle(s) : choisis-en un avec des workers (bouton ↻ En ligne)'); }
+    if (checkData.is_possible === false) { cancelHordeJob(id, net); throw new Error('aucun worker en ligne pour ce(s) modèle(s) : choisis-en un avec des workers (bouton ↻ En ligne)'); }
     if (onProgress && !checkData.done) onProgress(checkData);
     if (checkData.done) {
-      const statusRes = await fetch(WORKER_BASE + 'horde/generate/status/' + id, {
-        headers: { 'X-App-Secret': password }
-      });
-      if (!statusRes.ok) throw new Error('résultat indisponible (' + statusRes.status + ')');
+      const statusRes = await fetch(net.base + 'generate/status/' + id, { headers: net.headers });
+      if (!statusRes.ok) throw new Error('résultat indisponible (' + await hordeErr(statusRes) + ')');
       const statusData = await statusRes.json();
       const gen = statusData.generations && statusData.generations[0];
       if (gen && gen.img) return gen.img;
       throw new Error('aucune image dans le résultat');
     }
   }
-  cancelHordeJob(id);
+  cancelHordeJob(id, net);
   throw new Error('délai dépassé (file d\'attente trop longue)');
 }
 
@@ -2245,6 +2524,64 @@ async function generateAIHordeImage(botText) {
 }
 
 // ========== sendToWorker ==========
+// ========== RÉPONSE EN CONTINU (streaming) ==========
+let streamAbort = null; // AbortController de la réponse en cours (sert au bouton ■)
+
+function setGenerating(on) {
+  sendBtn.textContent = on ? '■' : '➤';
+  sendBtn.title = on ? 'Arrêter la réponse' : '';
+  sendBtn.style.background = on ? '#8a2a2a' : '';
+  sendBtn.style.color = on ? '#fff' : '';
+}
+
+// Les modèles « raisonneurs » émettent leur réflexion entre <think>…</think> : on la masque,
+// y compris tant que la balise de fin n'est pas arrivée.
+function stripThink(t) {
+  return String(t).replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<think>[\s\S]*$/i, '');
+}
+
+// Voix en continu : chaque réplique entre guillemets est lue dès qu'elle est terminée, sans
+// attendre la fin du message. Sans guillemets, on retombe sur les premières phrases à la fin.
+function makeStreamSpeaker() {
+  let fed = 0, stopped = false, chain = Promise.resolve();
+  const speak = (t) => {
+    chain = chain.then(async () => {
+      if (stopped) return;
+      if (ttsEleven) await speakWithEleven(t);
+      if (ttsBrowser) speakWithBrowser(t);
+    }).catch(() => {});
+  };
+  return {
+    feed(text) {
+      const m = [...text.matchAll(/"([^"]+)"/g)];
+      for (; fed < m.length; fed++) {
+        const t = m[fed][1].trim();
+        if (t.length >= 5) speak(t);
+      }
+    },
+    end(text) {
+      if (stopped) return;
+      this.feed(text);
+      if (fed === 0) extractSpeakableTexts(text).forEach(speak);
+    },
+    stop() { stopped = true; }
+  };
+}
+
+// Une ligne « data: … » d'un flux SSE de type OpenAI → { delta, error }
+function parseSSELine(line) {
+  const t = line.trim();
+  if (!t.startsWith('data:')) return null;
+  const payload = t.slice(5).trim();
+  if (!payload || payload === '[DONE]') return null;
+  try {
+    const j = JSON.parse(payload);
+    if (j.error) return { error: j.error.message || JSON.stringify(j.error) };
+    const c = j.choices && j.choices[0];
+    return { delta: (c && ((c.delta && c.delta.content) ?? (c.message && c.message.content) ?? c.text)) || '' };
+  } catch (e) { return null; }
+}
+
 async function sendToWorker(userText, userTs) {
   const isInit = userText === '__init__';
   let typingEl = null;
@@ -2253,13 +2590,19 @@ async function sendToWorker(userText, userTs) {
   // Ouvert tout de suite, de façon SYNCHRONE, pour rester rattaché au geste utilisateur
   // (clic sur Envoyer) — si on attend le premier `await`, le navigateur bloque le popup.
   // Seulement si Perchance est activé pour ce profil, sinon pas de popup inutile.
-  const imagePopup = genPerchance ? window.open('about:blank', '_blank') : null;
+  const imagePopup = (genPerchance && !perchancePersistentOn()) ? window.open('about:blank', '_blank') : null;
   function closeUnusedPopup() {
     if (imagePopup && !imagePopup.closed) { try { imagePopup.close(); } catch (e) {} }
   }
 
+  const ctrl = new AbortController();
+  streamAbort = ctrl;
+  let fullText = '';
+  let stalled = false, streamError = '', watchdog = null;
+  const speaker = makeStreamSpeaker();
+
   try {
-    sendBtn.disabled = true;
+    setGenerating(true);
     typingEl = addMessage('...', 'typing');
     typingEl.classList.remove('msg');
 
@@ -2268,6 +2611,7 @@ async function sendToWorker(userText, userTs) {
 
     const response = await fetch(WORKER_BASE + provider, {
       method: 'POST',
+      signal: ctrl.signal,
       headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
       body: JSON.stringify({
         model: model,
@@ -2289,59 +2633,105 @@ async function sendToWorker(userText, userTs) {
       return;
     }
 
-    if (!response.body) {
-      typingEl.remove();
-      const data = await response.json();
-      const botText = data?.choices?.[0]?.message?.content || JSON.stringify(data);
-      addMessage(botText, 'bot');
-      finalizeHistory(userText, botText, isInit, userTs);
-      if (botText.length > 20) {
-        speakQuotedText(botText);
-        launchImageGenerators(botText, userText, imagePopup, closeUnusedPopup);
+    typingEl.remove(); typingEl = null;
+    botDiv = addMessage('', 'bot');
+    const contentEl = botDiv.querySelector('.msg-content');
+
+    // Rendu groupé : au plus une mise à jour par image affichée, défilement automatique
+    // seulement si on était déjà en bas (on peut remonter lire sans être ramené de force).
+    let rafPending = false;
+    const render = (final) => {
+      const stick = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 90;
+      contentEl.innerHTML = renderMarkdownBasic(stripThink(fullText)) + (final ? '' : '<span class="cursor">▍</span>');
+      if (stick) messagesEl.scrollTop = messagesEl.scrollHeight;
+    };
+    const schedule = () => {
+      if (rafPending) return;
+      rafPending = true;
+      requestAnimationFrame(() => { rafPending = false; render(false); });
+    };
+    render(false);
+
+    const ct = response.headers.get('content-type') || '';
+    try {
+      if (/json/i.test(ct) && !/event-stream/i.test(ct)) {
+        // Le fournisseur a ignoré le flux et renvoie la réponse entière : on l'affiche
+        // quand même progressivement pour garder la même sensation.
+        const data = await response.json();
+        if (data && data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+        const txt = (data && data.choices && data.choices[0] && ((data.choices[0].message && data.choices[0].message.content) ?? data.choices[0].text)) || '';
+        for (let i = 0; i < txt.length && !ctrl.signal.aborted; i += 8) {
+          fullText = txt.slice(0, i + 8);
+          speaker.feed(stripThink(fullText));
+          render(false);
+          await new Promise(r => setTimeout(r, 12));
+        }
+        if (!ctrl.signal.aborted) fullText = txt;
+      } else if (response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let lastChunk = Date.now();
+        // Flux bloqué : plus aucune donnée depuis 60 s → on garde ce qui est arrivé
+        watchdog = setInterval(() => {
+          if (Date.now() - lastChunk > 60000) { stalled = true; ctrl.abort(); }
+        }, 5000);
+        const consume = (line) => {
+          const r = parseSSELine(line);
+          if (!r) return false;
+          if (r.error) { streamError = r.error; return false; }
+          if (r.delta) { fullText += r.delta; return true; }
+          return false;
+        };
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          lastChunk = Date.now();
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop();
+          let changed = false;
+          for (const line of lines) if (consume(line)) changed = true;
+          if (changed) { speaker.feed(stripThink(fullText)); schedule(); }
+        }
+        if (buffer.trim() && consume(buffer)) speaker.feed(stripThink(fullText));
       } else {
-        closeUnusedPopup();
+        const data = await response.json();
+        fullText = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
       }
+    } catch (e) {
+      if (e.name !== 'AbortError') throw e;
+      // arrêt demandé (bouton ■) ou flux bloqué : on garde le texte déjà reçu
+    }
+
+    if (watchdog) clearInterval(watchdog);
+    const stoppedByUser = !!ctrl.__user;
+    const finalText = stripThink(fullText).trim();
+    render(true);
+
+    if (stalled) {
+      const note = document.createElement('div');
+      note.className = 'msg image-loading';
+      note.textContent = '⚠️ Flux interrompu : plus aucune donnée depuis 60 s. Le début de la réponse est conservé.';
+      messagesEl.appendChild(note);
+    }
+    if (!finalText) {
+      contentEl.innerHTML = streamError ? '' : '(réponse vide)';
+      if (streamError) addMessage('Erreur du fournisseur : ' + streamError.slice(0, 200), 'err');
+      closeUnusedPopup();
       return;
     }
 
-    typingEl.remove();
-    botDiv = addMessage('', 'bot');
-    const botContentEl = botDiv.querySelector('.msg-content');
-    let fullText = '';
+    finalizeHistory(userText, finalText, isInit, userTs);
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop();
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) continue;
-        const payload = trimmed.slice(5).trim();
-        if (payload === '[DONE]') continue;
-        try {
-          const parsed = JSON.parse(payload);
-          const delta = parsed?.choices?.[0]?.delta?.content || parsed?.choices?.[0]?.message?.content || '';
-          if (delta) {
-            fullText += delta;
-            botContentEl.innerHTML = renderMarkdownBasic(fullText);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-          }
-        } catch (e) {}
-      }
+    if (stoppedByUser) {
+      speaker.stop();
+      closeUnusedPopup();
+      return; // pas de voix ni d'images pour une réponse interrompue
     }
-
-    if (!fullText) botContentEl.innerHTML = '(réponse vide)';
-    finalizeHistory(userText, fullText, isInit, userTs);
-
-    if (fullText && fullText.length > 20) {
-      speakQuotedText(fullText);
-      launchImageGenerators(fullText, userText, imagePopup, closeUnusedPopup);
+    speaker.end(finalText);
+    if (finalText.length > 20) {
+      launchImageGenerators(finalText, userText, imagePopup, closeUnusedPopup);
     } else {
       closeUnusedPopup();
     }
@@ -2349,9 +2739,15 @@ async function sendToWorker(userText, userTs) {
   } catch (err) {
     closeUnusedPopup();
     if (typingEl) typingEl.remove();
-    addMessage('Erreur réseau : ' + err.message, 'err');
+    if (err && err.name === 'AbortError') {
+      if (!botDiv) addMessage('■ Génération arrêtée.', 'err');
+    } else {
+      addMessage('Erreur réseau : ' + err.message, 'err');
+    }
   } finally {
-    sendBtn.disabled = false;
+    if (watchdog) clearInterval(watchdog);
+    streamAbort = null;
+    setGenerating(false);
   }
 }
 
@@ -2362,6 +2758,8 @@ function finalizeHistory(userText, botText, isInit, userTs) {
 }
 
 function handleSend() {
+  // Pendant une réponse, le bouton devient ■ : un clic l'interrompt
+  if (streamAbort) { streamAbort.__user = true; streamAbort.abort(); return; }
   const text = input.value.trim();
   if (!text) return;
   const ts = Date.now();
@@ -2440,7 +2838,8 @@ micBtn.addEventListener('click', async () => {
   micTimer = setTimeout(() => { if (micRecorder && micRecorder.state === 'recording') micRecorder.stop(); }, 120000);
 });
 input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+  // Entrée n'interrompt jamais une réponse en cours (seul le bouton ■ le fait)
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!streamAbort) handleSend(); }
 });
 input.addEventListener('input', () => {
   input.style.height = 'auto';
