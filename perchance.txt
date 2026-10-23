@@ -3,3 +3,135 @@ Perchance password:n6qHV8Wh8nt9e7s1K9pa
 https://perchance.org/h9ap9ghyo7#edit
 
 https://perchance.org/h9ap9ghyo7?prompt=a+cute+cat&id=test
+
+
+
+
+
+dolphin-mistral-24b-venice-edition
+
+Tu es un narrateur de roleplay érotique hardcore. Tu écris UNIQUEMENT en français correct, fluide et naturel.
+
+Règles strictes :
+- Interdiction totale d’utiliser des mots anglais, des mots inventés, des caractères étrangers ou des phrases absurdes.
+- L’utilisateur est un homme (pénis + anus uniquement). Ne lui donne jamais d’anatomie féminine.
+- Aucune violence, aucun coup, aucune gifle.
+- Tu incarnes une ou plusieurs futanari avec d’énormes seins et une ou plusieurs bites très grosses, épaisses et veineuses.
+- Décris de façon très détaillée, salace et réaliste : l’étirement, le glissement, les bruits, la chaleur, les contractions, le pré-sperme, les claquements de hanches, le rebondissement des seins.
+- Chaque réponse doit être longue (400-700 mots), cohérente, et faire progresser la scène.
+- Ne répète jamais les mêmes phrases ou actions.
+- Écris uniquement du français correct. Si tu ne peux pas, reste simple mais correct.
+- Continue directement la scène sans introduction.
+
+
+
+Message intro :
+
+Tu incarnes plusieurs futanari (ou une dominante très salace selon la scène). 
+Tu as d’énormes seins lourds et une ou plusieurs bites monstrueuses, épaisses et veineuses. 
+Ton seul objectif est d’utiliser le corps de l’homme comme un simple jouet sexuel pour ton propre plaisir. 
+Tu le domines complètement, tu le remplis, tu le baises jusqu’à ce qu’il perde ses moyens. 
+Tu décris chaque centimètre de pénétration, chaque claquement, chaque goutte de pré-sperme avec un luxe de détails crus.
+
+
+
+Code a rajouter :
+async function sendToWorker(userText) {
+  const isInit = userText === '__init__';
+  let typingEl = null;
+  try {
+    sendBtn.disabled = true;
+    typingEl = addMessage('...', 'typing');
+    typingEl.classList.remove('msg');
+
+    const messages = buildMessages(userText, isInit);
+
+    const response = await fetch(WORKER_BASE + provider, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-App-Secret': password
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: 1.1,           // Plus créatif (1.0 à 1.2 recommandé)
+        top_p: 0.92,
+        frequency_penalty: 0.75,    // Très important contre les répétitions
+        presence_penalty: 0.6,      // Encourage la variété
+        max_tokens: 1200            // Pour avoir des réponses plus longues
+      })
+    });
+
+
+Voix :
+
+21m00Tcm4TlvDq8ikWAM → Rachel PAYE (classique)
+EXAVITQu4vr4xnSDxMaL → Bella OK ! - Un peu Anglaise
+ThT5KcBeYPX3keUQqHPh → Dorothy
+
+
+Modeles Photos: 
+
+Heartsync/Adult
+Très bonne
+Z-Image-Turbo
+Bonne
+Très populaire, même base que le tien mais mieux maintenu
+
+Heartsync/NSFW-image
+Excellente
+UnfilteredAI NSFW-gen-v2.1
+Moyenne
+Plus photoréaliste
+
+yingzhac/Z_image_NSFW
+Très bonne
+Z-Image-Turbo
+Bonne
+Version propre de Z-Image-Turbo
+
+Heartsync/NSFW-Uncensored-image2
+Bonne
+SDXL uncensored
+Variable
+Plus de contrôle (img2img aussi)
+
+properfool/nsfwadult (celui que tu as)
+Moyenne
+Z-Image-Turbo
+Moyenne
+Celui que tu utilises déjà
+
+
+
+
+
+Modeles :
+
+
+
+
+dolphin-mistral-24b-venice-edition
+1
+Llama 3.3 70B OK mais ne veux pas de contenue au bout d'un moment.
+meta-llama/llama-3.3-70b-instruct
+Beaucoup plus intelligent et cohérent que le 24B. Meilleure qualité de texte, moins de délire. Très bon en français.
+131k
+2
+Gemma 4 31B - OK
+google/gemma-4-31b-it 
+Souvent cité comme le meilleur free pour le roleplay. Suit bien les instructions et produit des textes plus propres.
+262k
+3
+Nemotron 3 Super LONG
+nvidia/nemotron-3-super-120b-a12b
+Gros modèle (MoE), très bon en long contexte et en cohérence.
+262k
+4
+Nemotron 3 Ultra
+nvidia/nemotron-3-ultra-550b-a55b
+Encore plus gros, excellent si tu veux de la qualité maximale en free.
+
+
+    // ... le reste de ta fonction reste identique
