@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur de Prompts Portrait & Anatomie Pro</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            max-width: 950px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            background: #fff;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .section-title {
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #34495e;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 5px;
+            font-size: 1.1em;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            color: #7f8c8d;
+            font-weight: 500;
+        }
+        select, input {
+            padding: 10px;
+            border: 1px solid #bdc3c7;
+            border-radius: 6px;
+            background-color: #fff;
+            font-size: 0.95em;
+            outline: none;
+        }
+        select:focus {
+            border-color: #3498db;
+        }
+        button.generate-btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2em;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+            margin-top: 25px;
+            box-shadow: 0 4px 6px rgba(46, 204, 113, 0.2);
+        }
+        button.generate-btn:hover {
+            background-color: #27ae60;
+        }
+        #result-container {
+            margin-top: 25px;
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 25px;
+            border-radius: 8px;
+            position: relative;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+        #result {
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-size: 1.05em;
+            line-height: 1.5;
+            padding-right: 90px;
+        }
+        .copy-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 0.9em;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .copy-btn:hover {
+            background: #2980b9;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Générateur de Prompts IA : Portrait & Anatomie Étendue</h1>
+
+    <!-- CONFIGURATION DE BASE -->
+    <div class="section">
+        <div class="section-title">Configuration Initiale & Identité</div>
+        <div class="grid">
+            <div class="form-group">
+                <label for="prefix">Accroche initiale (Prefix)</label>
+                <select id="prefix">
+                    <option value="A casual real-life photograph. A casual photo of">A casual real-life photograph. A casual photo of</option>
+                    <option value="A realistic portrait of">A realistic portrait of</option>
+                    <option value="A raw candid candid photo of">A raw candid photo of</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="gender">Sujet</label>
+                <select id="gender">
+                    <option value="a woman">Une femme (a woman)</option>
+                    <option value="a man">Un homme (a man)</option>
+                    <option value="a person">Une personne (a person)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="ethnicity">Ethnie / Origine</label>
+                <select id="ethnicity">
+                    <option value="">Aucune sélection</option>
+                    <option value="Peruvian">Péruvienne (Peruvian)</option>
+                    <option value="Native American">Native Américaine (Native American)</option>
+                    <option value="French">Français(e)</option>
+                    <option value="Mediterranean">Méditerranéen(ne)</option>
+                    <option value="East Asian">Est-Asiatique</option>
+                    <option value="South Asian">Sud-Asiatique</option>
+                    <option value="Hispanic">Hispanique</option>
+                    <option value="African">Africain(e)</option>
+                    <option value="Nordic">Nordique</option>
+                    <option value="Mixed-race">Métisse</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="style-subculture">Style / Sous-culture</label>
+                <select id="style-subculture">
+                    <option value="">Aucun style spécifique</option>
+                    <option value="punk aesthetic">Punk</option>
+                    <option value="goth aesthetic">Gothique (Goth)</option>
+                    <option value="chicano lifestyle style">Chicano</option>
+                    <option value="streetwear fashion">Streetwear</option>
+                    <option value="vintage bohemian">Bohème / Vintage</option>
+                    <option value="cyberpunk techwear">Cyberpunk / Techwear</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- ANATOMIE ET MORPHOLOGIE AVANCÉE -->
+    <div class="section">
+        <div class="section-title">Anatomie & Silhouette Corporelle</div>
+        <div class="grid">
+            <div class="form-group">
+                <label for="body-shape">Silhouette / Corpulence globale</label>
+                <select id="body-shape">
+                    <option value="">Par défaut</option>
+                    <option value="round body shape">Silhouette ronde (round body shape)</option>
+                    <option value="chubby build">Chubby / Charnue (chubby build)</option>
+                    <option value="slender build">Svelte / Mince (slender build)</option>
+                    <option value="athletic toned build">Athlétique et tonique (athletic toned)</option>
+                    <option value="petite build">Menu / Petite taille (petite build)</option>
+                    <option value="curvy hourglass figure">Silouhette en sablier voluptueuse (hourglass)</option>
+                    <option value="pear-shaped body">Silhouette en poire (pear-shaped)</option>
+                    <option value="plus-size body">Grande taille / Forte corpulence (plus-size)</option>
+                    <option value="muscular lean physique">Musclée et sèche (muscular lean)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="height-proportion">Taille / Proportions de hauteur</label>
+                <select id="height-proportion">
+                    <option value="">Par défaut</option>
+                    <option value="petite height">Petite de taille (petite height)</option>
+                    <option value="tall statuesque height">Grande et élancée (tall statuesque)</option>
+                    <option value="average height">Taille moyenne</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="waist-shape">Taille / Abdomens (Waist)</label>
+                <select id="waist-shape">
+                    <option value="">Par défaut</option>
+                    <option value="slim narrow waist">Taille fine et étroite (slim narrow waist)</option>
+                    <option value="thick soft waist">Taille épaisse et douce (thick soft waist)</option>
+                    <option value="toned flat stomach">Ventre plat et tonique (flat stomach)</option>
+                    <option value="soft curvy midsection">Ventre doux et pulpeux</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="hips-shape">Hanches & Bassin (Hips)</label>
+                <select id="hips-shape">
+                    <option value="">Par défaut</option>
+                    <option value="wide voluptuous hips">Hanches larges / généreuses (wide hips)</option>
+                    <option value="narrow slim hips">Hanches étroites / fines (narrow hips)</option>
+                    <option value="flared hips">Hanches marquées et évasées (flared hips)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="shoulders-neck">Épaules & Cou</label>
+                <select id="shoulders-neck">
+                    <option value="">Par défaut</option>
+                    <option value="slender delicate collarbones and a long neck">Cou allongé et clavicules apparentes</option>
+                    <option value="broad soft shoulders">Épaules larges et douces</option>
+                    <option value="strong athletic shoulders">Épaules athlétiques et développées</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="bust-chest">Proportions Poitrine (Bust)</label>
+                <select id="bust-chest">
+                    <option value="">Par défaut</option>
+                    <option value="ample bust">Poitrine généreuse (ample bust)</option>
+                    <option value="modest small bust">Poitrine menue (small bust)</option>
+                    <option value="average bust">Poitrine moyenne</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- MORPHOLOGIE DU VISAGE EXTENSIVE -->
+    <div class="section">
+        <div class="section-title">Structure Fine du Visage</div>
+        <div class="grid">
+            <div class="form-group">
+                <label for="face-shape">Forme globale du visage</label>
+                <select id="face-shape">
+                    <option value="">Aucune</option>
+                    <option value="oval face">Ovale (oval)</option>
+                    <option value="round face">Rond (round)</option>
+                    <option value="square face">Carré (square)</option>
+                    <option value="heart-shaped face">En cœur (heart-shaped)</option>
+                    <option value="diamond-shaped face">En losange (diamond)</option>
+                    <option value="chiseled face">Ciselé / Émacié (chiseled)</option>
+                    <option value="chubby face">Joufflu (chubby face)</option>
+                    <option value="soft soft-contoured round face">Rond aux contours très doux</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="cheeks">Joues</label>
+                <select id="cheeks">
+                    <option value="">Par défaut</option>
+                    <option value="high prominent cheekbones">Pommettes hautes et saillantes</option>
+                    <option value="plump rosy cheeks">Joues pleines et rebondies</option>
+                    <option value="hollow cheeks">Joues creuses</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="eyes">Yeux (Forme & Ouverture)</label>
+                <select id="eyes">
+                    <option value="">Aucune</option>
+                    <option value="almond-shaped eyes">En amande (almond-shaped)</option>
+                    <option value="hooded eyes">Paupières tombantes (hooded)</option>
+                    <option value="round wide-awake eyes">Ronds et bien ouverts (round)</option>
+                    <option value="deep-set piercing eyes">Enfoncés et perçants (deep-set)</option>
+                    <option value="doe-like soft eyes">De biche / Regard doux (doe-like)</option>
+                    <option value="monolid eyes">Monolides (monolid)</option>
+                    <option value="downturned sleepy eyes">Tombants / Regard endormi</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="brows">Sourcils</label>
+                <select id="brows">
+                    <option value="">Aucune</option>
+                    <option value="arched eyebrows">Arqués (arched)</option>
+                    <option value="straight horizontal eyebrows">Droits et horizontaux (straight)</option>
+                    <option value="bushy thick eyebrows">Broussailleux (bushy)</option>
+                    <option value="thin pencil-thin eyebrows">Tracés très fins (thin)</option>
+                    <option value="feathery fluffy eyebrows">Aériens / Effet plume (feathery)</option>
+                    <option value="unibrow">Monosourcil (unibrow)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="lashes">Cils</label>
+                <select id="lashes">
+                    <option value="">Aucune</option>
+                    <option value="long curled eyelashes">Longs et recourbés</option>
+                    <option value="thick dense dark eyelashes">Épais, denses et sombres</option>
+                    <option value="sparse delicate eyelashes">Clairsemés et discrets</option>
+                    <option value="voluminous sweeping eyelashes">Volumineux et déployés</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="nose">Nez</label>
+                <select id="nose">
+                    <option value="">Aucune</option>
+                    <option value="button nose">En bouton / Retroussé (button)</option>
+                    <option value="aquiline hawk nose">Aquilin / Busqué (aquiline)</option>
+                    <option value="straight prominent Greek nose">Grec / Droit (straight)</option>
+                    <option value="bulbous wide nose">Bulbeux / Large (bulbous)</option>
+                    <option value="crooked asymmetrical nose">Tordu / Asymétrique (crooked)</option>
+                    <option value="small snub nose">Petit et court (snub)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="lips">Lèvres</label>
+                <select id="lips">
+                    <option value="">Aucune</option>
+                    <option value="full plush lips">Pulpées et charnues (full plush)</option>
+                    <option value="thin delicate lips">Fines et délicates (thin)</option>
+                    <option value="exaggerated Cupid's-bow lips">Arc de Cupidon très marqué</option>
+                    <option value="pouty protruding lips">Boudeuses (pouty)</option>
+                    <option value="wide generous lips">Bouche large et expressive</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="jaw">Mâchoire & Menton</label>
+                <select id="jaw">
+                    <option value="">Aucune</option>
+                    <option value="sharp chiseled angular jawline">Mâchoire ciselée et anguleuse</option>
+                    <option value="soft rounded delicate jawline">Mâchoire douce et arrondie</option>
+                    <option value="pointed prominent chin">Menton pointu et en avant</option>
+                    <option value="cleft chin">Menton fourchu (cleft chin)</option>
+                    <option value="soft double chin">Double menton doux (double chin)</option>
+                    <option value="strong broad square jawline">Mâchoire carrée et puissante</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHEVEUX ET TENUES -->
+    <div class="section">
+        <div class="section-title">Vêtements, Chevelure & Style</div>
+        <div class="grid">
+            <div class="form-group">
+                <label for="clothing">Vêtements / Tenues</label>
+                <select id="clothing">
+                    <option value="">Aucun vêtement spécifique</option>
+                    <option value="wearing an elegant embroidered Victorian black dress">Robe victorienne noire brodée (Victorian black dress)</option>
+                    <option value="wearing a casual oversized cotton t-shirt">T-shirt ample en coton (casual oversized t-shirt)</option>
+                    <option value="wearing a heavy cozy oversized knit sweater">Gros pull en maille confortable (oversized sweater)</option>
+                    <option value="wearing a sleek textured leather jacket">Veste en cuir texturée (leather jacket)</option>
+                    <option value="wearing a distressed vintage denim jacket">Veste en jean usée vintage</option>
+                    <option value="wearing a minimalist streetwear hoodie">Sweat à capuche streetwear</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="hair-texture">Texture / Coupe des cheveux</label>
+                <select id="hair-texture">
+                    <option value="">Par défaut</option>
+                    <option value="straight sleek hair">Raides et lisses (straight)</option>
+                    <option value="wavy textured hair">Ondulés avec volume (wavy)</option>
+                    <option value="curly voluminous hair">Bouclés et volumineux (curly)</option>
+                    <option value="coily kinky textured hair">Crépus très serrés (coily/kinky)</option>
+                    <option value="shaved buzzed head">Crâne rasé de près (shaved/buzzed)</option>
+                    <option value="messy undone hair">Ébouriffés / Coiffé-décoiffé</option>
+                    <option value="long flowing thick hair">Très longs et fluides</option>
+                    <option value="short textured pixie cut">Coupe pixie texturée courte</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="hair-color">Couleur des cheveux</label>
+                <select id="hair-color">
+                    <option value="">Par défaut</option>
+                    <option value="jet-black">Noir jais (jet-black)</option>
+                    <option value="deep dark brown">Brun profond (dark brown)</option>
+                    <option value="honey blonde">Blond miel (honey blonde)</option>
+                    <option value="striking platinum blonde">Blond platine éclatant (platinum blonde)</option>
+                    <option value="vibrant auburn red">Roux auburn vibrant (auburn red)</option>
+                    <option value="silver gray">Gris argenté (silver gray)</option>
+                    <option value="neon dyed tones">Teintes colorées fluo (neon dyed)</option>
+                    <option value="pastel pink hue">Teinte rose pastel</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- IMPERFECTIONS ET TEXTURE DE PEAU DETALLÉES -->
+    <div class="section">
+        <div class="section-title">Particularités Cutanées, Imperfections & Lumière</div>
+        <div class="grid">
+            <div class="form-group">
+                <label for="skin-blemish">Détails de peau & Imperfections</label>
+                <select id="skin-blemish">
+                    <option value="">Aucune</option>
+                    <option value="prominent organic freckles scattered across the nose and cheeks">Taches de rousseur (freckles)</option>
+                    <option value="noticeable acne blemishes, pores, and natural light redness">Boutons d'acné actifs & rougeurs</option>
+                    <option value="visible real acne scars and skin texture on the cheeks">Cicatrices d'acné texturées (acne scars)</option>
+                    <option value="visible enlarged skin pores and real oily skin texture">Pores dilatés et zone T luisante</option>
+                    <option value="distinct sun spots and uneven hyperpigmentation age spots">Taches solaires / de vieillesse</option>
+                    <option value="visible fine flaky dry skin patches">Zones de sécheresse / Peau qui pèle</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="skin-marks">Signes d'Âge, Expressions & Charme</label>
+                <select id="skin-marks">
+                    <option value="">Aucune</option>
+                    <option value="a small dark hyper-realistic beauty mark near the upper lip">Grain de beauté près de la lèvre</option>
+                    <option value="deep natural dimples on the cheeks when smiling">Fossettes profondes aux joues (dimples)</option>
+                    <option value="subtle crow's feet wrinkles and fine lines around the eyes">Rides de la patte d'oie et ridules</option>
+                    <option value="pronounced tired dark circles under the eyes">Cernes de fatigue marqués (dark circles)</option>
+                    <option value="a charming distinct gap teeth smile">Dents du bonheur visibles (gap teeth)</option>
+                    <option value="subtle frown lines between the eyebrows">Rides du lion naissantes</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="lighting-vibe">Ambiance de prise de vue & Éclairage</label>
+                <select id="lighting-vibe">
+                    <option value="candid unposed street photography style">Instantané sur le vif de style photo de rue</option>
+                    <option value="cozy ambient warm indoor lighting">Lumière d'ambiance d'intérieur chaude</option>
+                    <option value="cinematic golden hour sunlight with soft lens flare">Soleil doré couchant (golden hour)</option>
+                    <option value="moody low-key dramatic studio lighting">Studio sombre, ombres denses et contrastées</option>
+                    <option value="bright overcast daylight with natural reflections">Lumière du jour par temps nuageux diffuse</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <button class="generate-btn" onclick="generatePrompt()">GÉNÉRER LE PROMPT INTÉGRAL</button>
+
+    <div id="result-container">
+        <button class="copy-btn" onclick="copyPrompt()">Copier</button>
+        <div id="result">Votre prompt ultra-détaillé apparaîtra ici...</div>
+    </div>
+
+    <script>
+        function generatePrompt() {
+            const prefix = document.getElementById('prefix').value;
+            const gender = document.getElementById('gender').value;
+            const ethnicity = document.getElementById('ethnicity').value;
+            const styleSub = document.getElementById('style-subculture').value;
+            
+            const bodyShape = document.getElementById('body-shape').value;
+            const heightProp = document.getElementById('height-proportion').value;
+            const waistShape = document.getElementById('waist-shape').value;
+            const hipsShape = document.getElementById('hips-shape').value;
+            const shouldersNeck = document.getElementById('shoulders-neck').value;
+            const bustChest = document.getElementById('bust-chest').value;
+            
+            const clothing = document.getElementById('clothing').value;
+            const hairTexture = document.getElementById('hair-texture').value;
+            const hairColor = document.getElementById('hair-color').value;
+
+            const faceShape = document.getElementById('face-shape').value;
+            const cheeks = document.getElementById('cheeks').value;
+            const eyes = document.getElementById('eyes').value;
+            const brows = document.getElementById('brows').value;
+            const lashes = document.getElementById('lashes').value;
+            const nose = document.getElementById('nose').value;
+            const lips = document.getElementById('lips').value;
+            const jaw = document.getElementById('jaw').value;
+            
+            const blemish = document.getElementById('skin-blemish').value;
+            const marks = document.getElementById('skin-marks').value;
+            const lighting = document.getElementById('lighting-vibe').value;
+
+            let components = [];
+
+            // 1. Base Identité (Ethnie + Genre)
+            let coreSubject = gender;
+            if (ethnicity) {
+                coreSubject = `${ethnicity} ${gender}`;
+            }
+            
+            // Collecte des modificateurs anatomiques de silhouette globale et de style
+            let subjectModifiers = [];
+            if (bodyShape) subjectModifiers.push(bodyShape);
+            if (heightProp) subjectModifiers.push(heightProp);
+            if (styleSub) subjectModifiers.push(styleSub);
+            
+            if (subjectModifiers.length > 0) {
+                coreSubject = `a ${subjectModifiers.join(', ')} ${coreSubject.replace(/^a\s/, '')}`;
+            }
+            components.push(coreSubject);
+
+            // 2. Anatomie fine du corps (Taille, hanches, poitrine, cou/épaules)
+            let bodyDetails = [];
+            if (waistShape) bodyDetails.push(waistShape);
+            if (hipsShape) bodyDetails.push(hipsShape);
+            if (bustChest) bodyDetails.push(bustChest);
+            if (shouldersNeck) bodyDetails.push(shouldersNeck);
+            
+            if (bodyDetails.length > 0) {
+                components.push(`possessing a body with a ${bodyDetails.join(', ')}`);
+            }
+
+            // 3. Cheveux (Couleur + Texture)
+            let hairDetails = [];
+            if (hairColor) hairDetails.push(hairColor);
+            if (hairTexture) hairDetails.push(hairTexture);
+            if (hairDetails.length > 0) {
+                components.push(`with ${hairDetails.join(' ')}`);
+            }
+
+            // 4. Structure du visage
+            let faceFeatures = [];
+            if (faceShape) faceFeatures.push(faceShape);
+            if (cheeks) faceFeatures.push(cheeks);
+            if (eyes) faceFeatures.push(eyes);
+            if (brows) faceFeatures.push(brows);
+            if (lashes) faceFeatures.push(lashes);
+            if (nose) faceFeatures.push(nose);
+            if (lips) faceFeatures.push(lips);
+            if (jaw) faceFeatures.push(jaw);
+
+            if (faceFeatures.length > 0) {
+                components.push(`featuring a ${faceFeatures.join(', ')}`);
+            }
+
+            // 5. Texture de Peau, Imperfections & Signes
+            if (blemish) components.push(blemish);
+            if (marks) components.push(marks);
+
+            // 6. Tenue vestimentaire
+            if (clothing) components.push(clothing);
+
+            // 7. Éclairage
+            if (lighting) components.push(`captured in ${lighting}`);
+
+            // Assemblage avec balises de qualité réalistes
+            let finalPrompt = `${prefix} ${components.join(', ')}. Authentic features, raw skin texture, sharp focus, 8k resolution, photorealistic, cinematic photography.`;
+            
+            // Nettoyage typographique automatisé
+            finalPrompt = finalPrompt.replace(/\s+/g, ' ').replace(/ ,/g, ',').replace(/, ,/g, ',');
+
+            document.getElementById('result').innerText = finalPrompt;
+        }
+
+        function copyPrompt() {
+            const textText = document.getElementById('result').innerText;
+            
+            const textArea = document.createElement("textarea");
+            textArea.value = textText;
+            textArea.style.position = "fixed";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                const successful = document.execCommand('copy');
+                if(successful) {
+                    alert('Prompt copié dans votre presse-papiers !');
+                } else {
+                    alert('Échec de la copie automatique. Sélectionnez le texte manuellement dans la zone sombre.');
+                }
+            } catch (err) {
+                alert('Erreur lors de la copie. Sélectionnez le texte manuellement.');
+            }
+
+            document.body.removeChild(textArea);
+        }
+    </script>
+</body>
+</html>
