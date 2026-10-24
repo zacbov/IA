@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Éditeur de Prompt Persona NSFW - Version Finale</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #0f0f13;
+    color: #e5e5e5;
+    line-height: 1.5;
+    padding: 20px;
+    min-height: 100vh;
+  }
+
+  .container { max-width: 1150px; margin: 0 auto; }
+
+  h1 {
+    text-align: center;
+    font-size: 1.75rem;
+    margin-bottom: 6px;
+    background: linear-gradient(90deg, #ff6b9d, #c44dff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: #888;
+    margin-bottom: 28px;
+    font-size: 0.92rem;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+
+  @media (max-width: 850px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: #1a1a22;
+    border: 1px solid #2a2a35;
+    border-radius: 14px;
+    padding: 18px 20px;
+  }
+
+  .card h2 {
+    font-size: 1.05rem;
+    margin-bottom: 12px;
+    color: #ff6b9d;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.82rem;
+    color: #aaa;
+  }
+
+  select, input[type="text"], textarea {
+    width: 100%;
+    padding: 9px 11px;
+    background: #121218;
+    border: 1px solid #333;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 0.92rem;
+    margin-bottom: 12px;
+    outline: none;
+  }
+
+  select:focus, input:focus, textarea:focus {
+    border-color: #ff6b9d;
+  }
+
+  .checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #121218;
+    padding: 6px 11px;
+    border-radius: 18px;
+    border: 1px solid #333;
+    cursor: pointer;
+    font-size: 0.84rem;
+    transition: 0.15s;
+  }
+
+  .checkbox-item:hover { border-color: #ff6b9d; }
+  .checkbox-item input { accent-color: #ff6b9d; }
+
+  .full-width { grid-column: 1 / -1; }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    padding: 11px 20px;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.92rem;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .btn-generate {
+    background: linear-gradient(90deg, #ff6b9d, #c44dff);
+    color: white;
+  }
+  .btn-generate:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(255,107,157,0.35);
+  }
+
+  .btn-copy { background: #2a2a35; color: #fff; }
+  .btn-copy:hover { background: #3a3a48; }
+
+  .btn-clear {
+    background: transparent;
+    border: 1px solid #444;
+    color: #aaa;
+  }
+  .btn-clear:hover { border-color: #ff6b9d; color: #ff6b9d; }
+
+  #output {
+    width: 100%;
+    min-height: 280px;
+    background: #0d0d12;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 15px;
+    color: #e0e0e0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    resize: vertical;
+  }
+
+  .warning {
+    background: #3a1f1f;
+    border: 1px solid #ff6b6b;
+    color: #ffb4b4;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+    display: none;
+  }
+
+  .suffix-box {
+    background: #16161e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 8px;
+    font-size: 0.82rem;
+    color: #aaa;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #22c55e;
+    color: white;
+    padding: 11px 22px;
+    border-radius: 28px;
+    font-weight: 500;
+    opacity: 0;
+    transition: 0.3s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Éditeur de Prompt Persona NSFW</h1>
+  <p class="subtitle">Combinaisons cohérentes + suffixe photo réaliste</p>
+
+  <div class="grid">
+
+    <!-- Corps -->
+    <div class="card">
+      <h2>Corps & détails intimes</h2>
+
+      <label>Taille / forme des seins</label>
+      <select id="breasts">
+        <option value="">— Choisir —</option>
+        <option value="small firm breasts">Petits seins fermes</option>
+        <option value="medium round breasts">Seins moyens ronds</option>
+        <option value="large heavy breasts">Gros seins lourds</option>
+        <option value="huge hanging tits">Huge hanging tits</option>
+        <option value="massive sagging breasts">Seins massifs et très tombants</option>
+      </select>
+
+      <label>Aréoles</label>
+      <select id="areolas">
+        <option value="">— Choisir —</option>
+        <option value="small areolas">Petites aréoles</option>
+        <option value="medium areolas">Aréoles moyennes</option>
+        <option value="large areolas">Grandes aréoles</option>
+        <option value="huge areolas">Huge areolas</option>
+      </select>
+
+      <label>Tétons</label>
+      <select id="nipples">
+        <option value="">— Choisir —</option>
+        <option value="small nipples">Petits tétons</option>
+        <option value="medium nipples">Tétons moyens</option>
+        <option value="long prominent nipples">Tétons longs et proéminents</option>
+        <option value="upturned nipples">Upturned nipples</option>
+        <option value="thick hard nipples">Tétons épais et durs</option>
+      </select>
+
+      <label>Pilosité vulve</label>
+      <select id="pussy">
+        <option value="">— Choisir —</option>
+        <option value="shaved pussy">Vulve rasée</option>
+        <option value="light pubic hair">Léger duvet</option>
+        <option value="neatly trimmed pubic hair">Poils taillés</option>
+        <option value="hairy pussy">Vulve poilue</option>
+        <option value="thick bushy pubic hair">Pilosité dense et sauvage</option>
+      </select>
+    </div>
+
+    <!-- Apparence + Expression -->
+    <div class="card">
+      <h2>Apparence & expression</h2>
+
+      <label>Coiffure</label>
+      <select id="hair">
+        <option value="">— Choisir —</option>
+        <option value="long straight hair">Longs cheveux lisses</option>
+        <option value="ponytail">Queue de cheval (pony)</option>
+        <option value="high ponytail">Queue de cheval haute</option>
+        <option value="bangs">Frange (bangs)</option>
+        <option value="side bangs">Frange sur le côté</option>
+        <option value="messy bun">Chignon décoiffé</option>
+        <option value="loose waves">Vagues naturelles</option>
+        <option value="braided hair">Tresses</option>
+        <option value="short bob">Carré court</option>
+        <option value="wet hair">Cheveux mouillés</option>
+      </select>
+
+      <label>Expression faciale</label>
+      <select id="expression">
+        <option value="">— Choisir —</option>
+        <option value="orgasm face">Orgasm face</option>
+        <option value="ahegao">Ahegao</option>
+        <option value="pleasure face">Pleasure face</option>
+        <option value="moaning expression">Moaning expression</option>
+        <option value="ecstatic face">Ecstatic face</option>
+        <option value="eyes rolled back">Eyes rolled back</option>
+        <option value="tongue out">Tongue out</option>
+        <option value="biting lip">Biting lip</option>
+        <option value="seductive look">Seductive look</option>
+        <option value="flushed cheeks">Flushed cheeks</option>
+      </select>
+
+      <label>Tenue sexuelle</label>
+      <select id="outfit">
+        <option value="">— Choisir —</option>
+        <option value="completely nude">Complètement nue</option>
+        <option value="lingerie">Lingerie sexy</option>
+        <option value="sheer lingerie">Lingerie transparente</option>
+        <option value="bra and panties">Soutien-gorge + culotte</option>
+        <option value="only panties">Seulement une culotte</option>
+        <option value="open robe">Peignoir ouvert</option>
+        <option value="stockings and garter">Bas et porte-jarretelles</option>
+        <option value="micro bikini">Micro bikini</option>
+        <option value="ripped clothes">Vêtements déchirés</option>
+      </select>
+
+      <label>Position sexuelle</label>
+      <select id="position">
+        <option value="">— Choisir —</option>
+        <option value="missionary">Missionnaire</option>
+        <option value="doggy style">Levrette (doggy)</option>
+        <option value="cowgirl">Cowgirl</option>
+        <option value="reverse cowgirl">Reverse cowgirl</option>
+        <option value="standing doggy">Levrette debout</option>
+        <option value="legs spread">Jambes écartées</option>
+        <option value="on all fours">À quatre pattes</option>
+        <option value="lying on back">Allongée sur le dos</option>
+        <option value="sitting on face">Assise sur le visage</option>
+        <option value="kneeling">À genoux</option>
+      </select>
+    </div>
+
+    <!-- Actions -->
+    <div class="card full-width">
+      <h2>Actions (plusieurs possibles)</h2>
+      <div class="checkbox-group" id="actions">
+        <label class="checkbox-item"><input type="checkbox" value="sucking huge penis"> sucking huge penis</label>
+        <label class="checkbox-item"><input type="checkbox" value="deepthroat"> deepthroat</label>
+        <label class="checkbox-item"><input type="checkbox" value="rubbing clitoris"> rubbing clitoris</label>
+        <label class="checkbox-item"><input type="checkbox" value="fingering pussy"> fingering</label>
+        <label class="checkbox-item"><input type="checkbox" value="licking nipples"> licking nipples</label>
+        <label class="checkbox-item"><input type="checkbox" value="titjob"> titjob</label>
+        <label class="checkbox-item"><input type="checkbox" value="grinding"> grinding</label>
+        <label class="checkbox-item"><input type="checkbox" value="spreading pussy"> spreading pussy</label>
+        <label class="checkbox-item"><input type="checkbox" value="squirting"> squirting</label>
+      </div>
+
+      <label>Détails supplémentaires (optionnel)</label>
+      <input type="text" id="extra" placeholder="ex: sueur, lumière douce, vue rapprochée...">
+    </div>
+
+    <!-- Suffixe réaliste -->
+    <div class="card full-width">
+      <h2>Terminaison du prompt</h2>
+      <label class="checkbox-item" style="display:inline-flex; margin-bottom:10px;">
+        <input type="checkbox" id="addSuffix" checked>
+        Ajouter le suffixe photo réaliste à la fin
+      </label>
+      <div class="suffix-box">
+        (((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. All characters are over 19-years-old. It's a casual photo. Overall it's an actual real-life photograph.
+      </div>
+    </div>
+
+    <!-- Sortie -->
+    <div class="card full-width">
+      <h2>Prompt généré</h2>
+      <div class="warning" id="warning"></div>
+      <textarea id="output" readonly placeholder="Clique sur « Générer le prompt »..."></textarea>
+
+      <div class="actions">
+        <button class="btn-generate" onclick="generatePrompt()">Générer le prompt</button>
+        <button class="btn-copy" onclick="copyPrompt()">Copier</button>
+        <button class="btn-clear" onclick="clearAll()">Tout effacer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Copié !</div>
+
+<script>
+const REALISM_SUFFIX = `(((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. All characters are over 19-years-old. It's a casual photo. Overall it's an actual real-life photograph.`;
+
+function generatePrompt() {
+  const breasts = document.getElementById('breasts').value;
+  const areolas = document.getElementById('areolas').value;
+  const nipples = document.getElementById('nipples').value;
+  const pussy = document.getElementById('pussy').value;
+  const hair = document.getElementById('hair').value;
+  const expression = document.getElementById('expression').value;
+  const outfit = document.getElementById('outfit').value;
+  const position = document.getElementById('position').value;
+  const extra = document.getElementById('extra').value.trim();
+  const addSuffix = document.getElementById('addSuffix').checked;
+
+  const actionChecks = document.querySelectorAll('#actions input:checked');
+  let actions = Array.from(actionChecks).map(el => el.value);
+
+  // === Cohérence ===
+  let warnings = [];
+
+  if (actions.includes('titjob') && !breasts.includes('huge') && !breasts.includes('large') && !breasts.includes('massive')) {
+    warnings.push("Titjob plus réaliste avec de gros seins.");
+  }
+
+  if ((position.includes('doggy') || position === 'on all fours') && 
+      (actions.includes('sucking huge penis') || actions.includes('deepthroat'))) {
+    warnings.push("Sucer en levrette peu réaliste → action retirée du prompt.");
+    actions = actions.filter(a => a !== 'sucking huge penis' && a !== 'deepthroat');
+  }
+
+  const warningEl = document.getElementById('warning');
+  if (warnings.length > 0) {
+    warningEl.style.display = 'block';
+    warningEl.innerHTML = "⚠️ " + warnings.join("<br>⚠️ ");
+  } else {
+    warningEl.style.display = 'none';
+  }
+
+  // === Construction ===
+  let parts = [];
+
+  let body = [];
+  if (breasts) body.push(breasts);
+  if (areolas) body.push(areolas);
+  if (nipples) body.push(nipples);
+  if (pussy) body.push(pussy);
+  if (hair) body.push(hair);
+
+  if (body.length > 0) {
+    parts.push("beautiful woman with " + body.join(", "));
+  } else {
+    parts.push("beautiful woman");
+  }
+
+  if (expression) parts.push(expression);
+  if (outfit) {
+    parts.push(outfit === 'completely nude' ? 'completely nude' : 'wearing ' + outfit);
+  }
+  if (position) parts.push("in " + position + " position");
+  if (actions.length > 0) parts.push(actions.join(" and "));
+  if (extra) parts.push(extra);
+
+  parts.push("highly detailed, realistic skin texture, realistic anatomy, natural proportions, photorealistic");
+
+  let finalPrompt = parts.join(", ");
+
+  if (addSuffix) {
+    finalPrompt += " " + REALISM_SUFFIX;
+  }
+
+  document.getElementById('output').value = finalPrompt;
+}
+
+function copyPrompt() {
+  const output = document.getElementById('output');
+  if (!output.value) return;
+  navigator.clipboard.writeText(output.value).then(() => {
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1800);
+  });
+}
+
+function clearAll() {
+  document.querySelectorAll('select').forEach(s => s.value = "");
+  document.querySelectorAll('input[type="checkbox"]').forEach(c => {
+    if (c.id !== 'addSuffix') c.checked = false;
+  });
+  document.getElementById('extra').value = "";
+  document.getElementById('output').value = "";
+  document.getElementById('warning').style.display = 'none';
+}
+</script>
+</body>
+</html>
