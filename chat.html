@@ -135,6 +135,27 @@
 
   .cursor { display: inline-block; color: #e0a34a; animation: cursorBlink 1s steps(2, start) infinite; }
   @keyframes cursorBlink { to { visibility: hidden; } }
+  .suggest-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; align-self: flex-start; max-width: 90%; }
+  .suggest-chip { background: #1a2a22; border: 1px solid #2a3d33; color: #e8e8e4; border-radius: 14px; padding: 6px 12px; font-size: 13px; cursor: pointer; text-align: left; font-family: inherit; }
+  .suggest-chip:hover { border-color: #e0a34a; }
+  #suggestBtn.off { opacity: .45; }
+  #scenePanel { position: fixed; top: 54px; right: 8px; width: min(330px, 92vw); z-index: 8000; background: #101713; border: 1px solid #2a3d33; border-radius: 12px; padding: 12px; font-size: 12px; color: #ccc; box-shadow: 0 8px 30px #000a; }
+  #scenePanel.hidden { display: none; }
+  #scenePanel label { display: block; margin: 6px 0 2px; color: #9ab; font-size: 11px; }
+  #scenePanel input[type=text] { width: 100%; font-size: 12px; padding: 5px 8px; }
+  #sceneBtn.off { opacity: .45; }
+  .compare-card { padding: 10px; max-width: 96%; width: 96%; }
+  .compare-head { font-size: 12px; color: #cfd; margin-bottom: 8px; }
+  .compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+  .cmp-tile { background: #0f1612; border: 1px solid #263329; border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+  .cmp-tile.win { border-color: #e0a34a; box-shadow: 0 0 0 1px #e0a34a; }
+  .cmp-tile img { width: 100%; border-radius: 8px; cursor: zoom-in; display: block; }
+  .cmp-label { font-size: 11px; color: #9ab; }
+  .cmp-actions { display: flex; gap: 6px; }
+  .cmp-actions button { flex: 1; background: #1a2a22; border: 1px solid #2a3d33; color: #e8e8e4; border-radius: 8px; padding: 5px 6px; font-size: 12px; cursor: pointer; }
+  .cmp-actions button:disabled { opacity: .45; cursor: default; }
+  .cmp-foot { font-size: 11px; color: #8a9; margin-top: 8px; }
+  #compareBtn.off { opacity: .45; }
 </style>
 </head>
 <body>
@@ -169,6 +190,7 @@
     <div>
       <label>Fournisseur</label>
       <select id="provider">
+        <option value="pollinations">pollinations</option>
         <option value="groq">groq</option>
         <option value="openrouter">openrouter</option>
         <option value="cerebras">cerebras</option>
@@ -294,6 +316,10 @@
             <label><input type="checkbox" id="hAdvTrusted"> Workers de confiance seulement</label>
             <button type="button" id="hAdvReset" style="font-size:11px; padding:5px 10px; width:auto;">Réinitialiser</button>
           </div>
+          <div style="margin-top:8px;">
+            <label style="font-size:11px; color:#aaa;">Clé Horde pour l'accès direct (reste dans ce navigateur, facultatif — sinon anonyme)</label>
+            <input type="password" id="hordeKeyLocal" placeholder="clé gratuite sur aihorde.net/register" style="width:100%; font-size:11px; padding:5px 8px;">
+          </div>
           <div style="display:flex; gap:6px; align-items:center; margin-top:8px;">
             <button type="button" id="hordeCheckKey" style="font-size:11px; padding:5px 10px; width:auto;">🔑 Vérifier la clé Horde du Worker</button>
             <span id="hordeKeyInfo" style="font-size:10px; color:#888;"></span>
@@ -313,8 +339,16 @@
           <input type="number" id="charSeed" step="1" placeholder="seed" style="width:130px; font-size:12px;">
           <button type="button" id="charSeedRoll" style="font-size:11px; padding:5px 10px; width:auto;" title="Tirer un nouveau seed">🎲</button>
         </div>
-        <label style="font-size:11px; color:#aaa;">Image de référence (URL publique) — utilisée par Pollination avec kontext, gptimage, nanobanana, seedream</label>
-        <input type="text" id="charRef" placeholder="https://… (⭐ dans la visionneuse pour en choisir une)" style="width:100%; font-size:12px;">
+        <label style="font-size:11px; color:#aaa;">Image de référence — uniquement une image générée par l'app (⭐ dans la visionneuse). Utilisée par Pollination avec kontext, gptimage, nanobanana, seedream</label>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="charRef" readonly placeholder="aucune — choisis-en une avec ⭐ dans la galerie" style="flex:1; font-size:12px;">
+          <button type="button" id="charRefClear" style="font-size:11px; padding:5px 10px; width:auto;" title="Retirer la référence">✕</button>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:6px; flex-wrap:wrap;">
+          <button type="button" id="charRefImport" style="font-size:11px; padding:5px 10px; width:auto;">📥 Importer une image de mon personnage (IA)</button>
+          <input type="file" id="charRefFile" accept="image/*" style="display:none;">
+          <span id="charRefInfo" style="font-size:10px; color:#888;">Nécessite le mode permanent Perchance (hébergement de l'image).</span>
+        </div>
       </div>
       <label style="display:flex; gap:8px; align-items:center; font-size:12px; margin-top:10px;">
         <input type="checkbox" id="genTranslate" style="width:auto;"> 🌐 Traduire en anglais la description physique et la scène (si elles sont en français)
@@ -370,6 +404,21 @@
   <button id="startBtn">Démarrer la conversation</button>
 </div>
 
+<div id="scenePanel" class="hidden">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+    <b style="color:#e8e8e4;">🎬 Fiche de scène</b>
+    <label style="display:flex; gap:6px; align-items:center; margin:0; cursor:pointer;"><input type="checkbox" id="sceneAuto" style="width:auto;"> suivi auto</label>
+  </div>
+  <div style="color:#778; font-size:10px; margin-bottom:4px;">Mise à jour après chaque réponse, réinjectée dans le contexte du chat et dans les prompts d'image. Modifiable à la main (en anglais).</div>
+  <label for="sceneLocation">Lieu</label><input type="text" id="sceneLocation">
+  <label for="sceneTime">Moment / lumière</label><input type="text" id="sceneTime">
+  <label for="sceneOutfit">Tenue</label><input type="text" id="sceneOutfit">
+  <label for="sceneMood">Ambiance</label><input type="text" id="sceneMood">
+  <div style="display:flex; gap:8px; margin-top:10px;">
+    <button type="button" id="sceneReset" style="font-size:11px; padding:5px 10px; width:auto;">↺ Réinitialiser</button>
+    <button type="button" id="sceneClose" style="font-size:11px; padding:5px 10px; width:auto;">Fermer</button>
+  </div>
+</div>
 <div id="gallery" class="hidden">
   <div id="gHead">
     <span class="gt">🖼️ Galerie <span id="gCount" style="font-weight:400; color:#888;"></span></span>
@@ -398,6 +447,9 @@
 <div id="topbar" class="hidden">
   <select id="quickSwitch"></select>
   <div class="actions">
+    <button id="compareBtn" title="Comparateur : tous les moteurs côte à côte, 👍 sur la meilleure">⚖️</button>
+    <button id="sceneBtn" title="Fiche de scène : lieu, moment, tenue, ambiance (suivie automatiquement)">🎬</button>
+    <button id="suggestBtn" title="Suggestions de réponse (générées par le modèle du chat)">💡</button>
     <button id="galleryBtn" title="Galerie des images générées">🖼️</button>
     <button id="resetBtn">↺ Vider</button>
     <button id="backBtn">⚙ Config</button>
@@ -408,6 +460,19 @@
 
 <div id="inputbar" class="hidden">
   <textarea id="input" rows="1" placeholder="Écris ton message..."></textarea>
+  <select id="shotSel" title="Cadrage des images (appliqué à tous les moteurs)" style="background:#1a2a22; border:1px solid #2a3d33; color:#e8e8e4; border-radius:10px; width:58px; font-size:16px; flex-shrink:0; padding:0 2px;">
+    <option value="">📷 Auto</option>
+    <option value="closeup">🔍 Gros plan</option>
+    <option value="portrait">🙂 Portrait</option>
+    <option value="medium">👤 Plan taille</option>
+    <option value="cowboy">🤠 Mi-cuisse</option>
+    <option value="full">🧍 En pied</option>
+    <option value="pov">👁 Vue subjective</option>
+    <option value="low">⬆️ Contre-plongée</option>
+    <option value="high">⬇️ Plongée</option>
+    <option value="side">↔️ De profil</option>
+    <option value="behind">↩️ Par derrière</option>
+  </select>
   <button id="mic" type="button" title="Dictée vocale (clique pour démarrer / arrêter)">🎤</button>
   <button id="send">➤</button>
 </div>
@@ -901,7 +966,11 @@ function addMessage(text, cls, ts) {
 function buildMessages(userText, isInit) {
   const recent = history.slice(-HISTORY_WINDOW);
   const messages = [];
-  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+  // Fiche de scène : rappel de continuité ajouté au message système
+  const sheet = sceneOn() ? sceneSheetText() : '';
+  let sys = systemPrompt || '';
+  if (sheet) sys += (sys ? '\n\n' : '') + '[Scene continuity — keep consistent unless the story changes it] ' + sheet;
+  if (sys) messages.push({ role: 'system', content: sys });
   for (const m of recent) messages.push({ role: m.role, content: m.content });
   if (isInit) {
     messages.push({ role: 'user', content: 'Initie la conversation maintenant, en restant fidèle au personnage et au ton décrits dans tes instructions système. Un seul message.' });
@@ -1320,6 +1389,218 @@ window.addEventListener("DOMContentLoaded", initAudioLooper);
 // on referme l'onglet automatiquement ; sinon l'onglet reste ouvert avec l'image visible
 // dedans (secours manuel, plus besoin de copier-coller à la main dans la plupart des cas).
 
+// ========== SUGGESTIONS DE RÉPONSE ==========
+// Trois répliques possibles pour l'utilisateur, écrites par le MÊME modèle que celui du chat.
+let suggestGen = 0;
+function suggestOn() { return localStorage.getItem('suggestOn') !== '0'; }
+function clearSuggestions() { document.querySelectorAll('.suggest-row').forEach(e => e.remove()); }
+(function () {
+  const b = document.getElementById('suggestBtn');
+  const paint = () => b.classList.toggle('off', !suggestOn());
+  paint();
+  b.addEventListener('click', () => {
+    localStorage.setItem('suggestOn', suggestOn() ? '0' : '1');
+    paint(); if (!suggestOn()) clearSuggestions();
+    showMediaToast(suggestOn() ? '💡 Suggestions activées' : '💡 Suggestions désactivées');
+  });
+})();
+// ----- Fiche de scène : lieu, moment, tenue, ambiance, tenue à jour par le modèle du chat -----
+function sceneOn() { return localStorage.getItem('sceneOn') !== '0'; }
+function getSceneSheet() {
+  try { return JSON.parse(localStorage.getItem('sceneSheet:' + (profileName || '')) || '{}') || {}; } catch (e) { return {}; }
+}
+function sceneSheetText() {
+  const sh = getSceneSheet(), out = [];
+  if (sh.location) out.push('place: ' + sh.location);
+  if (sh.time) out.push('time/light: ' + sh.time);
+  if (sh.outfit) out.push('outfits: ' + sh.outfit);
+  if (sh.mood) out.push('mood: ' + sh.mood);
+  return out.join('; ');
+}
+function setSceneSheet(o) {
+  localStorage.setItem('sceneSheet:' + (profileName || ''), JSON.stringify(o));
+  refreshScenePanel();
+}
+function refreshScenePanel() {
+  const sh = getSceneSheet();
+  [['sceneLocation', 'location'], ['sceneTime', 'time'], ['sceneOutfit', 'outfit'], ['sceneMood', 'mood']].forEach(([id, k]) => {
+    const el = document.getElementById(id);
+    if (el && document.activeElement !== el) el.value = sh[k] || '';
+  });
+  document.getElementById('sceneAuto').checked = sceneOn();
+  document.getElementById('sceneBtn').classList.toggle('off', !sceneOn());
+}
+(function () {
+  const panel = document.getElementById('scenePanel');
+  document.getElementById('sceneBtn').addEventListener('click', () => { refreshScenePanel(); panel.classList.toggle('hidden'); });
+  document.getElementById('sceneClose').addEventListener('click', () => panel.classList.add('hidden'));
+  document.getElementById('sceneAuto').addEventListener('change', (e) => {
+    localStorage.setItem('sceneOn', e.target.checked ? '1' : '0'); refreshScenePanel();
+  });
+  [['sceneLocation', 'location'], ['sceneTime', 'time'], ['sceneOutfit', 'outfit'], ['sceneMood', 'mood']].forEach(([id, k]) => {
+    document.getElementById(id).addEventListener('input', (e) => {
+      const sh = getSceneSheet(); sh[k] = e.target.value.trim().slice(0, 120);
+      localStorage.setItem('sceneSheet:' + (profileName || ''), JSON.stringify(sh));
+    });
+  });
+  document.getElementById('sceneReset').addEventListener('click', () => { setSceneSheet({}); showMediaToast('🎬 Fiche de scène réinitialisée'); });
+  refreshScenePanel();
+})();
+
+// Après chaque réponse : UN appel au modèle du chat qui rédige les 3 suggestions de réplique ET
+// met à jour la fiche de scène. Renvoie une promesse qui se résout toujours (jamais d'erreur).
+async function analyzeReply(afterEl) {
+  const wantSug = suggestOn(), wantScene = sceneOn();
+  if ((!wantSug && !wantScene) || !afterEl) return;
+  const mine = ++suggestGen;
+  try {
+    const ctx = history.slice(-6).map(m => (m.role === 'user' ? 'Utilisateur' : 'Personnage') + ' : ' + String(m.content).slice(0, 700)).join('\n\n');
+    const prev = getSceneSheet();
+    const res = await fetch(WORKER_BASE + provider, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      body: JSON.stringify({
+        model: model, stream: false, temperature: 0.7, max_tokens: 420,
+        messages: [
+          { role: 'system', content: 'Tu analyses une scène de roleplay. Réponds UNIQUEMENT par un objet JSON {"suggestions":[...],"scene":{"location":"","time":"","outfit":"","mood":""}}, sans commentaire. "suggestions" : exactement 3 répliques que l\'UTILISATEUR pourrait écrire ensuite (première personne, langue et registre de la conversation, 1 à 2 phrases courtes) : (1) une qui fait avancer l\'action, (2) une plus douce ou tendre, (3) une qui change de direction. "scene" : l\'état ACTUEL de la scène à la fin du dernier message, en ANGLAIS, très concis (8 mots maximum par champ) : location, time (moment ou lumière), outfit (tenue actuelle de chaque personnage), mood. Si un champ n\'a pas changé, recopie la valeur précédente.' },
+          { role: 'user', content: 'Demandé : suggestions=' + (wantSug ? 'oui' : 'non (laisse un tableau vide)') + ', scene=' + (wantScene ? 'oui' : 'non') + '\n\nÉtat précédent de la scène : ' + JSON.stringify(prev) + '\n\nConversation récente :\n\n' + ctx }
+        ]
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    const raw = stripThink((d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '');
+    let obj = null;
+    const mo = raw.match(/\{[\s\S]*\}/);
+    if (mo) { try { obj = JSON.parse(mo[0]); } catch (e) {} }
+    if (mine !== suggestGen) return; // un message plus récent a pris le relais
+
+    if (wantScene && obj && obj.scene && typeof obj.scene === 'object') {
+      const next = { ...prev };
+      ['location', 'time', 'outfit', 'mood'].forEach(k => {
+        if (typeof obj.scene[k] === 'string' && obj.scene[k].trim()) next[k] = obj.scene[k].trim().slice(0, 120);
+      });
+      setSceneSheet(next);
+    }
+    if (wantSug) {
+      let list = obj && Array.isArray(obj.suggestions) ? obj.suggestions : [];
+      if (!list.length) { // repli : simple tableau ou liste numérotée
+        const ma = raw.match(/\[[\s\S]*\]/);
+        if (ma) { try { list = JSON.parse(ma[0]); } catch (e) {} }
+      }
+      list = list.filter(x => typeof x === 'string').map(x => x.trim()).filter(Boolean).slice(0, 3);
+      if (!list.length || !afterEl.isConnected) return;
+      clearSuggestions();
+      const row = document.createElement('div');
+      row.className = 'suggest-row';
+      list.forEach(t => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'suggest-chip'; b.textContent = t.slice(0, 240);
+        b.onclick = () => { input.value = t; input.dispatchEvent(new Event('input')); handleSend(); };
+        row.appendChild(b);
+      });
+      afterEl.after(row);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  } catch (e) { console.warn('Analyse de la réponse indisponible :', e); }
+}
+
+// ========== IMPORT D'UNE IMAGE DE PERSONNAGE (générée par IA) ==========
+// L'image est réduite, rangée dans la galerie, hébergée via le générateur Perchance (URL publique
+// nécessaire aux modèles de référence de Pollination) puis définie comme référence du profil.
+// Si l'ancre visuelle est vide, elle est aussi rédigée à partir de l'image (visage, cheveux, yeux,
+// peau, silhouette seulement).
+function resizeImageFile(file, maxSide, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const u = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(u);
+      const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * k)); c.height = Math.max(1, Math.round(img.height * k));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => b ? resolve({ blob: b, dataUrl: c.toDataURL('image/jpeg', quality) }) : reject(new Error('conversion impossible')), 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(u); reject(new Error('image illisible')); };
+    img.src = u;
+  });
+}
+async function describeImageForAnchor(dataUrl) {
+  const res = await fetch(WORKER_BASE + 'gemini-text', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+    body: JSON.stringify({
+      contents: [{ parts: [
+        { text: 'Describe ONLY the apparent character\'s face and look for an image generator: apparent age, face shape, hair (colour, length, style, bangs), eye colour, skin tone, freckles or marks, build. One line of comma-separated English phrases, at most 220 characters. No clothing, no setting, no sexual content. Output only the line.' },
+        { inlineData: { mimeType: 'image/jpeg', data: dataUrl.split(',')[1] } }
+      ] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 160 }
+    })
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const d = await res.json();
+  const t = d && d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts && d.candidates[0].content.parts[0] && d.candidates[0].content.parts[0].text;
+  return String(t || '').replace(/\s+/g, ' ').replace(/^["'\s]+|["'\s]+$/g, '').slice(0, 260);
+}
+async function importCharRefImage(file) {
+  const info = document.getElementById('charRefInfo');
+  if (!file) return;
+  if (!confirm('Cette image est-elle un personnage généré par IA (fictif), et non la photo d\'une personne réelle ?')) {
+    info.textContent = 'Import annulé.'; return;
+  }
+  try {
+    info.textContent = 'Préparation de l\'image…';
+    let r = await resizeImageFile(file, 1024, 0.9);
+    if (r.dataUrl.length > 2800000) r = await resizeImageFile(file, 768, 0.8);
+    const galleryId = await gallerySave({ profile: profileName || '', ts: Date.now(), source: 'Référence importée', prompt: '', blob: r.blob, url: '', pubUrl: '' });
+
+    // ancre visuelle à partir de l'image, seulement si elle est vide
+    const anchorField = document.getElementById('charAnchor');
+    if (!anchorField.value.trim()) {
+      describeImageForAnchor(r.dataUrl).then(t => {
+        if (t.length > 15 && !anchorField.value.trim()) { anchorField.value = t; info.textContent += ' Ancre rédigée depuis l\'image (à relire).'; }
+      }).catch(e => console.warn('Description de l\'image indisponible :', e));
+    }
+
+    if (!perchancePersistentOn()) {
+      info.textContent = 'Image rangée dans la galerie. Pour l\'utiliser comme référence, active le mode permanent Perchance (hébergement), puis réimporte-la.';
+      return;
+    }
+    info.textContent = 'Envoi au générateur Perchance (il doit être ouvert)…';
+    const id = hex24();
+    const headers = { 'Content-Type': 'application/json', 'X-App-Secret': password };
+    const post = await fetch(WORKER_BASE + 'perchance-job', {
+      method: 'POST', headers,
+      body: JSON.stringify({ token: perchanceToken(), id, type: 'upload', dataUrl: r.dataUrl })
+    });
+    if (!post.ok) throw new Error('Worker HTTP ' + post.status);
+    const t0 = Date.now();
+    while (Date.now() - t0 < 150000) {
+      await new Promise(res => setTimeout(res, 2000));
+      const g = await fetch(WORKER_BASE + 'relay-get?id=' + id + 'a', { headers });
+      if (!g.ok) continue;
+      const d = await g.json();
+      if (d && d.url) {
+        setCharRef(d.url);
+        galleryPatch(galleryId, { pubUrl: d.url }).catch(() => {});
+        info.textContent = '✅ Référence définie. Elle sert à Pollination avec kontext, gptimage, nanobanana ou seedream.';
+        return;
+      }
+    }
+    info.textContent = '⏳ Pas de réponse du générateur Perchance : est-il ouvert et démarré ? (l\'image reste dans la galerie)';
+  } catch (e) {
+    console.error('Import de la référence :', e);
+    info.textContent = '⚠️ ' + (e && e.message || e);
+  }
+}
+document.getElementById('charRefImport').addEventListener('click', () => document.getElementById('charRefFile').click());
+document.getElementById('charRefFile').addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  importCharRefImage(f);
+});
+
 // ========== GALERIE PERSISTANTE (IndexedDB) ==========
 // Chaque image générée est copiée en local (blob) pour survivre au rechargement et aux liens
 // qui expirent (Horde : 30 min). Si la copie est impossible, on garde au moins l'URL.
@@ -1345,11 +1626,18 @@ async function gallerySave(rec) {
   const db = await galleryDb();
   const tx = db.transaction('images', 'readwrite');
   const st = tx.objectStore('images');
-  await idbDone(st.add(rec));
+  const newKey = await idbDone(st.add(rec));
   const keys = await idbDone(st.index('profile').getAllKeys(rec.profile));
   if (keys.length > GALLERY_MAX) {
     keys.sort((a, b) => a - b).slice(0, keys.length - GALLERY_MAX).forEach(k => st.delete(k));
   }
+  return newKey;
+}
+async function galleryPatch(id, patch) {
+  const db = await galleryDb();
+  const st = db.transaction('images', 'readwrite').objectStore('images');
+  const rec = await idbDone(st.get(id));
+  if (rec) await idbDone(st.put({ ...rec, ...patch }));
 }
 async function galleryList(allProfiles) {
   const db = await galleryDb();
@@ -1391,26 +1679,170 @@ async function archiveImage({ url, source, prompt }) {
   } catch (e) { console.warn('Galerie : sauvegarde impossible', e); }
 }
 
-// Affiche une image dans la conversation (cliquable → visionneuse) et l'archive
-function showGeneratedImage({ url, source, prompt, onError }) {
-  const wrap = document.createElement('div');
-  wrap.className = 'msg bot';
+// Crée l'<img> d'une image générée : cliquable (visionneuse) et archivée dans la galerie une fois chargée
+function makeImageEl({ url, source, prompt, onError, onOpen }) {
   const img = document.createElement('img');
   img.alt = 'Image générée (' + source + ')';
   img.style.cssText = 'max-width:100%; border-radius:10px; cursor:zoom-in; display:block;';
-  img.onclick = () => openLightbox([{ src: img.src, caption: source + (prompt ? ' — ' + prompt : ''), prompt, pubUrl: /^https:\/\//i.test(url) ? url : '' }], 0);
+  img.onclick = onOpen || (() => openLightbox([{ src: img.src, caption: source + (prompt ? ' — ' + prompt : ''), prompt, pubUrl: /^https:\/\//i.test(url) ? url : '' }], 0));
   img.onload = () => archiveImage({ url, source, prompt });
-  img.onerror = () => {
-    if (onError) return onError(wrap, url);
-    wrap.className = 'msg image-loading';
-    wrap.textContent = '⚠️ ' + source + ' : l\'image n\'a pas pu être chargée.';
-  };
+  img.onerror = () => onError && onError(url);
   img.src = url;
+  return img;
+}
+
+// Affiche une image dans la conversation (cliquable → visionneuse) et l'archive.
+// En mode comparateur, elle va dans la carte de comparaison du message en cours.
+function showGeneratedImage({ url, source, prompt, onError }) {
+  if (compareSession && compareSession.accepts(source)) return compareSession.add({ url, source, prompt });
+  const wrap = document.createElement('div');
+  wrap.className = 'msg bot';
+  const img = makeImageEl({
+    url, source, prompt,
+    onError: (u) => {
+      if (onError) return onError(wrap, u);
+      wrap.className = 'msg image-loading';
+      wrap.textContent = '⚠️ ' + source + ' : l\'image n\'a pas pu être chargée.';
+    }
+  });
   wrap.appendChild(img);
   messagesEl.appendChild(wrap);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   return wrap;
 }
+
+// ========== COMPARATEUR DE MOTEURS ==========
+// Même scène envoyée à tous les moteurs actifs, résultats côte à côte dans une seule carte.
+// 👍 désigne la meilleure ; les victoires sont comptées par moteur (et par cadrage) pour voir
+// lequel te convient vraiment, et 🎯 garde ce moteur seul pour le profil.
+const ENGINE_LABELS = { perchance: 'Perchance', pollination: 'Pollination', horde: 'AI Horde', space: 'Space HF' };
+function engineKeyOf(source) {
+  const t = String(source || '');
+  if (/^Perchance/i.test(t)) return 'perchance';
+  if (/^Pollination/i.test(t)) return 'pollination';
+  if (/^AI Horde/i.test(t)) return 'horde';
+  if (/^Space/i.test(t)) return 'space';
+  return '';
+}
+function compareOn() { return localStorage.getItem('compareOn') === '1'; }
+function enabledEngineKeys() {
+  return [genPerchance && 'perchance', genHFSpace && 'space', genPollination && 'pollination', genAIHorde && 'horde'].filter(Boolean);
+}
+let compareSession = null;
+
+function loadEngineStats() {
+  try { return JSON.parse(localStorage.getItem('engineStats') || '{}') || {}; } catch (e) { return {}; }
+}
+function bumpEngineStat(shotKey, engine, field) {
+  const st = loadEngineStats();
+  for (const bucket of [(st.all = st.all || { seen: {}, wins: {} }), ((st.shots = st.shots || {})[shotKey] = st.shots[shotKey] || { seen: {}, wins: {} })]) {
+    bucket[field][engine] = (bucket[field][engine] || 0) + 1;
+  }
+  localStorage.setItem('engineStats', JSON.stringify(st));
+}
+function engineScoreText(shotKey) {
+  const st = loadEngineStats();
+  const fmt = (b) => Object.keys(ENGINE_LABELS).filter(k => b.seen[k]).map(k => ENGINE_LABELS[k] + ' ' + (b.wins[k] || 0) + '/' + b.seen[k]).join(' · ');
+  const all = st.all ? fmt(st.all) : '';
+  const sh = st.shots && st.shots[shotKey];
+  const shVotes = sh ? Object.values(sh.wins).reduce((a, b) => a + b, 0) : 0;
+  let out = all ? '📊 Victoires : ' + all : '';
+  if (sh && shVotes >= 3) out += '\n🎬 Pour ce cadrage (' + shotKey + ') : ' + fmt(sh);
+  return out;
+}
+
+// Garde un seul moteur actif pour le profil courant (réglages + sauvegarde immédiate)
+function setOnlyEngine(key) {
+  genPerchance = key === 'perchance'; genHFSpace = key === 'space'; genPollination = key === 'pollination'; genAIHorde = key === 'horde';
+  const map = { genPerchance, genHFSpace, genPollination, genAIHorde };
+  Object.keys(map).forEach(id => { const el = document.getElementById(id); if (el) el.checked = map[id]; });
+  try {
+    const ps = loadProfiles();
+    if (profileName && ps[profileName]) {
+      ps[profileName].imageGenerators = { ...(ps[profileName].imageGenerators || {}), perchance: genPerchance, hfSpace: genHFSpace, pollination: genPollination, aiHorde: genAIHorde };
+      saveProfiles(ps);
+    }
+  } catch (e) {}
+  showMediaToast('🎯 ' + ENGINE_LABELS[key] + ' seul est maintenant actif pour ce profil');
+}
+
+function startCompareSession(keys) {
+  const shotKey = localStorage.getItem('shotPreset') || 'auto';
+  const card = document.createElement('div');
+  card.className = 'msg bot compare-card';
+  const head = document.createElement('div');
+  head.className = 'compare-head';
+  head.textContent = '⚖️ Comparaison de ' + keys.map(k => ENGINE_LABELS[k]).join(', ') + ' — clique 👍 sur la meilleure image.';
+  const grid = document.createElement('div');
+  grid.className = 'compare-grid';
+  const foot = document.createElement('div');
+  foot.className = 'cmp-foot';
+  foot.style.whiteSpace = 'pre-line';
+  foot.textContent = 'En attente des moteurs…';
+  card.append(head, grid, foot);
+  messagesEl.appendChild(card);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  const sess = {
+    keys, t0: Date.now(), voted: false, tiles: [], seenEngines: new Set(),
+    accepts(source) { return keys.includes(engineKeyOf(source)) && Date.now() - sess.t0 < 15 * 60000; },
+    add({ url, source, prompt }) {
+      const engine = engineKeyOf(source);
+      if (!sess.seenEngines.has(engine)) { sess.seenEngines.add(engine); bumpEngineStat(shotKey, engine, 'seen'); }
+      const tile = document.createElement('div');
+      tile.className = 'cmp-tile';
+      const item = { src: url, caption: source + (prompt ? ' — ' + prompt : ''), prompt, pubUrl: /^https:\/\//i.test(url) ? url : '' };
+      sess.tiles.push({ tile, item, engine });
+      const label = document.createElement('div');
+      label.className = 'cmp-label';
+      label.textContent = source;
+      const img = makeImageEl({
+        url, source, prompt,
+        onOpen: () => openLightbox(sess.tiles.map(t => t.item), sess.tiles.findIndex(t => t.tile === tile)),
+        onError: () => { tile.textContent = '⚠️ ' + source + ' : image non chargée.'; }
+      });
+      const actions = document.createElement('div');
+      actions.className = 'cmp-actions';
+      const vote = document.createElement('button');
+      vote.type = 'button'; vote.textContent = '👍 Meilleure'; vote.dataset.role = 'vote';
+      vote.onclick = () => {
+        if (sess.voted) return;
+        sess.voted = true;
+        tile.classList.add('win');
+        bumpEngineStat(shotKey, engine, 'wins');
+        card.querySelectorAll('button[data-role=vote]').forEach(b => { b.disabled = true; });
+        sess.refreshFoot();
+      };
+      const only = document.createElement('button');
+      only.type = 'button'; only.textContent = '🎯 Seul'; only.title = 'Garder ce moteur seul pour ce profil';
+      only.onclick = () => { if (confirm('Garder uniquement ' + ENGINE_LABELS[engine] + ' pour ce profil ?')) setOnlyEngine(engine); };
+      actions.append(vote, only);
+      tile.append(label, img, actions);
+      grid.appendChild(tile);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      sess.refreshFoot();
+      return tile;
+    },
+    refreshFoot() {
+      const sc = engineScoreText(shotKey);
+      foot.textContent = (sess.voted ? '✅ Vote enregistré.' : (sess.tiles.length ? 'Compare puis vote 👍.' : 'En attente des moteurs…')) + (sc ? '\n' + sc : '');
+    }
+  };
+  return sess;
+}
+(function () {
+  const b = document.getElementById('compareBtn');
+  const paint = () => b.classList.toggle('off', !compareOn());
+  paint();
+  b.addEventListener('click', () => {
+    localStorage.setItem('compareOn', compareOn() ? '0' : '1');
+    paint();
+    const n = enabledEngineKeys().length;
+    showMediaToast(compareOn()
+      ? (n >= 2 ? '⚖️ Comparateur activé (' + n + ' moteurs)' : '⚖️ Comparateur activé — coche au moins 2 moteurs dans les réglages d\'images')
+      : '⚖️ Comparateur désactivé');
+  });
+})();
 
 // ----- Visionneuse -----
 let lbItems = [], lbIdx = 0, lbDeletable = false;
@@ -1454,17 +1886,21 @@ document.getElementById('lbDownload').onclick = () => {
   a.target = '_blank';
   document.body.appendChild(a); a.click(); a.remove();
 };
-document.getElementById('lbRef').onclick = () => {
-  const it = lbItems[lbIdx]; if (!it || !it.pubUrl) return;
-  charRef = it.pubUrl;
-  const f = document.getElementById('charRef'); if (f) f.value = it.pubUrl;
-  try { // sauvegarde immédiate dans le profil courant
+// Définit l'image de référence du profil courant (champ du formulaire + sauvegarde immédiate)
+function setCharRef(url) {
+  charRef = url;
+  const f = document.getElementById('charRef'); if (f) f.value = url;
+  try {
     const ps = loadProfiles();
     if (profileName && ps[profileName]) {
-      ps[profileName].imageGenerators = { ...(ps[profileName].imageGenerators || {}), charRef: it.pubUrl };
+      ps[profileName].imageGenerators = { ...(ps[profileName].imageGenerators || {}), charRef: url };
       saveProfiles(ps);
     }
   } catch (e) {}
+}
+document.getElementById('lbRef').onclick = () => {
+  const it = lbItems[lbIdx]; if (!it || !it.pubUrl) return;
+  setCharRef(it.pubUrl);
   showMediaToast(/r2\.cloudflarestorage|aihorde/i.test(it.pubUrl)
     ? '⭐ Référence définie (lien Horde temporaire : il expirera)'
     : '⭐ Image de référence définie pour ce profil');
@@ -1553,10 +1989,25 @@ function perchanceToken() {
 function perchancePersistentOn() {
   return localStorage.getItem('perchancePersistent') === '1' && perchanceGenName() !== 'perchance-ai-api';
 }
+let daemonAlive = null;      // dernier état connu du générateur permanent (null = inconnu)
+let daemonOpenedAt = 0;
 function openPerchanceDaemon() {
-  const u = 'https://perchance.org/' + perchanceGenName() + '?' + new URLSearchParams({ mode: 'daemon', token: perchanceToken(), relay: WORKER_BASE }).toString();
-  return window.open(u, 'perchanceDaemon', 'width=520,height=720');
+  const u = 'https://perchance.org/' + perchanceGenName() + '?' + new URLSearchParams({ mode: 'daemon', token: perchanceToken(), relay: WORKER_BASE, autostart: '1' }).toString();
+  daemonOpenedAt = Date.now();
+  // petite fenêtre dans le coin de l'écran : elle démarre toute seule, il suffit de la laisser ouverte
+  const w = 380, h = 300;
+  const left = Math.max((screen.availWidth || 1200) - w - 20, 0), top = Math.max((screen.availHeight || 800) - h - 40, 0);
+  return window.open(u, 'perchanceDaemon', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top);
 }
+async function refreshDaemonState() {
+  if (!perchancePersistentOn() || !password) return;
+  try {
+    const r = await fetch(WORKER_BASE + 'perchance-status?token=' + perchanceToken(), { headers: { 'X-App-Secret': password } });
+    if (r.ok) daemonAlive = !!(await r.json()).alive;
+  } catch (e) {}
+}
+setInterval(refreshDaemonState, 10000);
+setTimeout(refreshDaemonState, 3000);
 (function () {
   const cb = document.getElementById('perchancePersistent');
   cb.checked = localStorage.getItem('perchancePersistent') === '1';
@@ -1643,6 +2094,36 @@ async function generatePerchanceViaDaemon(botText) {
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
+
+// ----- Cadrage des images -----
+const SHOT_PHRASES = {
+  closeup:  'extreme close-up shot, face filling the frame',
+  portrait: 'portrait shot, head and shoulders',
+  medium:   'medium shot, waist up',
+  cowboy:   'cowboy shot, framed from mid-thigh up',
+  full:     'full body shot, wide angle, entire figure visible',
+  pov:      'first-person POV shot, camera at the viewer\'s eye level',
+  low:      'low angle shot, camera below looking up',
+  high:     'high angle shot, camera above looking down',
+  side:     'side profile shot',
+  behind:   'shot from behind, rear view'
+};
+function shotPhrase() { return SHOT_PHRASES[localStorage.getItem('shotPreset') || ''] || ''; }
+// Retire du résumé de scène les cadrages que le modèle y a glissés (« Low angle shot »…) pour
+// qu'ils ne contredisent pas le préréglage choisi.
+function stripFraming(a) {
+  return a
+    .replace(/\b(?:(?:extreme\s+)?close-?up|medium|wide|full[- ]body|cowboy|pov|first[- ]person|over[- ]the[- ]shoulder|low[- ]angle|high[- ]angle|side[- ]profile|rear)\s+(?:shot|view|angle)\b,?/gi, '')
+    .replace(/\s{2,}/g, ' ').replace(/^[,\s]+|[,\s]+$/g, '');
+}
+(function () {
+  const sel = document.getElementById('shotSel');
+  sel.value = localStorage.getItem('shotPreset') || '';
+  sel.addEventListener('change', () => {
+    localStorage.setItem('shotPreset', sel.value);
+    showMediaToast(sel.value ? '📷 Cadrage : ' + sel.options[sel.selectedIndex].text : '📷 Cadrage automatique');
+  });
+})();
 
 // Seed verrouillé du personnage (null = aléatoire)
 function charSeedValue() {
@@ -1960,9 +2441,11 @@ function extractAction(botText) {
 // Prompt partagé par les trois générateurs : description physique du personnage (profil)
 // + action/position extraite du dernier message + les tags de style fixes.
 function buildImagePrompt(botText, maxLen) {
-  const action = extractAction(botText);
+  const shot = shotPhrase();
+  const action = shot ? stripFraming(extractAction(botText)) : extractAction(botText);
   const parts = [
     'masterpiece, best quality, highly detailed explicit erotic scene',
+    shot,
     physDescForImage(),
     action,
     'detailed anatomy, cinematic lighting'
@@ -1972,24 +2455,126 @@ function buildImagePrompt(botText, maxLen) {
 
 // Perchance répond mieux à ce cadrage précis (constaté à l'usage) : la phrase d'ouverture
 // et la phrase de clôture ne sont jamais tronquées, seul le contenu variable l'est si besoin.
-function buildPerchancePrompt(botText, maxLen) {
-  const action = extractAction(botText).slice(0, 300);
-  const tags = 'futanari, huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting';
-  const prefix = 'A casual real-life photograph, ';
-  const suffix = ". (((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. It's a casual photo. Overall it's an actual real-life photograph";
+// ========== PROMPTS ADAPTÉS À CHAQUE MOTEUR ==========
+// Tes constantes de style (valeurs d'origine, simplement remontées ici pour que tous les moteurs
+// puissent s'en servir) :
+const PERCHANCE_TAGS = 'detailed anatomy, cinematic lighting';
+const PERCHANCE_PREFIX = 'A casual real-life photograph, ';
+const PERCHANCE_SUFFIX = ". (((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. It's a casual photo. Overall it's an actual real-life photograph";
+
+// Découpe un texte en expressions courtes, retire la ponctuation parasite (« exertion., futanari »)
+// et les doublons. L'ordre est conservé : la première expression est la plus importante.
+function toPhrases(str) {
+  return String(str || '')
+    .replace(/\.\s*(?=[,;])/g, '')
+    .split(/[,;]|\.\s+(?=[A-Z(])/)
+    .map(x => x.replace(/^[\s.]+|[\s.]+$/g, ''))
+    .filter(Boolean);
+}
+function dedupePhrases(list) {
+  const seen = new Set();
+  return list.filter(p => { const k = p.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+}
+// Garde les premières expressions qui tiennent dans max caractères : on retire des expressions
+// ENTIÈRES en fin de liste, jamais un bout de phrase.
+function fitPhrases(list, max) {
+  const out = []; let len = 0;
+  for (const p of list) {
+    const add = (out.length ? 2 : 0) + p.length;
+    if (len + add > max) break;
+    out.push(p); len += add;
+  }
+  return out;
+}
+const fitText = (str, max) => fitPhrases(dedupePhrases(toPhrases(str)), max).join(', ');
+const capFirst = (t) => t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+
+// Éléments communs : cadrage choisi, sujet (ancre ou description), scène
+function promptParts(botText) {
+  const shot = shotPhrase();
+  let action = extractAction(botText);
+  if (shot) action = stripFraming(action);
+  // La fiche de scène complète ce que la réponse ne répète pas (tenue, lieu)
+  const sh = sceneOn() ? getSceneSheet() : {};
+  return {
+    shot,
+    subject: dedupePhrases(toPhrases(charAnchor || physDescForImage() || '')),
+    actionList: dedupePhrases([...toPhrases(action), ...toPhrases([sh.outfit, sh.location].filter(Boolean).join(', '))])
+  };
+}
+
+// Moteurs « langage naturel » (Flux, Z-Image Turbo, kontext, gptimage…) : phrases courtes,
+// sans poids ni étiquettes de qualité empilées, pas de prompt négatif.
+function buildProsePrompt(botText, maxLen) {
+  const { shot, subject, actionList } = promptParts(botText);
+  // « (((actual, actual photo))) » → « actual photo » : doublons retirés, poids SD supprimés
+  const style = compactSuffix(PERCHANCE_SUFFIX).replace(/\b(\w+),\s*\1\b/gi, '$1').replace(/[()]/g, '').replace(/^[\s.]+/, '');
+  const sentences = [
+    'A candid real-life photograph.',
+    shot ? capFirst(shot) + '.' : '',
+    subject.length ? capFirst(subject.join(', ')) + '.' : '',
+    actionList.length ? capFirst(fitPhrases(actionList, 360).join(', ')) + '.' : '',
+    style ? capFirst(style) + '.' : ''
+  ].filter(Boolean);
+  let out = sentences.join(' ');
+  // trop long : on enlève d'abord la fin du style, jamais la scène
+  if (out.length > (maxLen || 800)) out = sentences.slice(0, -1).join(' ');
+  return out.slice(0, maxLen || 800);
+}
+
+// Modèles Stable Diffusion (Horde, Pollination turbo) : étiquettes séparées par des virgules,
+// avec un en-tête de qualité adapté au style du modèle.
+function hordeStyleKind() {
+  const name = (hordeModels && hordeModels[0]) || '';
+  return /illustrious|pony|noob|anime|hassaku|wai-|anything|counterfeit|animagine|meina|waifu/i.test(name) ? 'anime' : 'photo';
+}
+const HORDE_ANIME_NEG = 'worst quality, low quality, lowres, bad anatomy, bad hands, extra fingers, jpeg artifacts, text, watermark, signature';
+function buildTagPrompt(botText, maxLen, kind) {
+  const { shot, subject, actionList } = promptParts(botText);
+  const head = kind === 'anime'
+    ? ['masterpiece', 'best quality', 'amazing quality', 'very aesthetic', 'absurdres']
+    : ['RAW photo', 'photorealistic'];
+  const tail = kind === 'anime'
+    ? ['detailed anatomy', 'cinematic lighting']
+    : ['film grain', 'skin pores', 'shallow depth of field', '8k uhd', 'dslr', 'soft natural lighting'];
+  const fixed = dedupePhrases(toPhrases(PERCHANCE_TAGS));
+  // ordre = priorité : le plus important d'abord, ce qui dépasse tombe en fin de liste
+  const all = dedupePhrases([...head, ...(shot ? [shot] : []), ...subject, ...actionList, ...fixed, ...tail]);
+  return fitPhrases(all, maxLen || 840).join(', ');
+}
+function buildHordePrompt(botText, maxLen) { return buildTagPrompt(botText, maxLen, hordeStyleKind()); }
+function buildPollinationPrompt(botText, model) {
+  return /^turbo$/i.test(model || '') ? buildTagPrompt(botText, 700, 'photo') : buildProsePrompt(botText, 800);
+}
+
+// Version courte du suffixe de style (Horde plafonne le prompt à ~1000 caractères) : on coupe
+// à une virgule pour ne jamais laisser une phrase en plan.
+function compactSuffix(sfx) {
+  if (sfx.length <= 170) return sfx;
+  const cut = sfx.slice(0, 170);
+  const i = Math.max(cut.lastIndexOf(','), cut.lastIndexOf('.'));
+  return i > 40 ? cut.slice(0, i) : cut;
+}
+function buildPerchancePrompt(botText, maxLen, compact) {
+  const shot = shotPhrase();
+  const action = dedupePhrases(toPhrases(shot ? stripFraming(extractAction(botText)) : extractAction(botText))).join(', ').slice(0, 300);
+  const tags = PERCHANCE_TAGS;
+  const prefix = PERCHANCE_PREFIX;
+  const suffixFull = PERCHANCE_SUFFIX;
+  const suffix = compact ? compactSuffix(suffixFull) : suffixFull;
   // La scène du moment est prioritaire : si le budget manque, c'est la description du
   // personnage qu'on raccourcit, jamais la scène ni les tags de style.
-  const budget = Math.max((maxLen || 900) - prefix.length - suffix.length - tags.length - 2, 0);
+  const budget = Math.max((maxLen || 900) - prefix.length - suffix.length - tags.length - 2 - (shot ? shot.length + 2 : 0), 0);
   // Avec une ancre visuelle, c'est elle qu'on garde entière (elle fait le visage) et la scène
   // qui cède en premier ; sans ancre, comportement d'origine.
   let descPart, actionPart = action;
   if (charAnchor) {
     descPart = charAnchor.slice(0, 260);
-    actionPart = action.slice(0, Math.max(budget - descPart.length - 2, 80));
+    actionPart = fitText(action, Math.max(budget - descPart.length - 2, 80));
   } else {
-    descPart = physDescForImage().slice(0, Math.max(budget - action.length - 2, 0));
+    descPart = fitText(physDescForImage(), Math.max(budget - action.length - 2, 0));
   }
-  const variable = [descPart, actionPart].filter(Boolean).join(', ');
+  const variable = [shot, descPart, actionPart].filter(Boolean).join(', ');
   return prefix + (variable ? variable + ', ' : '') + tags + suffix;
 }
 
@@ -2006,6 +2591,10 @@ async function launchImageGenerators(text, userText, popup, closePopup) {
     closePopup();
     return;
   }
+  // Comparateur : une carte unique reçoit les images de tous les moteurs actifs
+  compareSession = null;
+  const engineKeys = enabledEngineKeys();
+  if (compareOn() && engineKeys.length >= 2) compareSession = startCompareSession(engineKeys);
   await prepareScene(text, userText);
   await prepareTranslations(text);
   if (genPerchance) safeTrigger(() => generateNSFWImage(text, popup)); else closePopup();
@@ -2104,7 +2693,7 @@ async function generateHFSpaceImage(botText) {
   try {
     // Prompt naturel et concis : Z-Image Turbo (le modèle derrière ce Space) n'utilise pas
     // de negative prompt et préfère une description naturelle plutôt qu'un pavé de texte.
-    const prompt = buildImagePrompt(botText, 700);
+    const prompt = buildProsePrompt(botText, 600); // Z-Image Turbo : langage naturel
 
     const finalData = await callHFSpace([prompt, 768, 512, 10, 0, true, 1]);
     console.log('[Space HF] prompt :', prompt, '— réponse :', finalData);
@@ -2118,7 +2707,12 @@ async function generateHFSpaceImage(botText) {
         onError: (wrap, u) => {
           console.error('[Space HF] image non chargeable :', u);
           wrap.className = 'msg image-loading';
-          wrap.innerHTML = '⚠️ Space HF : l\'image n\'a pas pu être chargée. <a href="' + u + '" target="_blank" style="color:#e0a34a;">Ouvrir le lien</a>';
+          wrap.textContent = '⚠️ Space HF : l\'image n\'a pas pu être chargée. ';
+          if (/^https?:\/\//i.test(u)) { // lien construit sans innerHTML : l'URL vient d'un service externe
+            const a = document.createElement('a');
+            a.href = u; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Ouvrir le lien'; a.style.color = '#e0a34a';
+            wrap.appendChild(a);
+          }
         }
       });
     } else {
@@ -2150,8 +2744,9 @@ async function generatePollinationImage(botText) {
 
   // Mêmes réglages que Perchance : même prompt (personnage + scène + tags de style),
   // même résolution, même guidance, même prompt négatif.
-  const prompt = buildPerchancePrompt(botText, 900);
   const model = pollModel || 'flux';
+  const prompt = buildPollinationPrompt(botText, model);
+  
   // Image de référence : seulement pour les modèles « édition / référence »
   const refImage = (/^https:\/\//i.test(charRef) && /kontext|gptimage|nanobanana|seedream/i.test(model)) ? charRef : '';
   if (refImage) console.log('[Pollination] image de référence :', refImage);
@@ -2312,6 +2907,7 @@ document.getElementById('hAdvPreset').addEventListener('change', (e) => {
   if (pr) fillHordeAdvForm({ ...readHordeAdvFromForm(), ...pr });
   e.target.value = '';
 });
+document.getElementById('charRefClear').addEventListener('click', () => { document.getElementById('charRef').value = ''; });
 document.getElementById('charSeedRoll').addEventListener('click', () => {
   document.getElementById('charSeed').value = Math.floor(Math.random() * 1e9);
   document.getElementById('charSeedLock').checked = true;
@@ -2352,6 +2948,11 @@ document.getElementById('charAnchorGen').addEventListener('click', async () => {
   }
   document.getElementById('charAnchor').value = out.slice(0, 260);
 });
+(function () {
+  const f = document.getElementById('hordeKeyLocal');
+  f.value = localStorage.getItem('hordeKeyLocal') || '';
+  f.addEventListener('input', () => localStorage.setItem('hordeKeyLocal', f.value.trim()));
+})();
 document.getElementById('hAdvReset').addEventListener('click', () => fillHordeAdvForm(HORDE_ADV_DEFAULT));
 document.getElementById('hordeCheckKey').addEventListener('click', async () => {
   const info = document.getElementById('hordeKeyInfo');
@@ -2387,10 +2988,11 @@ async function hordeErr(res) {
 }
 // Deux chemins d'accès : le Worker (avec ta clé) ou, en secours, directement depuis ce navigateur
 // en anonyme (Horde refuse parfois les requêtes venant de l'adresse IP du Worker).
-const HORDE_DIRECT = {
-  base: 'https://aihorde.net/api/v2/',
-  headers: { 'apikey': '0000000000', 'Client-Agent': 'chat-perso-zacbov:1:chat.html' }
-};
+// Clé facultative propre à ce navigateur (champ dans les réglages avancés Horde) ; sinon anonyme.
+function hordeDirect() {
+  const key = (localStorage.getItem('hordeKeyLocal') || '').trim() || '0000000000';
+  return { base: 'https://aihorde.net/api/v2/', headers: { 'apikey': key, 'Client-Agent': 'chat-perso-zacbov:1:chat.html' }, direct: true };
+}
 function hordeViaWorker() {
   return { base: WORKER_BASE + 'horde/', headers: { 'X-App-Secret': password } };
 }
@@ -2408,7 +3010,8 @@ async function callAIHorde(prompt, onProgress) {
   const [w, h] = String(adv.size).split('x').map(Number);
   // Horde limite le prompt à ~1000 caractères (positif + négatif) : le négatif cède en premier
   let pos = prompt.slice(0, 990);
-  let neg = (adv.negative || '').slice(0, Math.max(0, 995 - pos.length - 5));
+  const negSource = (hordeStyleKind() === 'anime' && adv.negative === HORDE_REAL_NEG) ? HORDE_ANIME_NEG : (adv.negative || '');
+  let neg = negSource.slice(0, Math.max(0, 995 - pos.length - 5));
   const fullPrompt = neg ? pos + ' ### ' + neg : pos;
   const full = {
     width: w || 768,
@@ -2437,10 +3040,14 @@ async function callAIHorde(prompt, onProgress) {
   const attempts = [
     { net: hordeViaWorker(), params: full,  label: 'Worker' },
     { net: hordeViaWorker(), params: light, label: 'Worker (paramètres allégés)' },
-    { net: HORDE_DIRECT,     params: light, label: 'accès direct anonyme' }
+    { net: hordeDirect(),    params: full,  label: 'accès direct' }
   ];
+  // Horde met parfois l'adresse IP du Worker « en pause » (TimeoutIP) : on s'en souvient 30 min
+  // pour passer directement par le navigateur au lieu de perdre deux essais à chaque image.
+  let workerBlocked = Date.now() < Number(localStorage.getItem('hordeWorkerBlockedUntil') || 0);
   let net = null, id = null, lastErr = '';
   for (const a of attempts) {
+    if (workerBlocked && !a.net.direct) continue;
     let res;
     try {
       res = await fetch(a.net.base + 'generate/async', {
@@ -2457,7 +3064,7 @@ async function callAIHorde(prompt, onProgress) {
       const d = await res.json();
       if (d.id) {
         net = a.net; id = d.id;
-        if (a.label !== 'Worker') console.log('[Horde] demande acceptée via :', a.label);
+        if (a.net.direct) console.log('[Horde] demande acceptée via : accès direct' + (a.net.headers.apikey === '0000000000' ? ' (anonyme)' : ' (avec ta clé)'));
         break;
       }
       lastErr = a.label + ' : pas d\'id reçu';
@@ -2465,6 +3072,11 @@ async function callAIHorde(prompt, onProgress) {
     }
     lastErr = a.label + ' : ' + await hordeErr(res);
     console.warn('[Horde] demande refusée —', lastErr);
+    if (!a.net.direct && /TimeoutIP|into timeout/i.test(lastErr)) {
+      workerBlocked = true;
+      localStorage.setItem('hordeWorkerBlockedUntil', String(Date.now() + 30 * 60000));
+      console.log('[Horde] IP du Worker en pause : accès direct pendant 30 min');
+    }
     // Seuls les refus 401/403 tiennent au compte ou à l'adresse : on réessaie autrement.
     // Les autres (modèle inconnu, prompt, trop de requêtes) échoueraient partout.
     if (res.status !== 403 && res.status !== 401) break;
@@ -2503,8 +3115,8 @@ async function generateAIHordeImage(botText) {
   try {
     // Même prompt « photo » que Perchance et Pollination (le prompt à tags de buildImagePrompt
     // donnait un rendu illustré)
-    const prompt = buildPerchancePrompt(botText, 700);
-    console.log('[Horde] modèles :', hordeModels, '— prompt :', prompt);
+    const prompt = buildHordePrompt(botText, 840);
+    console.log('[Horde] style', hordeStyleKind(), '— modèles :', hordeModels, '— prompt :', prompt);
     const imgUrl = await callAIHorde(prompt, (c) => {
       loadingDiv.textContent = '🎨 AI Horde : ' +
         (c.processing ? 'en cours' : (c.queue_position != null ? 'file ' + c.queue_position : 'en attente')) +
@@ -2590,6 +3202,11 @@ async function sendToWorker(userText, userTs) {
   // Ouvert tout de suite, de façon SYNCHRONE, pour rester rattaché au geste utilisateur
   // (clic sur Envoyer) — si on attend le premier `await`, le navigateur bloque le popup.
   // Seulement si Perchance est activé pour ce profil, sinon pas de popup inutile.
+  // Mode permanent : si le générateur est connu comme inactif, on l'ouvre ici (geste de clic),
+  // une seule fois ; il démarre tout seul et sert ensuite à tous les messages suivants.
+  if (genPerchance && perchancePersistentOn() && daemonAlive === false && Date.now() - daemonOpenedAt > 30000) {
+    openPerchanceDaemon();
+  }
   const imagePopup = (genPerchance && !perchancePersistentOn()) ? window.open('about:blank', '_blank') : null;
   function closeUnusedPopup() {
     if (imagePopup && !imagePopup.closed) { try { imagePopup.close(); } catch (e) {} }
@@ -2730,8 +3347,13 @@ async function sendToWorker(userText, userTs) {
       return; // pas de voix ni d'images pour une réponse interrompue
     }
     speaker.end(finalText);
+    const analysis = analyzeReply(botDiv); // suggestions + fiche de scène, sans bloquer l'interface
     if (finalText.length > 20) {
-      launchImageGenerators(finalText, userText, imagePopup, closeUnusedPopup);
+      (async () => {
+        // les images attendent la fiche de scène (7 s au plus) pour en profiter
+        if (sceneOn()) await Promise.race([analysis, new Promise(r => setTimeout(r, 7000))]);
+        launchImageGenerators(finalText, userText, imagePopup, closeUnusedPopup);
+      })();
     } else {
       closeUnusedPopup();
     }
@@ -2762,6 +3384,7 @@ function handleSend() {
   if (streamAbort) { streamAbort.__user = true; streamAbort.abort(); return; }
   const text = input.value.trim();
   if (!text) return;
+  clearSuggestions(); suggestGen++;
   const ts = Date.now();
   addMessage(text, 'user', ts);
   input.value = '';
