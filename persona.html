@@ -4,151 +4,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Générateur de Prompts Portrait & Anatomie + NSFW</title>
+<title>Générateur de Prompts Portrait & Anatomie + NSFW Adulte</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Inter', system-ui, sans-serif;
-    background: #0f0f13;
-    color: #e5e5e5;
-    line-height: 1.5;
-    padding: 20px;
-  }
-  .container { max-width: 1200px; margin: 0 auto; }
-  h1 {
-    text-align: center;
-    font-size: 1.7rem;
-    margin-bottom: 8px;
-    background: linear-gradient(90deg, #ff6b9d, #c44dff);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .subtitle { text-align: center; color: #888; margin-bottom: 28px; font-size: 0.9rem; }
-  .section {
-    background: #1a1a22;
-    border: 1px solid #2a2a35;
-    border-radius: 14px;
-    padding: 20px;
-    margin-bottom: 18px;
-  }
-  .section-title {
-    font-size: 1.1rem;
-    color: #ff6b9d;
-    margin-bottom: 16px;
-    font-weight: 600;
-  }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 14px;
-  }
-  .form-group label {
-    display: block;
-    font-size: 0.8rem;
-    color: #aaa;
-    margin-bottom: 5px;
-  }
-  select, input[type="text"] {
-    width: 100%;
-    padding: 9px 11px;
-    background: #121218;
-    border: 1px solid #333;
-    border-radius: 8px;
-    color: #fff;
-    font-size: 0.9rem;
-  }
-  select:focus { border-color: #ff6b9d; outline: none; }
-  .checkbox-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .checkbox-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    background: #121218;
-    padding: 6px 11px;
-    border-radius: 18px;
-    border: 1px solid #333;
-    font-size: 0.84rem;
-    cursor: pointer;
-  }
-  .checkbox-item:hover { border-color: #ff6b9d; }
-  .checkbox-item input { accent-color: #ff6b9d; }
-  .generate-btn {
-    display: block;
-    width: 100%;
-    max-width: 400px;
-    margin: 24px auto 12px;
-    padding: 14px;
-    background: linear-gradient(90deg, #ff6b9d, #c44dff);
-    color: white;
-    border: none;
-    border-radius: 12px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .generate-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255,107,157,0.35); }
-  #result-container {
-    background: #0d0d12;
-    border: 1px solid #333;
-    border-radius: 12px;
-    padding: 16px;
-    margin-top: 10px;
-  }
-  #result {
-    font-family: 'Courier New', monospace;
-    font-size: 0.88rem;
-    line-height: 1.55;
-    white-space: pre-wrap;
-    min-height: 120px;
-  }
-  .copy-btn {
-    background: #2a2a35;
-    color: #fff;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
-    cursor: pointer;
-    margin-bottom: 12px;
-    font-size: 0.9rem;
-  }
-  .copy-btn:hover { background: #3a3a48; }
-  .suffix-box {
-    background: #16161e;
-    border: 1px solid #333;
-    border-radius: 8px;
-    padding: 12px;
-    font-size: 0.8rem;
-    color: #aaa;
-    margin-top: 8px;
-  }
-  .warning {
-    background: #3a1f1f;
-    border: 1px solid #ff6b6b;
-    color: #ffb4b4;
-    padding: 10px 14px;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    margin-bottom: 12px;
-    display: none;
-  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:#0f0f13;color:#e5e5e5;line-height:1.5;padding:20px}
+  .container{max-width:1200px;margin:0 auto}
+  h1{text-align:center;font-size:1.7rem;margin-bottom:6px;background:linear-gradient(90deg,#ff6b9d,#c44dff);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .subtitle{text-align:center;color:#888;margin-bottom:24px;font-size:.9rem}
+  .section{background:#1a1a22;border:1px solid #2a2a35;border-radius:14px;padding:18px 20px;margin-bottom:16px}
+  .section-title{font-size:1.05rem;color:#ff6b9d;margin-bottom:14px;font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .form-group label{display:block;font-size:.78rem;color:#aaa;margin-bottom:4px}
+  select,input[type=text]{width:100%;padding:8px 10px;background:#121218;border:1px solid #333;border-radius:8px;color:#fff;font-size:.88rem}
+  select:focus{border-color:#ff6b9d;outline:none}
+  .checkbox-group{display:flex;flex-wrap:wrap;gap:8px}
+  .checkbox-item{display:flex;align-items:center;gap:5px;background:#121218;padding:6px 11px;border-radius:18px;border:1px solid #333;font-size:.82rem;cursor:pointer}
+  .checkbox-item:hover{border-color:#ff6b9d}
+  .checkbox-item input{accent-color:#ff6b9d}
+  .btn-row{display:flex;gap:12px;justify-content:center;margin:22px 0 12px;flex-wrap:wrap}
+  .generate-btn,.random-btn{padding:13px 28px;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer}
+  .generate-btn{background:linear-gradient(90deg,#ff6b9d,#c44dff);color:#fff}
+  .random-btn{background:#2a2a35;color:#fff}
+  .generate-btn:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(255,107,157,.35)}
+  .random-btn:hover{background:#3a3a48}
+  #result-container{background:#0d0d12;border:1px solid #333;border-radius:12px;padding:16px;margin-top:8px}
+  #result{font-family:'Courier New',monospace;font-size:.86rem;line-height:1.55;white-space:pre-wrap;min-height:110px}
+  .copy-btn{background:#2a2a35;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;margin-bottom:10px;font-size:.88rem}
+  .copy-btn:hover{background:#3a3a48}
+  .suffix-box{background:#16161e;border:1px solid #333;border-radius:8px;padding:11px;font-size:.78rem;color:#aaa;margin-top:8px}
+  .warning{background:#3a1f1f;border:1px solid #ff6b6b;color:#ffb4b4;padding:10px 14px;border-radius:8px;font-size:.84rem;margin-bottom:10px;display:none}
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>Générateur de Prompts Portrait & Anatomie + NSFW</h1>
-  <p class="subtitle">Version complète – original + ajouts adultes uniquement</p>
+  <h1>Générateur de Prompts – Portrait & Anatomie + NSFW Adulte</h1>
+  <p class="subtitle">Tous les personnages sont explicitement adultes (19+)</p>
 
-  <!-- CONFIGURATION DE BASE -->
+  <!-- CONFIG -->
   <div class="section">
     <div class="section-title">Configuration Initiale & Identité</div>
     <div class="grid">
       <div class="form-group">
-        <label>Accroche initiale (Prefix)</label>
+        <label>Accroche (Prefix)</label>
         <select id="prefix">
           <option value="A casual real-life photograph. A casual photo of">A casual real-life photograph. A casual photo of</option>
           <option value="A realistic portrait of">A realistic portrait of</option>
@@ -158,19 +56,19 @@
       <div class="form-group">
         <label>Sujet</label>
         <select id="gender">
-          <option value="a woman">Une femme (a woman)</option>
-          <option value="a man">Un homme (a man)</option>
-          <option value="a person">Une personne (a person)</option>
+          <option value="a woman">Une femme</option>
+          <option value="a man">Un homme</option>
+          <option value="a person">Une personne</option>
         </select>
       </div>
       <div class="form-group">
         <label>Âge (adultes uniquement)</label>
         <select id="age">
           <option value="">Par défaut</option>
-          <option value="young adult">Young adult (18-25)</option>
+          <option value="young adult">Young adult (19-25)</option>
           <option value="mid-20s">Mid-20s</option>
           <option value="late 20s">Late 20s</option>
-          <option value="mature woman">Mature (30s-40s)</option>
+          <option value="mature">Mature (30s)</option>
           <option value="MILF">MILF</option>
           <option value="older mature">Older mature</option>
         </select>
@@ -178,147 +76,159 @@
       <div class="form-group">
         <label>Ethnie / Origine</label>
         <select id="ethnicity">
-          <option value="">Aucune sélection</option>
-          <option value="Peruvian">Péruvienne (Peruvian)</option>
-          <option value="Native American">Native Américaine</option>
-          <option value="French">Français(e)</option>
-          <option value="Mediterranean">Méditerranéen(ne)</option>
-          <option value="East Asian">Est-Asiatique</option>
-          <option value="South Asian">Sud-Asiatique</option>
-          <option value="Hispanic">Hispanique</option>
-          <option value="African">Africain(e)</option>
-          <option value="Nordic">Nordique</option>
-          <option value="Mixed-race">Métisse</option>
+          <option value="">Aucune</option>
+          <option value="Peruvian">Peruvian / Quechua</option>
+          <option value="Native American">Native American / Navajo</option>
+          <option value="French">French</option>
+          <option value="Mediterranean">Mediterranean</option>
+          <option value="East Asian">East Asian</option>
+          <option value="South Asian">South Asian</option>
+          <option value="Hispanic">Hispanic</option>
+          <option value="African">African</option>
+          <option value="Nordic">Nordic</option>
+          <option value="Mixed-race">Mixed-race</option>
+          <option value="Spanish">Spanish</option>
         </select>
       </div>
       <div class="form-group">
         <label>Style / Sous-culture</label>
         <select id="style-subculture">
-          <option value="">Aucun style spécifique</option>
+          <option value="">Aucun</option>
           <option value="punk aesthetic">Punk</option>
-          <option value="goth aesthetic">Gothique</option>
+          <option value="goth aesthetic">Goth</option>
           <option value="chicano lifestyle style">Chicano</option>
           <option value="streetwear fashion">Streetwear</option>
           <option value="vintage bohemian">Bohème / Vintage</option>
-          <option value="cyberpunk techwear">Cyberpunk / Techwear</option>
+          <option value="cyberpunk techwear">Cyberpunk</option>
         </select>
       </div>
     </div>
   </div>
 
-  <!-- ANATOMIE -->
+  <!-- CORPS -->
   <div class="section">
-    <div class="section-title">Anatomie & Silhouette Corporelle</div>
+    <div class="section-title">Anatomie & Silhouette</div>
     <div class="grid">
       <div class="form-group">
-        <label>Silhouette / Corpulence</label>
+        <label>Silhouette</label>
         <select id="body-shape">
           <option value="">Par défaut</option>
-          <option value="round body shape">Silhouette ronde</option>
+          <option value="round body shape">Ronde</option>
           <option value="chubby build">Chubby / Charnue</option>
-          <option value="slender build">Svelte / Mince</option>
-          <option value="athletic toned build">Athlétique et tonique</option>
-          <option value="petite build">Menu / Petite taille</option>
-          <option value="curvy hourglass figure">Silhouette en sablier voluptueuse</option>
-          <option value="pear-shaped body">Silhouette en poire</option>
-          <option value="plus-size body">Grande taille / Forte corpulence</option>
-          <option value="muscular lean physique">Musclée et sèche</option>
+          <option value="slender build">Svelte</option>
+          <option value="athletic toned build">Athlétique</option>
+          <option value="petite build">Petite</option>
+          <option value="curvy hourglass figure">Hourglass voluptueuse</option>
+          <option value="pear-shaped body">Poire</option>
+          <option value="plus-size body">Plus-size</option>
+          <option value="muscular lean physique">Musclée sèche</option>
+          <option value="thick hourglass">Thick hourglass</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Taille / Proportions</label>
+        <label>Taille</label>
         <select id="height-proportion">
           <option value="">Par défaut</option>
-          <option value="petite height">Petite de taille</option>
-          <option value="tall statuesque height">Grande et élancée</option>
-          <option value="average height">Taille moyenne</option>
+          <option value="petite height">Petite</option>
+          <option value="tall statuesque height">Grande</option>
+          <option value="average height">Moyenne</option>
+          <option value="short and curvy">Short and curvy</option>
         </select>
       </div>
       <div class="form-group">
         <label>Taille / Abdomen</label>
         <select id="waist-shape">
           <option value="">Par défaut</option>
-          <option value="slim narrow waist">Taille fine et étroite</option>
-          <option value="thick soft waist">Taille épaisse et douce</option>
-          <option value="toned flat stomach">Ventre plat et tonique</option>
-          <option value="soft curvy midsection">Ventre doux et pulpeux</option>
+          <option value="slim narrow waist">Taille fine</option>
+          <option value="very narrow waist">Very narrow waist</option>
+          <option value="thick soft waist">Taille épaisse</option>
+          <option value="toned flat stomach">Ventre plat</option>
+          <option value="soft curvy midsection">Ventre pulpeux</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Hanches & Bassin</label>
+        <label>Hanches</label>
         <select id="hips-shape">
           <option value="">Par défaut</option>
-          <option value="wide voluptuous hips">Hanches larges / généreuses</option>
-          <option value="narrow slim hips">Hanches étroites</option>
-          <option value="flared hips">Hanches marquées et évasées</option>
+          <option value="wide voluptuous hips">Hanches larges</option>
+          <option value="narrow slim hips">Hanches fines</option>
+          <option value="flared hips">Hanches évasées</option>
+          <option value="large round ass">Large round ass</option>
         </select>
       </div>
       <div class="form-group">
         <label>Épaules & Cou</label>
         <select id="shoulders-neck">
           <option value="">Par défaut</option>
-          <option value="slender delicate collarbones and a long neck">Cou allongé et clavicules</option>
-          <option value="broad soft shoulders">Épaules larges et douces</option>
+          <option value="slender delicate collarbones and a long neck">Cou allongé</option>
+          <option value="broad soft shoulders">Épaules larges</option>
           <option value="strong athletic shoulders">Épaules athlétiques</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Poitrine (original)</label>
-        <select id="bust-chest">
-          <option value="">Par défaut</option>
-          <option value="ample bust">Poitrine généreuse</option>
-          <option value="modest small bust">Poitrine menue</option>
-          <option value="average bust">Poitrine moyenne</option>
+          <option value="beautiful muscular back">Muscular back</option>
         </select>
       </div>
     </div>
   </div>
 
-  <!-- NSFW BODY DETAILS -->
+  <!-- NSFW BODY -->
   <div class="section">
     <div class="section-title">Détails intimes NSFW</div>
     <div class="grid">
       <div class="form-group">
-        <label>Taille / forme des seins (détail)</label>
+        <label>Seins</label>
         <select id="breasts">
-          <option value="">— Aucun —</option>
+          <option value="">—</option>
           <option value="small firm breasts">Petits seins fermes</option>
-          <option value="medium round breasts">Seins moyens ronds</option>
+          <option value="medium round breasts">Seins moyens</option>
           <option value="large heavy breasts">Gros seins lourds</option>
-          <option value="huge hanging tits">Huge hanging tits</option>
-          <option value="massive sagging breasts">Seins massifs et très tombants</option>
+          <option value="huge heavy natural hanging tits">Huge heavy natural hanging tits</option>
+          <option value="massive sagging breasts">Massive sagging</option>
+          <option value="huge milkers tits">Huge milkers</option>
         </select>
       </div>
       <div class="form-group">
         <label>Aréoles</label>
         <select id="areolas">
-          <option value="">— Aucun —</option>
-          <option value="small areolas">Petites aréoles</option>
-          <option value="medium areolas">Aréoles moyennes</option>
-          <option value="large areolas">Grandes aréoles</option>
+          <option value="">—</option>
+          <option value="small areolas">Petites</option>
+          <option value="medium areolas">Moyennes</option>
+          <option value="large areolas">Grandes</option>
+          <option value="large puffy areolas">Large puffy areolas</option>
           <option value="huge areolas">Huge areolas</option>
         </select>
       </div>
       <div class="form-group">
         <label>Tétons</label>
         <select id="nipples">
-          <option value="">— Aucun —</option>
-          <option value="small nipples">Petits tétons</option>
-          <option value="medium nipples">Tétons moyens</option>
-          <option value="long prominent nipples">Tétons longs et proéminents</option>
-          <option value="upturned nipples">Upturned nipples</option>
-          <option value="thick hard nipples">Tétons épais et durs</option>
+          <option value="">—</option>
+          <option value="small nipples">Petits</option>
+          <option value="medium nipples">Moyens</option>
+          <option value="long prominent nipples">Longs proéminents</option>
+          <option value="upturned erect nipples">Upturned erect nipples</option>
+          <option value="upturned erect nipples with rings">Upturned erect nipples with rings</option>
+          <option value="thick hard nipples">Épais et durs</option>
+          <option value="puffy nipples">Puffy nipples</option>
         </select>
       </div>
       <div class="form-group">
         <label>Pilosité vulve</label>
         <select id="pussy">
-          <option value="">— Aucun —</option>
-          <option value="shaved pussy">Vulve rasée</option>
+          <option value="">—</option>
+          <option value="shaved pussy">Rasée</option>
           <option value="light pubic hair">Léger duvet</option>
-          <option value="neatly trimmed pubic hair">Poils taillés</option>
-          <option value="hairy pussy">Vulve poilue</option>
-          <option value="thick bushy pubic hair">Pilosité dense et sauvage</option>
+          <option value="neatly trimmed pubic hair">Taillée</option>
+          <option value="thick natural pubic hair">Thick natural pubic hair</option>
+          <option value="hairy pussy">Hairy</option>
+          <option value="thick bushy pubic hair">Dense et sauvage</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>État de la vulve</label>
+        <select id="pussy-state">
+          <option value="">—</option>
+          <option value="pussy gaping">Pussy gaping</option>
+          <option value="pussy dripping fluid">Pussy dripping fluid</option>
+          <option value="pussy gaping and dripping fluid">Gaping + dripping</option>
+          <option value="wet dripping pussy">Wet dripping</option>
         </select>
       </div>
     </div>
@@ -326,62 +236,61 @@
 
   <!-- VISAGE -->
   <div class="section">
-    <div class="section-title">Structure Fine du Visage</div>
+    <div class="section-title">Structure du Visage + Accessoires</div>
     <div class="grid">
       <div class="form-group">
         <label>Forme du visage</label>
         <select id="face-shape">
-          <option value="">Aucune</option>
+          <option value="">—</option>
           <option value="oval face">Ovale</option>
           <option value="round face">Rond</option>
           <option value="square face">Carré</option>
-          <option value="heart-shaped face">En cœur</option>
-          <option value="diamond-shaped face">En losange</option>
+          <option value="heart-shaped face">Cœur</option>
+          <option value="diamond-shaped face">Losange</option>
           <option value="chiseled face">Ciselé</option>
           <option value="chubby face">Joufflu</option>
-          <option value="soft soft-contoured round face">Rond aux contours doux</option>
+          <option value="soft soft-contoured round face">Rond doux</option>
         </select>
       </div>
       <div class="form-group">
         <label>Joues</label>
         <select id="cheeks">
-          <option value="">Par défaut</option>
+          <option value="">—</option>
           <option value="high prominent cheekbones">Pommettes hautes</option>
-          <option value="plump rosy cheeks">Joues pleines et rebondies</option>
+          <option value="plump rosy cheeks">Joues rebondies</option>
           <option value="hollow cheeks">Joues creuses</option>
         </select>
       </div>
       <div class="form-group">
         <label>Yeux</label>
         <select id="eyes">
-          <option value="">Aucune</option>
-          <option value="almond-shaped eyes">En amande</option>
-          <option value="hooded eyes">Paupières tombantes</option>
-          <option value="round wide-awake eyes">Ronds et ouverts</option>
-          <option value="deep-set piercing eyes">Enfoncés et perçants</option>
-          <option value="doe-like soft eyes">De biche</option>
-          <option value="monolid eyes">Monolides</option>
-          <option value="downturned sleepy eyes">Tombants</option>
+          <option value="">—</option>
+          <option value="almond-shaped eyes">Amande</option>
+          <option value="hooded eyes">Hooded</option>
+          <option value="round wide-awake eyes">Ronds</option>
+          <option value="deep-set piercing eyes">Enfoncés</option>
+          <option value="doe-like soft eyes">Doe-like</option>
+          <option value="monolid eyes">Monolid</option>
+          <option value="big blue eyes">Big blue eyes</option>
         </select>
       </div>
       <div class="form-group">
         <label>Sourcils</label>
         <select id="brows">
-          <option value="">Aucune</option>
+          <option value="">—</option>
           <option value="arched eyebrows">Arqués</option>
           <option value="straight horizontal eyebrows">Droits</option>
           <option value="bushy thick eyebrows">Broussailleux</option>
-          <option value="thin pencil-thin eyebrows">Très fins</option>
+          <option value="thin pencil-thin eyebrows">Fins</option>
           <option value="feathery fluffy eyebrows">Aériens</option>
-          <option value="unibrow">Monosourcil</option>
         </select>
       </div>
       <div class="form-group">
         <label>Cils</label>
         <select id="lashes">
-          <option value="">Aucune</option>
-          <option value="long curled eyelashes">Longs et recourbés</option>
-          <option value="thick dense dark eyelashes">Épais et sombres</option>
+          <option value="">—</option>
+          <option value="long curled eyelashes">Longs recourbés</option>
+          <option value="thick dense dark eyelashes">Épais sombres</option>
           <option value="sparse delicate eyelashes">Clairsemés</option>
           <option value="voluminous sweeping eyelashes">Volumineux</option>
         </select>
@@ -389,136 +298,171 @@
       <div class="form-group">
         <label>Nez</label>
         <select id="nose">
-          <option value="">Aucune</option>
-          <option value="button nose">En bouton</option>
+          <option value="">—</option>
+          <option value="button nose">Bouton</option>
           <option value="aquiline hawk nose">Aquilin</option>
-          <option value="straight prominent Greek nose">Grec / Droit</option>
+          <option value="straight prominent Greek nose">Grec</option>
           <option value="bulbous wide nose">Bulbeux</option>
-          <option value="crooked asymmetrical nose">Tordu</option>
-          <option value="small snub nose">Petit et court</option>
+          <option value="small snub nose">Petit</option>
+          <option value="small nose">Small nose</option>
         </select>
       </div>
       <div class="form-group">
         <label>Lèvres</label>
         <select id="lips">
-          <option value="">Aucune</option>
+          <option value="">—</option>
           <option value="full plush lips">Pulpées</option>
           <option value="thin delicate lips">Fines</option>
-          <option value="exaggerated Cupid's-bow lips">Arc de Cupidon marqué</option>
+          <option value="exaggerated Cupid's-bow lips">Arc de Cupidon</option>
           <option value="pouty protruding lips">Boudeuses</option>
-          <option value="wide generous lips">Bouche large</option>
+          <option value="wide generous lips">Larges</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Mâchoire & Menton</label>
+        <label>Mâchoire</label>
         <select id="jaw">
-          <option value="">Aucune</option>
-          <option value="sharp chiseled angular jawline">Mâchoire ciselée</option>
-          <option value="soft rounded delicate jawline">Mâchoire douce</option>
+          <option value="">—</option>
+          <option value="sharp chiseled angular jawline">Ciselée</option>
+          <option value="soft rounded delicate jawline">Douce</option>
           <option value="pointed prominent chin">Menton pointu</option>
-          <option value="cleft chin">Menton fourchu</option>
+          <option value="cleft chin">Fourchu</option>
           <option value="soft double chin">Double menton</option>
-          <option value="strong broad square jawline">Mâchoire carrée</option>
+          <option value="strong broad square jawline">Carrée</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Expression faciale</label>
+        <label>Expression</label>
         <select id="expression">
-          <option value="">— Aucune —</option>
+          <option value="">—</option>
           <option value="orgasm face">Orgasm face</option>
-          <option value="ahegao">Ahegao</option>
+          <option value="ahegao face">Ahegao face</option>
+          <option value="ahegao face, orgasm expression, deep pleasure">Ahegao + deep pleasure</option>
           <option value="pleasure face">Pleasure face</option>
           <option value="moaning expression">Moaning</option>
           <option value="ecstatic face">Ecstatic</option>
           <option value="eyes rolled back">Eyes rolled back</option>
           <option value="tongue out">Tongue out</option>
           <option value="biting lip">Biting lip</option>
-          <option value="seductive look">Seductive look</option>
-          <option value="flushed cheeks">Flushed cheeks</option>
+          <option value="seductive look">Seductive</option>
+          <option value="flushed cheeks">Flushed</option>
+          <option value="silly face">Silly face</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Lunettes</label>
+        <select id="glasses">
+          <option value="">Aucune</option>
+          <option value="wearing glasses">Glasses</option>
+          <option value="black-rimmed glasses">Black-rimmed glasses</option>
+          <option value="round glasses">Round glasses</option>
+          <option value="thin metal glasses">Thin metal glasses</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Piercing facial (un seul)</label>
+        <select id="facial-piercing">
+          <option value="">Aucun</option>
+          <option value="snakebite piercing">Snakebite (two lower lip piercings)</option>
+          <option value="septum piercing">Septum piercing</option>
+          <option value="nose ring">Nose ring</option>
+          <option value="nostril piercing">Nostril piercing</option>
+          <option value="labret piercing">Labret piercing</option>
+          <option value="eyebrow piercing">Eyebrow piercing</option>
+          <option value="monroe piercing">Monroe piercing</option>
+          <option value="medusa piercing">Medusa piercing</option>
+          <option value="bridge piercing">Bridge piercing</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Face painting / Tatouages</label>
+        <select id="face-art">
+          <option value="">Aucun</option>
+          <option value="traditional face painting, thick line painting">Traditional face painting</option>
+          <option value="intricate Native American tribal tattoos">Native American tribal tattoos</option>
+          <option value="intricate tribal tattoos on arms, shoulders and lower belly">Tribal tattoos arms/shoulders/belly</option>
         </select>
       </div>
     </div>
   </div>
 
-  <!-- CHEVEUX & TENUES -->
+  <!-- CHEVEUX & TENUE -->
   <div class="section">
-    <div class="section-title">Vêtements, Chevelure & Style</div>
+    <div class="section-title">Cheveux, Tenue & Position</div>
     <div class="grid">
       <div class="form-group">
-        <label>Vêtements (original)</label>
-        <select id="clothing">
-          <option value="">Aucun</option>
-          <option value="wearing an elegant embroidered Victorian black dress">Robe victorienne noire</option>
-          <option value="wearing a casual oversized cotton t-shirt">T-shirt ample</option>
-          <option value="wearing a heavy cozy oversized knit sweater">Gros pull</option>
-          <option value="wearing a sleek textured leather jacket">Veste en cuir</option>
-          <option value="wearing a distressed vintage denim jacket">Veste jean vintage</option>
-          <option value="wearing a minimalist streetwear hoodie">Sweat streetwear</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Tenue sexuelle</label>
-        <select id="outfit">
-          <option value="">— Aucune —</option>
-          <option value="completely nude">Complètement nue</option>
-          <option value="lingerie">Lingerie sexy</option>
-          <option value="sheer lingerie">Lingerie transparente</option>
-          <option value="bra and panties">Soutien-gorge + culotte</option>
-          <option value="only panties">Seulement une culotte</option>
-          <option value="open robe">Peignoir ouvert</option>
-          <option value="stockings and garter">Bas et porte-jarretelles</option>
-          <option value="micro bikini">Micro bikini</option>
-          <option value="ripped clothes">Vêtements déchirés</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Texture / Coupe cheveux</label>
+        <label>Texture / Coupe</label>
         <select id="hair-texture">
-          <option value="">Par défaut</option>
-          <option value="straight sleek hair">Raides et lisses</option>
+          <option value="">—</option>
+          <option value="straight sleek hair">Raides</option>
           <option value="wavy textured hair">Ondulés</option>
           <option value="curly voluminous hair">Bouclés</option>
-          <option value="coily kinky textured hair">Crépus</option>
-          <option value="shaved buzzed head">Crâne rasé</option>
-          <option value="messy undone hair">Ébouriffés</option>
+          <option value="long thick wavy hair with bangs">Long wavy with bangs</option>
           <option value="long flowing thick hair">Très longs</option>
-          <option value="short textured pixie cut">Pixie cut</option>
-          <option value="ponytail">Queue de cheval (pony)</option>
-          <option value="high ponytail">Queue de cheval haute</option>
-          <option value="bangs">Frange (bangs)</option>
-          <option value="side bangs">Frange sur le côté</option>
-          <option value="messy bun">Chignon décoiffé</option>
-          <option value="wet hair">Cheveux mouillés</option>
+          <option value="ponytail">Ponytail</option>
+          <option value="high ponytail">High ponytail</option>
+          <option value="bangs">Bangs</option>
+          <option value="side bangs">Side bangs</option>
+          <option value="messy bun">Messy bun</option>
+          <option value="wet hair">Wet hair</option>
+          <option value="short textured pixie cut">Pixie</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Couleur des cheveux</label>
+        <label>Couleur</label>
         <select id="hair-color">
-          <option value="">Par défaut</option>
+          <option value="">—</option>
           <option value="jet-black">Noir jais</option>
-          <option value="deep dark brown">Brun profond</option>
+          <option value="deep dark brown">Brun</option>
           <option value="honey blonde">Blond miel</option>
-          <option value="striking platinum blonde">Blond platine</option>
+          <option value="striking platinum blonde">Platine</option>
           <option value="vibrant auburn red">Roux auburn</option>
-          <option value="silver gray">Gris argenté</option>
-          <option value="neon dyed tones">Teintes fluo</option>
+          <option value="long vibrant black hair">Vibrant black</option>
+          <option value="silver gray">Gris</option>
           <option value="pastel pink hue">Rose pastel</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Position sexuelle</label>
+        <label>Tenue</label>
+        <select id="outfit">
+          <option value="">—</option>
+          <option value="completely nude">Completely nude</option>
+          <option value="wearing white lingerie">White lingerie</option>
+          <option value="wearing lingerie">Lingerie</option>
+          <option value="wearing sheer lingerie">Sheer lingerie</option>
+          <option value="wearing long victorian black dress">Victorian black dress</option>
+          <option value="wearing only panties">Only panties</option>
+          <option value="wearing open robe">Open robe</option>
+          <option value="wearing stockings and garter">Stockings + garter</option>
+          <option value="wearing micro bikini">Micro bikini</option>
+          <option value="wearing ripped clothes">Ripped clothes</option>
+          <option value="wearing black neck choker">Black neck choker</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Bijoux</label>
+        <select id="jewelry">
+          <option value="">Aucun</option>
+          <option value="gleaming traditional Navajo silver and turquoise squash blossom necklace and matching earrings">Navajo silver & turquoise</option>
+          <option value="traditional Navajo silver and turquoise jewelry">Navajo jewelry</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Position</label>
         <select id="position">
-          <option value="">— Aucune —</option>
-          <option value="missionary">Missionnaire</option>
-          <option value="doggy style">Levrette</option>
+          <option value="">—</option>
+          <option value="missionary">Missionary</option>
+          <option value="doggy style">Doggy</option>
           <option value="cowgirl">Cowgirl</option>
           <option value="reverse cowgirl">Reverse cowgirl</option>
-          <option value="standing doggy">Levrette debout</option>
-          <option value="legs spread">Jambes écartées</option>
-          <option value="on all fours">À quatre pattes</option>
-          <option value="lying on back">Allongée sur le dos</option>
-          <option value="sitting on face">Assise sur le visage</option>
-          <option value="kneeling">À genoux</option>
+          <option value="standing doggy">Standing doggy</option>
+          <option value="legs spread">Legs spread</option>
+          <option value="on all fours">On all fours</option>
+          <option value="lying on back">Lying on back</option>
+          <option value="kneeling">Kneeling</option>
+          <option value="ballerina sex position, one leg completely up and spread">Ballerina sex position</option>
+          <option value="squatting over a man">Squatting over</option>
+          <option value="on her back, legs spread wide and held up next to her head">Legs up next to head</option>
+          <option value="legs tied up with wrists up">Legs & wrists tied</option>
         </select>
       </div>
     </div>
@@ -530,52 +474,61 @@
     <div class="checkbox-group" id="actions">
       <label class="checkbox-item"><input type="checkbox" value="sucking huge penis"> sucking huge penis</label>
       <label class="checkbox-item"><input type="checkbox" value="deepthroat"> deepthroat</label>
-      <label class="checkbox-item"><input type="checkbox" value="rubbing clitoris"> rubbing clitoris</label>
+      <label class="checkbox-item"><input type="checkbox" value="rubbing her clitoris"> rubbing clitoris</label>
       <label class="checkbox-item"><input type="checkbox" value="fingering pussy"> fingering</label>
       <label class="checkbox-item"><input type="checkbox" value="licking nipples"> licking nipples</label>
       <label class="checkbox-item"><input type="checkbox" value="titjob"> titjob</label>
-      <label class="checkbox-item"><input type="checkbox" value="grinding"> grinding</label>
-      <label class="checkbox-item"><input type="checkbox" value="spreading pussy"> spreading pussy</label>
-      <label class="checkbox-item"><input type="checkbox" value="squirting"> squirting</label>
+      <label class="checkbox-item"><input type="checkbox" value="the penis is in her anus"> anal penetration</label>
+      <label class="checkbox-item"><input type="checkbox" value="cum dripping"> cum dripping</label>
+      <label class="checkbox-item"><input type="checkbox" value="holding her asscheeks stretched open"> spreading ass</label>
+      <label class="checkbox-item"><input type="checkbox" value="looking at camera"> looking at camera</label>
     </div>
   </div>
 
   <!-- PEAU & LUMIÈRE -->
   <div class="section">
-    <div class="section-title">Particularités Cutanées, Imperfections & Lumière</div>
+    <div class="section-title">Peau, Imperfections & Lumière</div>
     <div class="grid">
       <div class="form-group">
-        <label>Détails de peau & Imperfections</label>
+        <label>Imperfections peau</label>
         <select id="skin-blemish">
-          <option value="">Aucune</option>
-          <option value="prominent organic freckles scattered across the nose and cheeks">Taches de rousseur</option>
-          <option value="noticeable acne blemishes, pores, and natural light redness">Acné & rougeurs</option>
-          <option value="visible real acne scars and skin texture on the cheeks">Cicatrices d'acné</option>
-          <option value="visible enlarged skin pores and real oily skin texture">Pores dilatés</option>
-          <option value="distinct sun spots and uneven hyperpigmentation age spots">Taches solaires</option>
-          <option value="visible fine flaky dry skin patches">Peau sèche</option>
+          <option value="">—</option>
+          <option value="prominent organic freckles scattered across the nose and cheeks">Freckles</option>
+          <option value="actual freckles across nose and cheeks">Actual freckles</option>
+          <option value="pale freckled skin">Pale freckled skin</option>
+          <option value="visible enlarged skin pores and real oily skin texture">Pores</option>
+          <option value="noticeable acne blemishes, pores, and natural light redness">Acné</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Signes d'âge & Charme</label>
+        <label>Signes & Charme</label>
         <select id="skin-marks">
-          <option value="">Aucune</option>
-          <option value="a small dark hyper-realistic beauty mark near the upper lip">Grain de beauté</option>
-          <option value="deep natural dimples on the cheeks when smiling">Fossettes</option>
-          <option value="subtle crow's feet wrinkles and fine lines around the eyes">Rides patte d'oie</option>
-          <option value="pronounced tired dark circles under the eyes">Cernes</option>
-          <option value="a charming distinct gap teeth smile">Dents du bonheur</option>
-          <option value="subtle frown lines between the eyebrows">Rides du lion</option>
+          <option value="">—</option>
+          <option value="a small dark hyper-realistic beauty mark near the upper lip">Beauty mark</option>
+          <option value="deep natural dimples on the cheeks when smiling">Dimples</option>
+          <option value="subtle crow's feet wrinkles and fine lines around the eyes">Crow's feet</option>
+          <option value="pronounced tired dark circles under the eyes">Dark circles</option>
         </select>
       </div>
       <div class="form-group">
-        <label>Ambiance & Éclairage</label>
+        <label>Éclairage / Ambiance</label>
         <select id="lighting-vibe">
-          <option value="candid unposed street photography style">Photo de rue</option>
-          <option value="cozy ambient warm indoor lighting">Intérieur chaud</option>
+          <option value="candid unposed street photography style">Street candid</option>
+          <option value="cozy ambient warm indoor lighting">Indoor warm</option>
           <option value="cinematic golden hour sunlight with soft lens flare">Golden hour</option>
           <option value="moody low-key dramatic studio lighting">Studio sombre</option>
-          <option value="bright overcast daylight with natural reflections">Jour nuageux</option>
+          <option value="bright overcast daylight with natural reflections">Overcast</option>
+          <option value="warm firelight, dimly lit wooden hogan">Warm firelight hogan</option>
+          <option value="dimly lit, warm firelight, primitive sacred atmosphere">Sacred atmosphere</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Lieu (optionnel)</label>
+        <select id="location">
+          <option value="">—</option>
+          <option value="she lays on a traditional victorian bed">Victorian bed</option>
+          <option value="inside a dimly lit wooden hogan in the deep forest">Wooden hogan</option>
+          <option value="on a traditional woven rug">Woven rug</option>
         </select>
       </div>
     </div>
@@ -583,164 +536,146 @@
 
   <!-- SUFFIXE -->
   <div class="section">
-    <div class="section-title">Terminaison du prompt</div>
-    <label class="checkbox-item" style="display:inline-flex;">
-      <input type="checkbox" id="addSuffix" checked>
-      Ajouter le suffixe photo réaliste
+    <div class="section-title">Terminaison</div>
+    <label class="checkbox-item" style="display:inline-flex;margin-bottom:8px">
+      <input type="checkbox" id="addSuffix" checked> Ajouter le suffixe photo réaliste
     </label>
     <div class="suffix-box">
-      (((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. All characters are over 19-years-old. It's a casual photo. Overall it's an actual real-life photograph.
+      (((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 28mm lens. All characters are over 19-years-old. It's a casual photo. Overall it's an actual real-life photograph.
     </div>
   </div>
 
-  <button class="generate-btn" onclick="generatePrompt()">GÉNÉRER LE PROMPT INTÉGRAL</button>
+  <div class="btn-row">
+    <button class="random-btn" onclick="randomize()">Aléatoire</button>
+    <button class="generate-btn" onclick="generatePrompt()">GÉNÉRER LE PROMPT</button>
+  </div>
 
   <div id="result-container">
     <div class="warning" id="warning"></div>
     <button class="copy-btn" onclick="copyPrompt()">Copier</button>
-    <div id="result">Votre prompt ultra-détaillé apparaîtra ici...</div>
+    <div id="result">Le prompt apparaîtra ici...</div>
   </div>
 </div>
 
 <script>
-const REALISM_SUFFIX = `(((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. All characters are over 19-years-old. It's a casual photo. Overall it's an actual real-life photograph.`;
+const REALISM_SUFFIX = `(((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 28mm lens. All characters are over 19-years-old. It's a casual photo. Overall it's an actual real-life photograph.`;
 
-function generatePrompt() {
-  const prefix = document.getElementById('prefix').value;
-  const gender = document.getElementById('gender').value;
-  const age = document.getElementById('age').value;
-  const ethnicity = document.getElementById('ethnicity').value;
-  const styleSub = document.getElementById('style-subculture').value;
-
-  const bodyShape = document.getElementById('body-shape').value;
-  const heightProp = document.getElementById('height-proportion').value;
-  const waistShape = document.getElementById('waist-shape').value;
-  const hipsShape = document.getElementById('hips-shape').value;
-  const shouldersNeck = document.getElementById('shoulders-neck').value;
-  const bustChest = document.getElementById('bust-chest').value;
-
-  const breasts = document.getElementById('breasts').value;
-  const areolas = document.getElementById('areolas').value;
-  const nipples = document.getElementById('nipples').value;
-  const pussy = document.getElementById('pussy').value;
-
-  const clothing = document.getElementById('clothing').value;
-  const outfit = document.getElementById('outfit').value;
-  const hairTexture = document.getElementById('hair-texture').value;
-  const hairColor = document.getElementById('hair-color').value;
-  const position = document.getElementById('position').value;
-  const expression = document.getElementById('expression').value;
-
-  const faceShape = document.getElementById('face-shape').value;
-  const cheeks = document.getElementById('cheeks').value;
-  const eyes = document.getElementById('eyes').value;
-  const brows = document.getElementById('brows').value;
-  const lashes = document.getElementById('lashes').value;
-  const nose = document.getElementById('nose').value;
-  const lips = document.getElementById('lips').value;
-  const jaw = document.getElementById('jaw').value;
-
-  const blemish = document.getElementById('skin-blemish').value;
-  const marks = document.getElementById('skin-marks').value;
-  const lighting = document.getElementById('lighting-vibe').value;
-  const addSuffix = document.getElementById('addSuffix').checked;
-
-  const actionChecks = document.querySelectorAll('#actions input:checked');
-  let actions = Array.from(actionChecks).map(el => el.value);
-
-  // Cohérence simple
-  let warnings = [];
-  if (actions.includes('titjob') && !breasts.includes('huge') && !breasts.includes('large') && !breasts.includes('massive') && !bustChest.includes('ample')) {
-    warnings.push("Titjob plus réaliste avec de gros seins.");
-  }
-  if ((position.includes('doggy') || position === 'on all fours') && (actions.includes('sucking huge penis') || actions.includes('deepthroat'))) {
-    warnings.push("Sucer en levrette peu réaliste → action retirée.");
-    actions = actions.filter(a => a !== 'sucking huge penis' && a !== 'deepthroat');
-  }
-  const warningEl = document.getElementById('warning');
-  if (warnings.length) {
-    warningEl.style.display = 'block';
-    warningEl.innerHTML = "⚠️ " + warnings.join("<br>⚠️ ");
-  } else {
-    warningEl.style.display = 'none';
-  }
-
-  let components = [];
-
-  // Identité
-  let coreSubject = gender;
-  if (ethnicity) coreSubject = `${ethnicity} ${gender}`;
-  if (age) coreSubject = `${age} ${coreSubject}`;
-
-  let subjectModifiers = [];
-  if (bodyShape) subjectModifiers.push(bodyShape);
-  if (heightProp) subjectModifiers.push(heightProp);
-  if (styleSub) subjectModifiers.push(styleSub);
-  if (subjectModifiers.length) {
-    coreSubject = `a ${subjectModifiers.join(', ')} ${coreSubject.replace(/^a\s/, '')}`;
-  }
-  components.push(coreSubject);
-
-  // Corps
-  let bodyDetails = [];
-  if (waistShape) bodyDetails.push(waistShape);
-  if (hipsShape) bodyDetails.push(hipsShape);
-  if (bustChest) bodyDetails.push(bustChest);
-  if (shouldersNeck) bodyDetails.push(shouldersNeck);
-  if (breasts) bodyDetails.push(breasts);
-  if (areolas) bodyDetails.push(areolas);
-  if (nipples) bodyDetails.push(nipples);
-  if (pussy) bodyDetails.push(pussy);
-  if (bodyDetails.length) components.push(`possessing a body with ${bodyDetails.join(', ')}`);
-
-  // Cheveux
-  let hairDetails = [];
-  if (hairColor) hairDetails.push(hairColor);
-  if (hairTexture) hairDetails.push(hairTexture);
-  if (hairDetails.length) components.push(`with ${hairDetails.join(' ')}`);
-
-  // Visage
-  let faceFeatures = [];
-  if (faceShape) faceFeatures.push(faceShape);
-  if (cheeks) faceFeatures.push(cheeks);
-  if (eyes) faceFeatures.push(eyes);
-  if (brows) faceFeatures.push(brows);
-  if (lashes) faceFeatures.push(lashes);
-  if (nose) faceFeatures.push(nose);
-  if (lips) faceFeatures.push(lips);
-  if (jaw) faceFeatures.push(jaw);
-  if (expression) faceFeatures.push(expression);
-  if (faceFeatures.length) components.push(`featuring a ${faceFeatures.join(', ')}`);
-
-  // Peau
-  if (blemish) components.push(blemish);
-  if (marks) components.push(marks);
-
-  // Tenue
-  if (outfit) {
-    components.push(outfit === 'completely nude' ? 'completely nude' : 'wearing ' + outfit);
-  } else if (clothing) {
-    components.push(clothing);
-  }
-
-  // Position + actions
-  if (position) components.push(`in ${position} position`);
-  if (actions.length) components.push(actions.join(' and '));
-
-  // Lumière
-  if (lighting) components.push(`captured in ${lighting}`);
-
-  let finalPrompt = `${prefix} ${components.join(', ')}. Authentic features, raw skin texture, sharp focus, 8k resolution, photorealistic, cinematic photography.`;
-  finalPrompt = finalPrompt.replace(/\s+/g, ' ').replace(/ ,/g, ',').replace(/, ,/g, ',');
-
-  if (addSuffix) finalPrompt += ' ' + REALISM_SUFFIX;
-
-  document.getElementById('result').innerText = finalPrompt;
+function getVal(id){return document.getElementById(id).value}
+function randomSelect(id){
+  const s=document.getElementById(id);
+  if(!s||s.options.length<2)return;
+  s.selectedIndex=Math.floor(Math.random()*(s.options.length-1))+1;
+}
+function randomize(){
+  const ids=['prefix','gender','age','ethnicity','style-subculture','body-shape','height-proportion','waist-shape','hips-shape','shoulders-neck','breasts','areolas','nipples','pussy','pussy-state','face-shape','cheeks','eyes','brows','lashes','nose','lips','jaw','expression','glasses','facial-piercing','face-art','hair-texture','hair-color','outfit','jewelry','position','skin-blemish','skin-marks','lighting-vibe','location'];
+  ids.forEach(randomSelect);
+  document.querySelectorAll('#actions input').forEach(c=>c.checked=Math.random()>0.7);
+  generatePrompt();
 }
 
-function copyPrompt() {
-  const text = document.getElementById('result').innerText;
-  navigator.clipboard.writeText(text).then(() => alert('Prompt copié !'));
+function generatePrompt(){
+  const prefix=getVal('prefix');
+  const gender=getVal('gender');
+  const age=getVal('age');
+  const ethnicity=getVal('ethnicity');
+  const styleSub=getVal('style-subculture');
+  const bodyShape=getVal('body-shape');
+  const heightProp=getVal('height-proportion');
+  const waist=getVal('waist-shape');
+  const hips=getVal('hips-shape');
+  const shoulders=getVal('shoulders-neck');
+  const breasts=getVal('breasts');
+  const areolas=getVal('areolas');
+  const nipples=getVal('nipples');
+  const pussy=getVal('pussy');
+  const pussyState=getVal('pussy-state');
+  const faceShape=getVal('face-shape');
+  const cheeks=getVal('cheeks');
+  const eyes=getVal('eyes');
+  const brows=getVal('brows');
+  const lashes=getVal('lashes');
+  const nose=getVal('nose');
+  const lips=getVal('lips');
+  const jaw=getVal('jaw');
+  const expression=getVal('expression');
+  const glasses=getVal('glasses');
+  const piercing=getVal('facial-piercing');
+  const faceArt=getVal('face-art');
+  const hairTex=getVal('hair-texture');
+  const hairCol=getVal('hair-color');
+  const outfit=getVal('outfit');
+  const jewelry=getVal('jewelry');
+  const position=getVal('position');
+  const blemish=getVal('skin-blemish');
+  const marks=getVal('skin-marks');
+  const lighting=getVal('lighting-vibe');
+  const location=getVal('location');
+  const addSuffix=document.getElementById('addSuffix').checked;
+
+  const actions=[...document.querySelectorAll('#actions input:checked')].map(c=>c.value);
+
+  let parts=[];
+  let subject=gender;
+  if(ethnicity) subject=ethnicity+' '+gender;
+  if(age) subject=age+' '+subject;
+  let mods=[];
+  if(bodyShape)mods.push(bodyShape);
+  if(heightProp)mods.push(heightProp);
+  if(styleSub)mods.push(styleSub);
+  if(mods.length) subject=`a ${mods.join(', ')} ${subject.replace(/^a /,'')}`;
+  parts.push(subject);
+
+  let body=[];
+  if(waist)body.push(waist);
+  if(hips)body.push(hips);
+  if(shoulders)body.push(shoulders);
+  if(breasts)body.push(breasts);
+  if(areolas)body.push(areolas);
+  if(nipples)body.push(nipples);
+  if(pussy)body.push(pussy);
+  if(pussyState)body.push(pussyState);
+  if(body.length)parts.push(body.join(', '));
+
+  let hair=[];
+  if(hairCol)hair.push(hairCol);
+  if(hairTex)hair.push(hairTex);
+  if(hair.length)parts.push(hair.join(' '));
+
+  let face=[];
+  if(faceShape)face.push(faceShape);
+  if(cheeks)face.push(cheeks);
+  if(eyes)face.push(eyes);
+  if(brows)face.push(brows);
+  if(lashes)face.push(lashes);
+  if(nose)face.push(nose);
+  if(lips)face.push(lips);
+  if(jaw)face.push(jaw);
+  if(expression)face.push(expression);
+  if(glasses)face.push(glasses);
+  if(piercing)face.push(piercing);
+  if(faceArt)face.push(faceArt);
+  if(face.length)parts.push(face.join(', '));
+
+  if(blemish)parts.push(blemish);
+  if(marks)parts.push(marks);
+  if(outfit)parts.push(outfit);
+  if(jewelry)parts.push(jewelry);
+  if(position)parts.push('in '+position);
+  if(actions.length)parts.push(actions.join(' and '));
+  if(location)parts.push(location);
+  if(lighting)parts.push('captured in '+lighting);
+
+  let prompt=`${prefix} ${parts.join(', ')}. Authentic features, raw skin texture, sharp focus, photorealistic.`;
+  prompt=prompt.replace(/\s+/g,' ').replace(/ ,/g,',').replace(/, ,/g,',');
+  if(addSuffix)prompt+=' '+REALISM_SUFFIX;
+
+  document.getElementById('result').innerText=prompt;
+  document.getElementById('warning').style.display='none';
+}
+
+function copyPrompt(){
+  const t=document.getElementById('result').innerText;
+  navigator.clipboard.writeText(t).then(()=>alert('Prompt copié !'));
 }
 </script>
 </body>
