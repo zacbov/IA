@@ -156,6 +156,24 @@
   .cmp-actions button:disabled { opacity: .45; cursor: default; }
   .cmp-foot { font-size: 11px; color: #8a9; margin-top: 8px; }
   #compareBtn.off { opacity: .45; }
+  #personaEditor { position: fixed; inset: 0; z-index: 9200; background: rgba(8,10,9,.985); overflow-y: auto; padding: 14px; }
+  #personaEditor.hidden { display: none; }
+  .pe-wrap { max-width: 1000px; margin: 0 auto; }
+  .pe-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; position: sticky; top: 0; background: rgba(8,10,9,.97); padding: 6px 0; z-index: 2; flex-wrap: wrap; }
+  .pe-head b { flex: 1; min-width: 160px; font-size: 15px; }
+  .pe-head button, .pe-out button { background: #1a2a22; border: 1px solid #2a3d33; color: #e8e8e4; border-radius: 8px; padding: 7px 12px; font-size: 12px; cursor: pointer; }
+  .pe-head button.pe-main, .pe-out button.pe-main { background: #e0a34a; border-color: #e0a34a; color: #1a1208; font-weight: 700; }
+  .pe-sec { background: #101713; border: 1px solid #2a3d33; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .pe-sec h4 { margin: 0 0 8px; font-size: 13px; color: #e0a34a; }
+  .pe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px 10px; }
+  .pe-grid label { display: block; font-size: 11px; color: #9ab; margin-bottom: 2px; }
+  .pe-grid select { width: 100%; background: #14201a; border: 1px solid #2a3d33; color: #e8e8e4; border-radius: 8px; padding: 6px 8px; font-size: 12px; }
+  .pe-grid select:disabled { opacity: .4; }
+  .pe-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pe-acts label { display: flex; align-items: center; gap: 5px; background: #14201a; border: 1px solid #2a3d33; border-radius: 16px; padding: 5px 10px; font-size: 12px; color: #ddd; cursor: pointer; margin: 0; }
+  .pe-out textarea { width: 100%; background: #0c110e; border: 1px solid #2a3d33; color: #e8e8e4; border-radius: 8px; padding: 8px; font-size: 12px; font-family: monospace; min-height: 90px; }
+  .pe-out .pe-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 12px; align-items: center; }
+  .pe-note { font-size: 10px; color: #778; }
 </style>
 </head>
 <body>
@@ -191,6 +209,7 @@
       <label>Fournisseur</label>
       <select id="provider">
         <option value="pollinations">pollinations</option>
+        <option value="google">google (AI Studio · Gemma 4)</option>
         <option value="groq">groq</option>
         <option value="openrouter">openrouter</option>
         <option value="cerebras">cerebras</option>
@@ -220,6 +239,7 @@
   <div>
     <label>Description physique (pour génération d'image)</label>
     <textarea id="physicalDescription" placeholder="ex: redhead, green eyes, athletic build, 1m70..." style="min-height:50px;"></textarea>
+    <button type="button" id="personaOpen" class="secondary" style="margin-top:6px;">🎭 Éditeur de persona (choisir les traits, générer la description et le prompt)</button>
   </div>
   <div>
     <label>Génération d'image</label>
@@ -234,6 +254,9 @@
           <input type="checkbox" id="perchancePersistent" style="width:auto;"> Mode permanent : 2 images, sans popup à chaque message
         </label>
         <button type="button" id="perchanceOpenDaemon" style="font-size:11px; padding:5px 10px; width:auto; margin-top:4px;">🪟 Ouvrir le générateur permanent</button>
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:6px; cursor:pointer;">
+          <input type="checkbox" id="perchanceMobile" style="width:auto;"> Perchance aussi sur téléphone (la fenêtre doit rester au premier plan)
+        </label>
       </div>
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; text-transform:none; letter-spacing:normal; cursor:pointer;">
         <input type="checkbox" id="genHFSpace" style="width:auto;"> Space Hugging Face
@@ -404,6 +427,41 @@
   <button id="startBtn">Démarrer la conversation</button>
 </div>
 
+<div id="personaEditor" class="hidden">
+  <div class="pe-wrap">
+    <div class="pe-head">
+      <b>🎭 Éditeur de persona — personnages adultes uniquement</b>
+      <button type="button" id="peRandom">🎲 Aléatoire</button>
+      <button type="button" id="peReset">↺ Tout effacer</button>
+      <button type="button" id="peClose">✕ Fermer</button>
+    </div>
+    <div id="peForm"></div>
+    <div class="pe-sec">
+      <h4>Terminaison du prompt complet</h4>
+      <label style="display:inline-flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;"><input type="checkbox" id="peSuffix" checked style="width:auto;"> Ajouter le suffixe photo réaliste</label>
+      <div class="pe-note" style="margin-top:6px;">Ce suffixe ne concerne que le « prompt complet ». La description du personnage, elle, n'en contient pas : l'application ajoute son propre style.</div>
+    </div>
+    <div class="pe-out pe-sec">
+      <h4>Résultat</h4>
+      <div style="display:flex; gap:8px; margin-bottom:10px;"><button type="button" id="peGen" class="pe-main">GÉNÉRER</button></div>
+      <label class="pe-note">Description du personnage (traits fixes : identité, corps, visage, cheveux, peau) — en anglais</label>
+      <textarea id="peDesc" readonly placeholder="Clique sur GÉNÉRER…"></textarea>
+      <div class="pe-row">
+        <button type="button" id="peToDesc" class="pe-main">→ Description physique du profil</button>
+        <button type="button" id="peToAnchor">→ Ancre visuelle</button>
+        <button type="button" id="peCopyDesc">Copier</button>
+        <span class="pe-note" id="peInfo"></span>
+      </div>
+      <label class="pe-note">Prompt complet (identité + corps + scène : tenue, expression, position, actions, lieu)</label>
+      <textarea id="peFull" readonly placeholder="Clique sur GÉNÉRER…"></textarea>
+      <div class="pe-row">
+        <button type="button" id="peCopyFull">Copier</button>
+        <button type="button" id="peImages" class="pe-main">🎨 Générer des images avec ce prompt</button>
+        <span class="pe-note">Utilise les moteurs cochés du profil (et le comparateur s'il est actif).</span>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="scenePanel" class="hidden">
   <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
     <b style="color:#e8e8e4;">🎬 Fiche de scène</b>
@@ -603,6 +661,8 @@ let ttsVoiceName = '';
 let profileName = '';
 let sampling = {};
 let history = [];
+let rawPromptOverride = '';   // prompt complet imposé (éditeur de persona) : les constructeurs le renvoient tel quel
+let convEpoch = 0;   // change à chaque changement de profil ou « Vider » : le travail en cours est alors abandonné
 
 const setup = document.getElementById('setup');
 const topbar = document.getElementById('topbar');
@@ -811,6 +871,11 @@ function activateProfile(name, isSwitch) {
   const p = profiles[name];
   if (!p) return;
   if (isSwitch) persistCurrentHistory();
+  // Une réponse ou des images encore en cours appartiennent à l'ancien profil : on les arrête,
+  // sinon elles s'écriraient dans l'historique et la conversation du nouveau.
+  if (streamAbort) { streamAbort.__user = true; streamAbort.abort(); }
+  convEpoch++; compareSession = null; clearSuggestions(); suggestGen++;
+  refreshDaemonState();
   profileName = name;
   provider = p.provider || 'groq';
   model = p.model || '';
@@ -909,6 +974,8 @@ quickSwitch.addEventListener('change', () => {
 
 document.getElementById('resetBtn').addEventListener('click', () => {
   if (!confirm('Vider l\'historique de cette conversation ?')) return;
+  if (streamAbort) { streamAbort.__user = true; streamAbort.abort(); }
+  convEpoch++; compareSession = null; clearSuggestions(); suggestGen++;
   history = [];
   messagesEl.innerHTML = '';
   persistCurrentHistory();
@@ -1389,6 +1456,222 @@ window.addEventListener("DOMContentLoaded", initAudioLooper);
 // on referme l'onglet automatiquement ; sinon l'onglet reste ouvert avec l'image visible
 // dedans (secours manuel, plus besoin de copier-coller à la main dans la plupart des cas).
 
+// ========== ÉDITEUR DE PERSONA ==========
+// Choix des traits d'un personnage ADULTE → description fixe (profil / ancre visuelle) et prompt
+// complet pour les moteurs d'image. Les listes reprennent ton générateur de prompts.
+const PE_SUFFIX = '(((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 28mm lens. All characters are over 19-years-old. It\'s a casual photo. Overall it\'s an actual real-life photograph.';
+const peO = (...pairs) => pairs.map(p => Array.isArray(p) ? p : [p, p]);
+const PE_SECTIONS = [
+  { title: '1. Identité', fields: [
+    { id: 'prefix', label: 'Accroche', none: false, opts: peO(['A casual real-life photograph. A casual photo of', 'Photo réelle décontractée'], ['A realistic portrait of', 'Portrait réaliste'], ['A raw candid photo of', 'Photo brute sur le vif']) },
+    { id: 'gender', label: 'Sujet', none: false, opts: peO(['a woman', 'Une femme'], ['a person', 'Une personne']) },
+    { id: 'age', label: 'Âge (adulte)', opts: peO(['young adult', 'Jeune adulte (19-25)'], ['mid-20s', 'Mi-vingtaine'], ['late 20s', 'Fin de vingtaine'], ['mature', 'Mature (30s)'], ['MILF', 'MILF']) },
+    { id: 'ethnicity', label: 'Ethnie / Origine', opts: peO(['Peruvian', 'Péruvienne / Quechua'], ['Native American', 'Native Américaine / Navajo'], ['French', 'Française'], ['Mediterranean', 'Méditerranéenne'], ['East Asian', 'Est-Asiatique'], ['South Asian', 'Sud-Asiatique'], ['Hispanic', 'Hispanique'], ['Nordic', 'Nordique'], ['Spanish', 'Espagnole']) },
+    { id: 'style-subculture', label: 'Style / Sous-culture', opts: peO(['punk aesthetic', 'Punk'], ['goth aesthetic', 'Gothique'], ['chicano lifestyle style', 'Chicano'], ['streetwear fashion', 'Streetwear'], ['vintage bohemian', 'Bohème / Vintage']) }
+  ] },
+  { title: '2. Corps global', fields: [
+    { id: 'body-shape', label: 'Silhouette', opts: peO(['round body shape', 'Ronde'], ['chubby build', 'Chubby / Charnue'], ['slender build', 'Svelte'], ['athletic toned build', 'Athlétique'], ['petite build', 'Petite'], ['curvy hourglass figure', 'Sablier voluptueux'], ['pear-shaped body', 'Poire'], ['plus-size body', 'Grande taille'], ['muscular lean physique', 'Musclée sèche'], ['thick hourglass', 'Thick hourglass']) },
+    { id: 'height-proportion', label: 'Taille', opts: peO(['petite height', 'Petite'], ['tall statuesque height', 'Grande'], ['average height', 'Moyenne'], ['short and curvy', 'Petite et curvy']) },
+    { id: 'waist-shape', label: 'Taille / Abdomen', opts: peO(['slim narrow waist', 'Taille fine'], ['very narrow waist', 'Taille très étroite'], ['thick soft waist', 'Taille épaisse'], ['toned flat stomach', 'Ventre plat'], ['soft curvy midsection', 'Ventre pulpeux']) },
+    { id: 'hips-shape', label: 'Hanches & Fesses', opts: peO(['wide voluptuous hips', 'Hanches larges'], ['narrow slim hips', 'Hanches fines'], ['flared hips', 'Hanches évasées'], ['large round ass', 'Fesses rondes et larges']) },
+    { id: 'shoulders-neck', label: 'Épaules / Dos / Cou', opts: peO(['slender delicate collarbones and a long neck', 'Cou allongé + clavicules'], ['broad soft shoulders', 'Épaules larges'], ['strong athletic shoulders', 'Épaules athlétiques'], ['beautiful muscular back', 'Dos musclé']) }
+  ] },
+  { title: '3. Détails intimes', fields: [
+    { id: 'breasts', label: 'Seins', opts: peO(['small firm breasts', 'Petits seins fermes'], ['medium round breasts', 'Seins moyens'], ['large heavy breasts', 'Gros seins lourds'], ['huge heavy natural hanging tits', 'Huge hanging tits'], ['massive sagging breasts', 'Seins massifs tombants'], ['huge milkers tits', 'Huge milkers']) },
+    { id: 'areolas', label: 'Aréoles', opts: peO(['small areolas', 'Petites'], ['medium areolas', 'Moyennes'], ['large areolas', 'Grandes'], ['large puffy areolas', 'Large puffy areolas'], ['huge areolas', 'Huge areolas']) },
+    { id: 'nipples', label: 'Tétons', opts: peO(['small nipples', 'Petits'], ['medium nipples', 'Moyens'], ['long prominent nipples', 'Longs proéminents'], ['upturned erect nipples', 'Upturned erect'], ['upturned erect nipples with rings', 'Upturned + anneaux'], ['thick hard nipples', 'Épais et durs'], ['puffy nipples', 'Puffy nipples']) },
+    { id: 'pussy', label: 'Pilosité vulve', opts: peO(['shaved pussy', 'Rasée'], ['light pubic hair', 'Léger duvet'], ['neatly trimmed pubic hair', 'Taillée'], ['thick natural pubic hair', 'Thick natural pubic hair'], ['hairy pussy', 'Poilue'], ['thick bushy pubic hair', 'Dense et sauvage']) },
+    { id: 'pussy-state', label: 'État de la vulve (scène)', opts: peO(['pussy gaping', 'Pussy gaping'], ['pussy dripping fluid', 'Pussy dripping'], ['pussy gaping and dripping fluid', 'Gaping + dripping'], ['wet dripping pussy', 'Wet dripping']) }
+  ] },
+  { title: '4. Visage & accessoires', fields: [
+    { id: 'face-shape', label: 'Forme du visage', opts: peO(['oval face', 'Ovale'], ['round face', 'Rond'], ['square face', 'Carré'], ['heart-shaped face', 'Cœur'], ['diamond-shaped face', 'Losange'], ['chiseled face', 'Ciselé'], ['chubby face', 'Joufflu'], ['soft soft-contoured round face', 'Rond doux']) },
+    { id: 'cheeks', label: 'Joues', opts: peO(['high prominent cheekbones', 'Pommettes hautes'], ['plump rosy cheeks', 'Joues rebondies'], ['hollow cheeks', 'Joues creuses']) },
+    { id: 'eyes', label: 'Yeux', opts: peO(['almond-shaped eyes', 'Amande'], ['hooded eyes', 'Paupières tombantes'], ['round wide-awake eyes', 'Ronds'], ['deep-set piercing eyes', 'Enfoncés'], ['doe-like soft eyes', 'Regard de biche'], ['monolid eyes', 'Monolid'], ['big blue eyes', 'Grands yeux bleus']) },
+    { id: 'brows', label: 'Sourcils', opts: peO(['arched eyebrows', 'Arqués'], ['straight horizontal eyebrows', 'Droits'], ['bushy thick eyebrows', 'Broussailleux'], ['thin pencil-thin eyebrows', 'Fins'], ['feathery fluffy eyebrows', 'Aériens']) },
+    { id: 'lashes', label: 'Cils', opts: peO(['long curled eyelashes', 'Longs recourbés'], ['thick dense dark eyelashes', 'Épais sombres'], ['sparse delicate eyelashes', 'Clairsemés'], ['voluminous sweeping eyelashes', 'Volumineux']) },
+    { id: 'nose', label: 'Nez', opts: peO(['button nose', 'Bouton'], ['aquiline hawk nose', 'Aquilin'], ['straight prominent Greek nose', 'Grec'], ['bulbous wide nose', 'Bulbeux'], ['small snub nose', 'Petit'], ['small nose', 'Small nose']) },
+    { id: 'lips', label: 'Lèvres', opts: peO(['full plush lips', 'Pulpées'], ['thin delicate lips', 'Fines'], ["exaggerated Cupid's-bow lips", 'Arc de Cupidon'], ['pouty protruding lips', 'Boudeuses'], ['wide generous lips', 'Larges']) },
+    { id: 'jaw', label: 'Mâchoire', opts: peO(['sharp chiseled angular jawline', 'Ciselée'], ['soft rounded delicate jawline', 'Douce'], ['pointed prominent chin', 'Menton pointu'], ['cleft chin', 'Fourchu'], ['soft double chin', 'Double menton'], ['strong broad square jawline', 'Carrée']) },
+    { id: 'expression', label: 'Expression (scène)', opts: peO(['orgasm face', 'Orgasm face'], ['ahegao face', 'Ahegao'], ['ahegao face, orgasm expression, deep pleasure', 'Ahegao + deep pleasure'], ['pleasure face', 'Pleasure face'], ['moaning expression', 'Moaning'], ['ecstatic face', 'Ecstatic'], ['eyes rolled back', 'Eyes rolled back'], ['tongue out', 'Tongue out'], ['biting lip', 'Biting lip'], ['seductive look', 'Seductive'], ['flushed cheeks', 'Flushed'], ['silly face', 'Silly face']) },
+    { id: 'glasses', label: 'Lunettes', opts: peO(['wearing glasses', 'Lunettes'], ['black-rimmed glasses', 'Monture noire'], ['round glasses', 'Rondes'], ['thin metal glasses', 'Fines métal']) },
+    { id: 'facial-piercing', label: 'Piercing facial (un seul)', opts: peO(['snakebite piercing', 'Snakebite'], ['septum piercing', 'Septum'], ['nose ring', 'Anneau de nez'], ['nostril piercing', 'Narine'], ['labret piercing', 'Labret'], ['eyebrow piercing', 'Sourcil'], ['monroe piercing', 'Monroe'], ['medusa piercing', 'Medusa'], ['bridge piercing', 'Bridge']) },
+    { id: 'face-art', label: 'Peinture / tatouages tribaux', ethnicOnly: true, opts: peO(['traditional face painting, thick line painting', 'Peinture faciale traditionnelle'], ['intricate Native American tribal tattoos', 'Tatouages tribaux Native American'], ['intricate tribal tattoos on arms, shoulders and lower belly', 'Tatouages bras/épaules/ventre']) }
+  ] },
+  { title: '5. Cheveux, tenue & scène', fields: [
+    { id: 'hair-texture', label: 'Texture / coupe', opts: peO(['straight sleek hair', 'Raides'], ['wavy textured hair', 'Ondulés'], ['curly voluminous hair', 'Bouclés'], ['long thick wavy hair with bangs', 'Longs ondulés + frange'], ['long flowing thick hair', 'Très longs'], ['ponytail', 'Queue de cheval'], ['high ponytail', 'Queue de cheval haute'], ['bangs', 'Frange'], ['side bangs', 'Frange latérale'], ['messy bun', 'Chignon décoiffé'], ['wet hair', 'Mouillés'], ['short textured pixie cut', 'Pixie']) },
+    { id: 'hair-color', label: 'Couleur', opts: peO(['jet-black', 'Noir jais'], ['deep dark brown', 'Brun'], ['honey blonde', 'Blond miel'], ['striking platinum blonde', 'Platine'], ['vibrant auburn red', 'Roux auburn'], ['long vibrant black hair', 'Noir vibrant'], ['silver gray', 'Gris'], ['pastel pink hue', 'Rose pastel']) },
+    { id: 'outfit', label: 'Tenue (scène)', opts: peO(['completely nude', 'Complètement nue'], ['wearing white lingerie', 'Lingerie blanche'], ['wearing lingerie', 'Lingerie'], ['wearing sheer lingerie', 'Lingerie transparente'], ['wearing long victorian black dress', 'Robe victorienne noire'], ['wearing only panties', 'Seulement culotte'], ['wearing open robe', 'Peignoir ouvert'], ['wearing stockings and garter', 'Bas + porte-jarretelles'], ['wearing micro bikini', 'Micro bikini'], ['wearing ripped clothes', 'Vêtements déchirés'], ['wearing black neck choker', 'Tour de cou noir']) },
+    { id: 'jewelry', label: 'Bijoux (turquoise / Navajo)', ethnicOnly: true, opts: peO(['gleaming traditional Navajo silver and turquoise squash blossom necklace and matching earrings', 'Collier Navajo argent & turquoise'], ['traditional Navajo silver and turquoise jewelry', 'Bijoux Navajo']) },
+    { id: 'position', label: 'Position (scène)', opts: peO(['missionary', 'Missionnaire'], ['doggy style', 'Levrette'], ['cowgirl', 'Cowgirl'], ['reverse cowgirl', 'Reverse cowgirl'], ['standing doggy', 'Levrette debout'], ['legs spread', 'Jambes écartées'], ['on all fours', 'À quatre pattes'], ['lying on back', 'Allongée sur le dos'], ['kneeling', 'À genoux'], ['ballerina sex position, one leg completely up and spread', 'Position ballerine'], ['squatting over a man', 'Accroupie'], ['on her back, legs spread wide and held up next to her head', 'Jambes relevées'], ['legs tied up with wrists up', 'Jambes et poignets attachés']) },
+    { id: 'location', label: 'Lieu (scène)', opts: peO(['she lays on a traditional victorian bed', 'Lit victorien'], ['inside a dimly lit wooden hogan in the deep forest', 'Hogan en bois'], ['on a traditional woven rug', 'Tapis tissé']) }
+  ] },
+  { title: '6. Peau & imperfections', fields: [
+    { id: 'skin-blemish', label: 'Imperfections', opts: peO(['prominent organic freckles scattered across the nose and cheeks', 'Taches de rousseur'], ['actual freckles across nose and cheeks', 'Freckles réalistes'], ['pale freckled skin', 'Peau pâle frecklée'], ['visible enlarged skin pores and real oily skin texture', 'Pores dilatés'], ['noticeable acne blemishes, pores, and natural light redness', 'Acné']) },
+    { id: 'skin-marks', label: 'Signes & charme', opts: peO(['a small dark hyper-realistic beauty mark near the upper lip', 'Grain de beauté'], ['deep natural dimples on the cheeks when smiling', 'Fossettes'], ["subtle crow's feet wrinkles and fine lines around the eyes", 'Rides patte d\'oie'], ['pronounced tired dark circles under the eyes', 'Cernes']) }
+  ] }
+];
+const PE_ACTIONS = peO(['sucking huge penis', 'Sucer un énorme pénis'], ['deepthroat', 'Deepthroat'], ['rubbing her clitoris', 'Frotter le clitoris'], ['fingering pussy', 'Doigter'], ['licking nipples', 'Lécher les tétons'], ['titjob', 'Titjob'], ['the penis is in her anus', 'Pénétration anale'], ['cum dripping', 'Sperme qui coule'], ['holding her asscheeks stretched open', 'Écarter les fesses'], ['looking at camera', 'Regarder la caméra']);
+const PE_FIELDS = PE_SECTIONS.flatMap(sec => sec.fields);
+
+// Composition pure (testable) : valeurs choisies → description fixe, ancre, prompt complet
+function peCompose(v, addSuffix) {
+  const art = (t) => (/^[aeiou]/i.test(t) ? 'an ' : 'a ') + t;
+  const base = String(v.gender || 'a woman').replace(/^an? /, '');
+  // Sans âge choisi, le personnage est explicitement « adult »
+  const core = [v.age || 'adult', v.ethnicity, base].filter(Boolean).join(' ');
+  const mods = [v['body-shape'], v['height-proportion'], v['style-subculture']].filter(Boolean);
+  const subject = art(mods.length ? mods.join(', ') + ' ' + core : core);
+  const pick = (keys) => keys.map(k => v[k]).filter(Boolean);
+  const hair = [v['hair-color'], v['hair-texture']].filter(Boolean).join(' ');
+  const faceKeys = ['face-shape', 'cheeks', 'eyes', 'brows', 'lashes', 'nose', 'lips', 'jaw', 'glasses', 'facial-piercing', 'face-art'];
+  // description fixe : l'ordre sert aussi de priorité pour l'ancre (visage d'abord)
+  // description : sujet simple puis traits en expressions séparées (plus lisible pour les moteurs)
+  const plainSubject = art(core);
+  const persona = [plainSubject, ...mods, hair, ...pick(faceKeys), ...pick(['skin-blemish', 'skin-marks']), ...pick(['waist-shape', 'hips-shape', 'shoulders-neck']), ...pick(['breasts', 'areolas', 'nipples', 'pussy']), ...pick(['jewelry'])].filter(Boolean);
+  const desc = persona.join(', ');
+  const anchor = fitPhrases(dedupePhrases(toPhrases(desc)), 250).join(', ');
+  // prompt complet : même assemblage que ton générateur
+  const parts = [subject];
+  const bodyAll = pick(['waist-shape', 'hips-shape', 'shoulders-neck', 'breasts', 'areolas', 'nipples', 'pussy', 'pussy-state']);
+  if (bodyAll.length) parts.push(bodyAll.join(', '));
+  if (hair) parts.push(hair);
+  const faceAll = [v['face-shape'], v.cheeks, v.eyes, v.brows, v.lashes, v.nose, v.lips, v.jaw, v.expression, v.glasses, v['facial-piercing'], v['face-art']].filter(Boolean);
+  if (faceAll.length) parts.push(faceAll.join(', '));
+  [v['skin-blemish'], v['skin-marks'], v.outfit, v.jewelry].filter(Boolean).forEach(x => parts.push(x));
+  // « in missionary » mais pas « in on all fours » : on ne préfixe que les noms de positions
+  if (v.position) parts.push(/^(on |in |she |legs |lying|kneeling|squatting|ballerina)/i.test(v.position) ? v.position : 'in ' + v.position);
+  const acts = (v.actions || []);
+  if (acts.length) parts.push(acts.join(' and '));
+  if (v.location) parts.push(v.location);
+  let full = (v.prefix || '') + ' ' + parts.join(', ') + '. Authentic features, raw skin texture, sharp focus, photorealistic.';
+  full = full.replace(/\s+/g, ' ').replace(/ ,/g, ',').replace(/, ,/g, ',').trim();
+  if (addSuffix) full += ' ' + PE_SUFFIX;
+  return { desc, anchor, full };
+}
+
+function peKey() { return 'persona:' + ((document.getElementById('profileName').value || '').trim() || '_'); }
+function peUpdateEthnic() {
+  const eth = document.getElementById('pe-ethnicity').value;
+  const ok = (eth === 'Peruvian' || eth === 'Native American');
+  PE_FIELDS.filter(f => f.ethnicOnly).forEach(f => {
+    const el = document.getElementById('pe-' + f.id);
+    el.disabled = !ok; if (!ok) el.value = '';
+  });
+}
+function peRead() {
+  const v = {};
+  PE_FIELDS.forEach(f => { v[f.id] = document.getElementById('pe-' + f.id).value; });
+  v.actions = [...document.querySelectorAll('#pe-actions input:checked')].map(c => c.value);
+  return v;
+}
+function peWrite(v) {
+  PE_FIELDS.forEach(f => {
+    const el = document.getElementById('pe-' + f.id);
+    const want = (v && v[f.id] != null) ? v[f.id] : (f.none === false ? f.opts[0][0] : '');
+    el.value = [...el.options].some(o => o.value === want) ? want : (f.none === false ? f.opts[0][0] : '');
+  });
+  document.querySelectorAll('#pe-actions input').forEach(c => { c.checked = !!(v && v.actions && v.actions.includes(c.value)); });
+  peUpdateEthnic();
+}
+function peSave() { try { localStorage.setItem(peKey(), JSON.stringify(peRead())); } catch (e) {} }
+function peGenerate() {
+  const r = peCompose(peRead(), document.getElementById('peSuffix').checked);
+  document.getElementById('peDesc').value = r.desc;
+  document.getElementById('peFull').value = r.full;
+  document.getElementById('peDesc').dataset.anchor = r.anchor;
+  document.getElementById('peInfo').textContent = '';
+  return r;
+}
+let peBuilt = false;
+function peBuildForm() {
+  if (peBuilt) return;
+  peBuilt = true;
+  const form = document.getElementById('peForm');
+  PE_SECTIONS.forEach(sec => {
+    const box = document.createElement('div');
+    box.className = 'pe-sec';
+    const h = document.createElement('h4'); h.textContent = sec.title; box.appendChild(h);
+    const grid = document.createElement('div'); grid.className = 'pe-grid';
+    sec.fields.forEach(f => {
+      const wrap = document.createElement('div');
+      const lab = document.createElement('label'); lab.textContent = f.label + (f.ethnicOnly ? ' — Péruvienne / Native Américaine uniquement' : ''); lab.htmlFor = 'pe-' + f.id;
+      const sel = document.createElement('select'); sel.id = 'pe-' + f.id;
+      if (f.none !== false) sel.add(new Option('Aucun', ''));
+      f.opts.forEach(([val, lbl]) => sel.add(new Option(lbl, val)));
+      sel.addEventListener('change', () => { if (f.id === 'ethnicity') peUpdateEthnic(); peSave(); });
+      wrap.append(lab, sel); grid.appendChild(wrap);
+    });
+    box.appendChild(grid);
+    form.appendChild(box);
+    if (sec.title.startsWith('5.')) { // actions juste après la section « scène »
+      const ab = document.createElement('div'); ab.className = 'pe-sec';
+      const ah = document.createElement('h4'); ah.textContent = 'Actions (plusieurs possibles)'; ab.appendChild(ah);
+      const acts = document.createElement('div'); acts.className = 'pe-acts'; acts.id = 'pe-actions';
+      PE_ACTIONS.forEach(([val, lbl]) => {
+        const l = document.createElement('label'); const c = document.createElement('input'); c.type = 'checkbox'; c.value = val;
+        c.addEventListener('change', peSave); l.append(c, document.createTextNode(' ' + lbl)); acts.appendChild(l);
+      });
+      ab.appendChild(acts); form.appendChild(ab);
+    }
+  });
+}
+function peOpen() {
+  peBuildForm();
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(peKey()) || 'null'); } catch (e) {}
+  peWrite(saved);
+  document.getElementById('personaEditor').classList.remove('hidden');
+  if (saved) peGenerate();
+}
+function peClose() { document.getElementById('personaEditor').classList.add('hidden'); }
+(function () {
+  document.getElementById('personaOpen').addEventListener('click', peOpen);
+  document.getElementById('peClose').addEventListener('click', peClose);
+  document.getElementById('peGen').addEventListener('click', peGenerate);
+  document.getElementById('peSuffix').addEventListener('change', () => { if (document.getElementById('peFull').value) peGenerate(); });
+  document.getElementById('peReset').addEventListener('click', () => { peWrite(null); peSave(); document.getElementById('peDesc').value = ''; document.getElementById('peFull').value = ''; });
+  document.getElementById('peRandom').addEventListener('click', () => {
+    PE_FIELDS.forEach(f => {
+      const el = document.getElementById('pe-' + f.id);
+      if (el.disabled || el.options.length < 2) return;
+      el.selectedIndex = (f.none === false ? 0 : 1) + Math.floor(Math.random() * (el.options.length - (f.none === false ? 0 : 1)));
+    });
+    peUpdateEthnic();
+    PE_FIELDS.filter(f => f.ethnicOnly).forEach(f => {
+      const el = document.getElementById('pe-' + f.id);
+      if (!el.disabled) el.selectedIndex = 1 + Math.floor(Math.random() * (el.options.length - 1));
+    });
+    document.querySelectorAll('#pe-actions input').forEach(c => { c.checked = Math.random() > 0.72; });
+    peSave(); peGenerate();
+  });
+  document.getElementById('peToDesc').addEventListener('click', () => {
+    const r = peGenerate();
+    document.getElementById('physicalDescription').value = r.desc;
+    document.getElementById('peInfo').textContent = '✅ Description du profil remplie — pense à « Enregistrer ce profil ».';
+  });
+  document.getElementById('peToAnchor').addEventListener('click', () => {
+    const r = peGenerate();
+    document.getElementById('charAnchor').value = r.anchor;
+    document.getElementById('peInfo').textContent = '✅ Ancre visuelle remplie (' + r.anchor.length + ' caractères, visage en priorité) — pense à « Enregistrer ce profil ».';
+  });
+  document.getElementById('peCopyDesc').addEventListener('click', () => { navigator.clipboard.writeText(document.getElementById('peDesc').value).then(() => showMediaToast('📋 Description copiée')).catch(() => {}); });
+  document.getElementById('peCopyFull').addEventListener('click', () => { navigator.clipboard.writeText(document.getElementById('peFull').value).then(() => showMediaToast('📋 Prompt copié')).catch(() => {}); });
+  document.getElementById('peImages').addEventListener('click', () => {
+    const r = peGenerate();
+    if (!password) { showMediaToast('🎨 Démarre d\'abord la conversation (mot de passe du Worker requis)'); return; }
+    // onglet Perchance classique : à ouvrir ici, de façon synchrone, pendant le clic
+    const popup = (perchanceUsable() && !perchancePersistentOn()) ? window.open('about:blank', '_blank') : null;
+    const closePopup = () => { if (popup && !popup.closed) { try { popup.close(); } catch (e) {} } };
+    // retour à l'écran de conversation pour voir arriver les images
+    setup.classList.add('hidden'); topbar.classList.remove('hidden'); messagesEl.classList.remove('hidden'); inputbar.classList.remove('hidden');
+    peClose();
+    launchImageGenerators('__persona__', '', popup, closePopup, r.full);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !document.getElementById('personaEditor').classList.contains('hidden')) peClose();
+  });
+})();
+
 // ========== SUGGESTIONS DE RÉPONSE ==========
 // Trois répliques possibles pour l'utilisateur, écrites par le MÊME modèle que celui du chat.
 let suggestGen = 0;
@@ -1460,7 +1743,7 @@ async function analyzeReply(afterEl) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
       body: JSON.stringify({
-        model: model, stream: false, temperature: 0.7, max_tokens: 420,
+        model: model, stream: false, temperature: 0.7, max_tokens: helperTokens(420), __helper: true,
         messages: [
           { role: 'system', content: 'Tu analyses une scène de roleplay. Réponds UNIQUEMENT par un objet JSON {"suggestions":[...],"scene":{"location":"","time":"","outfit":"","mood":""}}, sans commentaire. "suggestions" : exactement 3 répliques que l\'UTILISATEUR pourrait écrire ensuite (première personne, langue et registre de la conversation, 1 à 2 phrases courtes) : (1) une qui fait avancer l\'action, (2) une plus douce ou tendre, (3) une qui change de direction. "scene" : l\'état ACTUEL de la scène à la fin du dernier message, en ANGLAIS, très concis (8 mots maximum par champ) : location, time (moment ou lumière), outfit (tenue actuelle de chaque personnage), mood. Si un champ n\'a pas changé, recopie la valeur précédente.' },
           { role: 'user', content: 'Demandé : suggestions=' + (wantSug ? 'oui' : 'non (laisse un tableau vide)') + ', scene=' + (wantScene ? 'oui' : 'non') + '\n\nÉtat précédent de la scène : ' + JSON.stringify(prev) + '\n\nConversation récente :\n\n' + ctx }
@@ -1577,16 +1860,18 @@ async function importCharRefImage(file) {
     if (!post.ok) throw new Error('Worker HTTP ' + post.status);
     const t0 = Date.now();
     while (Date.now() - t0 < 150000) {
-      await new Promise(res => setTimeout(res, 2000));
-      const g = await fetch(WORKER_BASE + 'relay-get?id=' + id + 'a', { headers });
-      if (!g.ok) continue;
-      const d = await g.json();
-      if (d && d.url) {
-        setCharRef(d.url);
-        galleryPatch(galleryId, { pubUrl: d.url }).catch(() => {});
-        info.textContent = '✅ Référence définie. Elle sert à Pollination avec kontext, gptimage, nanobanana ou seedream.';
-        return;
+      const tt = Date.now();
+      const g = await fetch(WORKER_BASE + 'relay-get?id=' + id + 'a&token=' + perchanceToken() + '&wait=15', { headers });
+      if (g.ok) {
+        const d = await g.json();
+        if (d && d.url) {
+          setCharRef(d.url);
+          galleryPatch(galleryId, { pubUrl: d.url }).catch(() => {});
+          info.textContent = '✅ Référence définie. Elle sert à Pollination avec kontext, gptimage, nanobanana ou seedream.';
+          return;
+        }
       }
+      if (Date.now() - tt < 1500) await new Promise(res => setTimeout(res, 2000));
     }
     info.textContent = '⏳ Pas de réponse du générateur Perchance : est-il ouvert et démarré ? (l\'image reste dans la galerie)';
   } catch (e) {
@@ -1667,16 +1952,22 @@ async function fetchImageBlob(url) {
   }
   return null;
 }
-async function archiveImage({ url, source, prompt }) {
+async function archiveImage({ url, source, prompt, profile }) {
   try {
     const blob = await fetchImageBlob(url);
     await gallerySave({
-      profile: profileName || '', ts: Date.now(), source: source || '',
+      profile: profile ?? (profileName || ''), ts: Date.now(), source: source || '',
       prompt: String(prompt || '').slice(0, 1500),
       blob: blob, url: blob ? '' : (url.startsWith('blob:') ? '' : url),
       pubUrl: /^https:\/\//i.test(url) ? url : ''
     });
   } catch (e) { console.warn('Galerie : sauvegarde impossible', e); }
+}
+
+function appendMsgEl(el, epoch) {
+  if (epoch !== undefined && epoch !== convEpoch) return;
+  messagesEl.appendChild(el);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
 // Crée l'<img> d'une image générée : cliquable (visionneuse) et archivée dans la galerie une fois chargée
@@ -1685,7 +1976,8 @@ function makeImageEl({ url, source, prompt, onError, onOpen }) {
   img.alt = 'Image générée (' + source + ')';
   img.style.cssText = 'max-width:100%; border-radius:10px; cursor:zoom-in; display:block;';
   img.onclick = onOpen || (() => openLightbox([{ src: img.src, caption: source + (prompt ? ' — ' + prompt : ''), prompt, pubUrl: /^https:\/\//i.test(url) ? url : '' }], 0));
-  img.onload = () => archiveImage({ url, source, prompt });
+  const prof = profileName || '';
+  img.onload = () => archiveImage({ url, source, prompt, profile: prof });
   img.onerror = () => onError && onError(url);
   img.src = url;
   return img;
@@ -1693,7 +1985,10 @@ function makeImageEl({ url, source, prompt, onError, onOpen }) {
 
 // Affiche une image dans la conversation (cliquable → visionneuse) et l'archive.
 // En mode comparateur, elle va dans la carte de comparaison du message en cours.
-function showGeneratedImage({ url, source, prompt, onError }) {
+function showGeneratedImage({ url, source, prompt, onError, epoch, profile }) {
+  // Image d'un profil / d'une conversation qui n'est plus affichée : rangée dans la galerie de
+  // son profil d'origine, mais pas ajoutée à la conversation courante
+  if (epoch !== undefined && epoch !== convEpoch) { archiveImage({ url, source, prompt, profile }); return null; }
   if (compareSession && compareSession.accepts(source)) return compareSession.add({ url, source, prompt });
   const wrap = document.createElement('div');
   wrap.className = 'msg bot';
@@ -1726,7 +2021,7 @@ function engineKeyOf(source) {
 }
 function compareOn() { return localStorage.getItem('compareOn') === '1'; }
 function enabledEngineKeys() {
-  return [genPerchance && 'perchance', genHFSpace && 'space', genPollination && 'pollination', genAIHorde && 'horde'].filter(Boolean);
+  return [perchanceUsable() && 'perchance', genHFSpace && 'space', genPollination && 'pollination', genAIHorde && 'horde'].filter(Boolean);
 }
 let compareSession = null;
 
@@ -1986,18 +2281,38 @@ function perchanceToken() {
   if (!/^[a-f0-9]{24}$/.test(t)) { t = hex24(); localStorage.setItem('perchanceToken', t); }
   return t;
 }
+// Sur téléphone, la fenêtre Perchance est un autre onglet : le navigateur la met en pause dès qu'on
+// revient au chat. Par défaut, Perchance n'y est donc pas utilisé (case dans les réglages pour forcer).
+function isMobile() {
+  try {
+    return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 900)
+      || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  } catch (e) { return false; }
+}
+function perchanceUsable() {
+  return genPerchance && (!isMobile() || localStorage.getItem('perchanceMobile') === '1');
+}
 function perchancePersistentOn() {
   return localStorage.getItem('perchancePersistent') === '1' && perchanceGenName() !== 'perchance-ai-api';
 }
 let daemonAlive = null;      // dernier état connu du générateur permanent (null = inconnu)
 let daemonOpenedAt = 0;
-function openPerchanceDaemon() {
+function openPerchanceDaemon(force) {
   const u = 'https://perchance.org/' + perchanceGenName() + '?' + new URLSearchParams({ mode: 'daemon', token: perchanceToken(), relay: WORKER_BASE, autostart: '1' }).toString();
   daemonOpenedAt = Date.now();
   // petite fenêtre dans le coin de l'écran : elle démarre toute seule, il suffit de la laisser ouverte
   const w = 380, h = 300;
   const left = Math.max((screen.availWidth || 1200) - w - 20, 0), top = Math.max((screen.availHeight || 800) - h - 40, 0);
-  return window.open(u, 'perchanceDaemon', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top);
+  let win = null;
+  try { win = window.open('', 'perchanceDaemon', 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top); } catch (e) {}
+  if (!win) return null;
+  // Une fenêtre déjà ouverte sur Perchance est de l'autre origine : lire son adresse échoue. On ne la
+  // recharge alors PAS (ça interromptrait un travail en cours) sauf demande explicite (bouton).
+  let blank = true;
+  try { blank = (win.location.href === 'about:blank'); } catch (e) { blank = false; }
+  if (blank || force) { try { win.location.href = u; } catch (e) {} }
+  else { try { win.focus(); } catch (e) {} showMediaToast('🪟 Le générateur est déjà ouvert : ramène sa fenêtre au premier plan.'); }
+  return win;
 }
 async function refreshDaemonState() {
   if (!perchancePersistentOn() || !password) return;
@@ -2012,10 +2327,14 @@ setTimeout(refreshDaemonState, 3000);
   const cb = document.getElementById('perchancePersistent');
   cb.checked = localStorage.getItem('perchancePersistent') === '1';
   cb.addEventListener('change', () => localStorage.setItem('perchancePersistent', cb.checked ? '1' : '0'));
-  document.getElementById('perchanceOpenDaemon').addEventListener('click', openPerchanceDaemon);
+  document.getElementById('perchanceOpenDaemon').addEventListener('click', () => openPerchanceDaemon(true));
+  const mob = document.getElementById('perchanceMobile');
+  mob.checked = localStorage.getItem('perchanceMobile') === '1';
+  mob.addEventListener('change', () => localStorage.setItem('perchanceMobile', mob.checked ? '1' : '0'));
 })();
 
 async function generatePerchanceViaDaemon(botText) {
+  const epoch = convEpoch, profile = profileName;
   const card = document.createElement('div');
   card.className = 'msg image-loading';
   const label = document.createElement('span');
@@ -2024,10 +2343,9 @@ async function generatePerchanceViaDaemon(botText) {
   openBtn.type = 'button';
   openBtn.textContent = '🪟 Ouvrir le générateur';
   openBtn.style.cssText = 'display:none; margin-left:8px; padding:4px 10px; border-radius:8px; border:1px solid #2a3d33; background:#1a2a22; color:#e8e8e4; cursor:pointer; font-size:12px;';
-  openBtn.onclick = openPerchanceDaemon;
+  openBtn.onclick = () => openPerchanceDaemon(true);
   card.appendChild(openBtn);
-  messagesEl.appendChild(card);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  appendMsgEl(card, epoch);
   label.textContent = '🎨 Perchance : travail envoyé au générateur permanent…';
 
   const prompt = buildPerchancePrompt(botText, 900);
@@ -2044,7 +2362,7 @@ async function generatePerchanceViaDaemon(botText) {
       method: 'POST', headers,
       body: JSON.stringify({
         token, id, prompt, count: N, seed: charSeedValue() ?? Math.floor(Math.random() * 1e9),
-        resolution: '768x512', guidanceScale: 7,
+        resolution: '768x512', guidanceScale: 7, replace: true, // le dernier message prime
         negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark'
       })
     });
@@ -2055,37 +2373,54 @@ async function generatePerchanceViaDaemon(botText) {
   }
 
   const got = new Set();
-  const t0 = Date.now();
-  while (got.size < N && Date.now() - t0 < 300000) {
-    await sleep(2000);
-    let alive = null;
-    try {
-      const st = await fetch(WORKER_BASE + 'perchance-status?token=' + token, { headers });
-      if (st.ok) alive = !!(await st.json()).alive;
-    } catch (e) {}
-    for (let i = 0; i < N; i++) {
-      if (got.has(ids[i])) continue;
+  const deadline = Date.now() + 300000;
+  let alive = null, done = false;
+  const refreshLabel = () => {
+    if (got.size >= N) return;
+    if (alive === false && got.size === 0) {
+      label.textContent = '⚠️ Générateur permanent inactif — ouvre-le (laisse-le ouvert) :';
+      openBtn.style.display = '';
+    } else {
+      label.textContent = '🎨 Perchance : génération en cours (' + got.size + '/' + N + ')…';
+      openBtn.style.display = 'none';
+    }
+  };
+  // Une attente par image. Avec le Durable Object, le Worker garde la requête ouverte jusqu'à
+  // 20 s et répond à l'instant où l'image arrive ; sans lui, il répond tout de suite et on
+  // retente toutes les 2 s (comportement d'avant).
+  const waitFor = async (i) => {
+    while (!got.has(ids[i]) && Date.now() < deadline && epoch === convEpoch) {
+      const t = Date.now();
       try {
-        const r = await fetch(WORKER_BASE + 'relay-get?id=' + ids[i], { headers });
-        if (!r.ok) continue;
-        const d = await r.json();
-        if (d && d.url) {
-          got.add(ids[i]);
-          console.log('[Perchance permanent] image ' + (i + 1) + ' reçue :', d.url);
-          showGeneratedImage({ url: d.url, source: 'Perchance #' + (i + 1), prompt });
+        const r = await fetch(WORKER_BASE + 'relay-get?id=' + ids[i] + '&token=' + token + '&wait=20', { headers });
+        if (r.ok) {
+          const d = await r.json();
+          if (d && d.url) {
+            got.add(ids[i]);
+            console.log('[Perchance permanent] image ' + (i + 1) + ' reçue :', d.url);
+            showGeneratedImage({ url: d.url, source: 'Perchance #' + (i + 1), prompt, epoch, profile });
+            refreshLabel();
+            return;
+          }
         }
       } catch (e) {}
+      if (Date.now() - t < 1500) await sleep(2000);
     }
-    if (got.size < N) {
-      if (alive === false && got.size === 0) {
-        label.textContent = '⚠️ Générateur permanent inactif — ouvre-le (laisse-le ouvert) :';
-        openBtn.style.display = '';
-      } else {
-        label.textContent = '🎨 Perchance : génération en cours (' + got.size + '/' + N + ')…';
-        openBtn.style.display = 'none';
-      }
+  };
+  (async () => { // le générateur est-il actif ?
+    while (!done && Date.now() < deadline && epoch === convEpoch) {
+      try {
+        const st = await fetch(WORKER_BASE + 'perchance-status?token=' + token, { headers });
+        if (st.ok) alive = !!(await st.json()).alive;
+      } catch (e) {}
+      refreshLabel();
+      await sleep(4000);
     }
-  }
+  })();
+  await Promise.all(ids.map((_, i) => waitFor(i)));
+  done = true;
+
+  if (epoch !== convEpoch) { try { card.remove(); } catch (e) {} return; }
   if (got.size === 0) {
     label.textContent = '⏳ Perchance : aucune image reçue. Le générateur permanent est-il ouvert et démarré ?';
     openBtn.style.display = '';
@@ -2138,11 +2473,12 @@ function perchanceGenName() {
 }
 
 async function generateNSFWImage(botText, popup) {
+  const epoch = convEpoch, profile = profileName;
   if (perchancePersistentOn()) return generatePerchanceViaDaemon(botText);
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
   loadingDiv.textContent = '🎨 Génération de l\'image en cours (Perchance)...';
-  messagesEl.appendChild(loadingDiv);
+  appendMsgEl(loadingDiv, epoch);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   if (!popup || popup.closed) {
@@ -2160,7 +2496,7 @@ async function generateNSFWImage(botText, popup) {
   };
 
   function addImageMessage(url) {
-    showGeneratedImage({ url, source: 'Perchance', prompt });
+    showGeneratedImage({ url, source: 'Perchance', prompt, epoch, profile });
   }
 
   // L'URL peut arriver sous plusieurs noms selon la version de l'API Perchance
@@ -2280,7 +2616,7 @@ async function generateNSFWImage(botText, popup) {
       const errDiv = document.createElement('div');
       errDiv.className = 'msg image-loading';
       errDiv.textContent = '⚠️ Perchance : image reçue mais affichage impossible (' + (e && e.message || e) + ') — ' + imgUrl;
-      messagesEl.appendChild(errDiv);
+      appendMsgEl(errDiv, epoch);
       shown = true;
     }
   }
@@ -2300,7 +2636,7 @@ async function generateNSFWImage(botText, popup) {
       try { if (popup) popup.close(); } catch (e) {}
     };
     errDiv.appendChild(btn);
-    messagesEl.appendChild(errDiv);
+    appendMsgEl(errDiv, epoch);
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
@@ -2311,6 +2647,21 @@ async function generateNSFWImage(botText, popup) {
 // C'est l'étape qui manquait dans l'ancienne version (elle faisait un .json() direct sur
 // la réponse du POST, qui ne contient que l'event_id — jamais l'image).
 
+function getHFSpaceSlug() { return (hfSpaceId || 'properfool/nsfwadult').trim().toLowerCase().replace('/', '-'); }
+const HF_CALL_PATH = '/gradio_api/call/generate_image';
+// Passe par le Worker, qui ajoute ta clé HF_KEY (quota ZeroGPU de ton compte) ; si le Worker est
+// injoignable, repli direct vers le Space (anonyme).
+async function hfSpaceFetch(path, init) {
+  const slug = getHFSpaceSlug();
+  try {
+    const res = await fetch(WORKER_BASE + 'hf-space?space=' + encodeURIComponent(slug) + '&path=' + encodeURIComponent(path), {
+      ...init, headers: { ...((init && init.headers) || {}), 'X-App-Secret': password }
+    });
+    if (res.status !== 401 && res.status < 500) return res;
+    console.warn('[Space HF] passerelle du Worker : HTTP', res.status, '— essai direct');
+  } catch (e) { console.warn('[Space HF] passerelle du Worker injoignable — essai direct', e); }
+  return fetch('https://' + slug + '.hf.space' + path, init);
+}
 function getHFSpaceBase() {
   const slug = (hfSpaceId || 'properfool/nsfwadult').trim().toLowerCase().replace('/', '-');
   return `https://${slug}.hf.space/gradio_api/call/generate_image`;
@@ -2322,52 +2673,71 @@ function getHFSpaceBase() {
 // message, puis tous les générateurs réutilisent ce résumé. Si l'appel échoue, on retombe
 // sur l'extraction simple de extractAction().
 const sceneCache = new Map();
+// Les modèles « à raisonnement » (gpt-oss, grok, deepseek-r1, qwen3, gemma-4…) dépensent leur budget
+// de tokens à réfléchir : avec 150 tokens, la réponse arrive VIDE et le prompt d'image retombe sur
+// le texte brut du message. Pour les appels auxiliaires, on prévoit donc de la marge.
+const REASONING_RE = /gpt-oss|grok|deepseek-r|\br1\b|qwen3|qwq|reason|think|\bo[134]\b|gemma-4/i;
+const helperTokens = (base) => REASONING_RE.test(model || '') ? Math.min(base * 4, 2400) : base;
 const SCENE_SYSTEM_PROMPT = "You write prompts for an image generator. Read the roleplay exchange and describe only what is visually happening right now: pose and body positions, the physical action, camera angle, facial expression, clothing state and setting. Write it in English as one line of concise comma-separated visual phrases, 45 words maximum. Do not describe the character's fixed appearance (hair, eyes, body type). No dialogue, no names, no explanations, no quotation marks.";
 
 function cleanSceneText(raw) {
   let s = String(raw || '');
   // Modèle "réflexion" coupé en plein raisonnement : inutilisable.
   if (/<think>/i.test(s) && !/<\/think>/i.test(s)) return '';
-  s = s.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/["“”«»*]/g, '').replace(/\s+/g, ' ').trim();
+  s = s.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  // première vraie ligne : on saute les introductions (« Here is the prompt: »)
+  const lines = s.split('\n').map(l => l.trim()).filter(Boolean);
+  s = lines.find(l => l.length > 15 && !/:$/.test(l) && !/^(here|sure|okay|ok|voici|certainly)\b/i.test(l)) || lines[0] || '';
+  s = s.replace(/^(scene|description|prompt|visual|image prompt)\s*[:\-–]\s*/i, '');
+  s = s.replace(/["“”«»*`#]/g, '').replace(/\s+/g, ' ').trim();
   if (/^(i['’]?m sorry|i am sorry|i can(not|['’]?t)|sorry|je ne peux|désolé)/i.test(s)) return '';
   return s.slice(0, 300);
 }
 
 async function prepareScene(botText, userText) {
   if (sceneCache.has(botText)) return;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  try {
-    const context = (userText && userText !== '__init__')
-      ? 'Previous message from the user: ' + userText.slice(0, 300) + '\n\n'
-      : '';
-    const res = await fetch(WORKER_BASE + provider, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: SCENE_SYSTEM_PROMPT },
-          { role: 'user', content: context + 'Character message:\n' + botText.slice(0, 1500) }
-        ],
-        stream: false,
-        temperature: 0.3,
-        max_tokens: 150
-      })
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    const scene = cleanSceneText(data?.choices?.[0]?.message?.content);
-    if (scene) {
-      sceneCache.set(botText, scene);
-      if (sceneCache.size > 30) sceneCache.delete(sceneCache.keys().next().value);
+  const context = (userText && userText !== '__init__')
+    ? 'Previous message from the user: ' + userText.slice(0, 300) + '\n\n'
+    : '';
+  // Deux essais : si la réponse est vide (budget épuisé par le raisonnement), on double la marge.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const res = await fetch(WORKER_BASE + provider, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: SCENE_SYSTEM_PROMPT },
+            { role: 'user', content: context + 'Character message:\n' + botText.slice(0, 1500) }
+          ],
+          stream: false,
+          temperature: 0.3,
+          max_tokens: helperTokens(150) * attempt,
+          __helper: true
+        })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const rawScene = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      const scene = cleanSceneText(rawScene);
+      console.log('[Scène] essai ' + attempt + ' — brut :', rawScene, '→', scene || '(vide)', '— fin :', data && data.choices && data.choices[0] && data.choices[0].finish_reason);
+      if (scene) {
+        sceneCache.set(botText, scene);
+        if (sceneCache.size > 30) sceneCache.delete(sceneCache.keys().next().value);
+        return;
+      }
+    } catch (err) {
+      console.error('Résumé de scène indisponible, repli sur l\'extraction simple :', err);
+      return;
+    } finally {
+      clearTimeout(timer);
     }
-  } catch (err) {
-    console.error('Résumé de scène indisponible, repli sur l\'extraction simple :', err);
-  } finally {
-    clearTimeout(timer);
   }
+  console.warn('[Scène] aucun résumé exploitable : le prompt d\'image utilise le texte brut du message');
 }
 
 // ----- Traduction FR → EN (Worker : Workers AI m2m100) -----
@@ -2506,6 +2876,7 @@ function promptParts(botText) {
 // Moteurs « langage naturel » (Flux, Z-Image Turbo, kontext, gptimage…) : phrases courtes,
 // sans poids ni étiquettes de qualité empilées, pas de prompt négatif.
 function buildProsePrompt(botText, maxLen) {
+  if (rawPromptOverride) return rawPromptOverride.slice(0, 1500);
   const { shot, subject, actionList } = promptParts(botText);
   // « (((actual, actual photo))) » → « actual photo » : doublons retirés, poids SD supprimés
   const style = compactSuffix(PERCHANCE_SUFFIX).replace(/\b(\w+),\s*\1\b/gi, '$1').replace(/[()]/g, '').replace(/^[\s.]+/, '');
@@ -2530,6 +2901,7 @@ function hordeStyleKind() {
 }
 const HORDE_ANIME_NEG = 'worst quality, low quality, lowres, bad anatomy, bad hands, extra fingers, jpeg artifacts, text, watermark, signature';
 function buildTagPrompt(botText, maxLen, kind) {
+  if (rawPromptOverride) return rawPromptOverride.slice(0, 1500);
   const { shot, subject, actionList } = promptParts(botText);
   const head = kind === 'anime'
     ? ['masterpiece', 'best quality', 'amazing quality', 'very aesthetic', 'absurdres']
@@ -2556,6 +2928,7 @@ function compactSuffix(sfx) {
   return i > 40 ? cut.slice(0, i) : cut;
 }
 function buildPerchancePrompt(botText, maxLen, compact) {
+  if (rawPromptOverride) return rawPromptOverride;
   const shot = shotPhrase();
   const action = dedupePhrases(toPhrases(shot ? stripFraming(extractAction(botText)) : extractAction(botText))).join(', ').slice(0, 300);
   const tags = PERCHANCE_TAGS;
@@ -2586,8 +2959,13 @@ function safeTrigger(fn) {
 
 // Prépare une seule fois le résumé de scène (si au moins un générateur est actif), puis lance
 // tous les générateurs cochés. Appelée sans await : elle ne retarde pas le bouton Envoyer.
-async function launchImageGenerators(text, userText, popup, closePopup) {
-  if (!(genPerchance || genHFSpace || genPollination || genAIHorde)) {
+async function launchImageGenerators(text, userText, popup, closePopup, rawPrompt) {
+  if (rawPrompt) rawPromptOverride = rawPrompt;
+  if (genPerchance && !perchanceUsable() && !(genHFSpace || genPollination || genAIHorde)) {
+    showMediaToast('📱 Perchance est désactivé sur téléphone. Active Pollination ou Horde, ou coche « Perchance aussi sur téléphone » dans les réglages.');
+  }
+  if (!(perchanceUsable() || genHFSpace || genPollination || genAIHorde)) {
+    rawPromptOverride = '';
     closePopup();
     return;
   }
@@ -2595,27 +2973,35 @@ async function launchImageGenerators(text, userText, popup, closePopup) {
   compareSession = null;
   const engineKeys = enabledEngineKeys();
   if (compareOn() && engineKeys.length >= 2) compareSession = startCompareSession(engineKeys);
-  await prepareScene(text, userText);
-  await prepareTranslations(text);
-  if (genPerchance) safeTrigger(() => generateNSFWImage(text, popup)); else closePopup();
+  if (!rawPromptOverride) { // prompt imposé : rien à résumer ni à traduire
+    await prepareScene(text, userText);
+    await prepareTranslations(text);
+  }
+  if (perchanceUsable()) safeTrigger(() => generateNSFWImage(text, popup)); else closePopup();
   if (genHFSpace) safeTrigger(() => generateHFSpaceImage(text));
   if (genPollination) safeTrigger(() => generatePollinationImage(text));
   if (genAIHorde) safeTrigger(() => generateAIHordeImage(text));
+  // Chaque générateur construit son prompt de façon synchrone au moment où il démarre : le prompt
+  // imposé peut donc être retiré dès maintenant.
+  rawPromptOverride = '';
 }
 
 async function callHFSpace(dataArray, timeoutMs) {
   timeoutMs = timeoutMs || 30000;
   const base = getHFSpaceBase();
-  const submitRes = await fetch(base, {
+  const submitRes = await hfSpaceFetch(HF_CALL_PATH, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ data: dataArray })
   });
-  if (!submitRes.ok) throw new Error('Soumission refusée (' + submitRes.status + ')');
+  if (!submitRes.ok) {
+    const detail = (await submitRes.text().catch(() => '')).replace(/\s+/g, ' ').slice(0, 160);
+    throw new Error('Soumission refusée (' + submitRes.status + ')' + (detail ? ' — ' + detail : ''));
+  }
   const { event_id } = await submitRes.json();
   if (!event_id) throw new Error('Pas d\'event_id reçu');
 
-  const streamRes = await fetch(base + '/' + event_id);
+  const streamRes = await hfSpaceFetch(HF_CALL_PATH + '/' + event_id, { method: 'GET' });
   if (!streamRes.ok || !streamRes.body) throw new Error('Flux de résultat indisponible (' + streamRes.status + ')');
 
   const reader = streamRes.body.getReader();
@@ -2684,10 +3070,11 @@ function extractHFImageUrl(finalData) {
 }
 
 async function generateHFSpaceImage(botText) {
+  const epoch = convEpoch, profile = profileName;
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
   loadingDiv.textContent = '🎨 Génération de l\'image en cours (Space HF)...';
-  messagesEl.appendChild(loadingDiv);
+  appendMsgEl(loadingDiv, epoch);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   try {
@@ -2703,7 +3090,7 @@ async function generateHFSpaceImage(botText) {
 
     if (imageUrl) {
       showGeneratedImage({
-        url: imageUrl, source: 'Space HF', prompt,
+        url: imageUrl, source: 'Space HF', prompt, epoch, profile,
         onError: (wrap, u) => {
           console.error('[Space HF] image non chargeable :', u);
           wrap.className = 'msg image-loading';
@@ -2719,15 +3106,15 @@ async function generateHFSpaceImage(botText) {
       const errDiv = document.createElement('div');
       errDiv.className = 'msg image-loading';
       errDiv.textContent = '⚠️ Image non récupérée depuis le Space.';
-      messagesEl.appendChild(errDiv);
+      appendMsgEl(errDiv, epoch);
     }
   } catch (err) {
     loadingDiv.remove();
     console.error('Erreur génération image (Space HF):', err);
     const errDiv = document.createElement('div');
     errDiv.className = 'msg image-loading';
-    errDiv.textContent = '❌ Space HF : ' + (err.message || 'génération échouée') + ' (ZeroGPU peut nécessiter une authentification).';
-    messagesEl.appendChild(errDiv);
+    errDiv.textContent = '❌ Space HF : ' + (err.message || 'génération échouée') + ' (ZeroGPU : vérifie que HF_KEY est défini dans le Worker et que la clé a accès à ce Space).';
+    appendMsgEl(errDiv, epoch);
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
@@ -2736,10 +3123,11 @@ async function generateHFSpaceImage(botText) {
 // Juste une image à charger depuis une URL — pas de popup, pas d'étape en deux temps,
 // pas de vérification anti-bot. Le point le plus simple et le plus fiable des trois.
 async function generatePollinationImage(botText) {
+  const epoch = convEpoch, profile = profileName;
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
   loadingDiv.textContent = '🎨 Génération de l\'image en cours (Pollination)...';
-  messagesEl.appendChild(loadingDiv);
+  appendMsgEl(loadingDiv, epoch);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   // Mêmes réglages que Perchance : même prompt (personnage + scène + tags de style),
@@ -2807,12 +3195,12 @@ async function generatePollinationImage(botText) {
   loadingDiv.remove();
 
   if (url) {
-    showGeneratedImage({ url, source: 'Pollination (' + model + ')', prompt });
+    showGeneratedImage({ url, source: 'Pollination (' + model + ')', prompt, epoch, profile });
   } else {
     const errDiv = document.createElement('div');
     errDiv.className = 'msg image-loading';
     errDiv.textContent = '⚠️ Pollination : pas d\'image après deux essais (file saturée ou clé refusée).';
-    messagesEl.appendChild(errDiv);
+    appendMsgEl(errDiv, epoch);
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
@@ -2926,7 +3314,7 @@ document.getElementById('charAnchorGen').addEventListener('click', async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-App-Secret': pw },
       body: JSON.stringify({
-        model: mdl || 'auto', stream: false, temperature: 0.2, max_tokens: 160,
+        model: mdl || 'auto', stream: false, temperature: 0.2, max_tokens: helperTokens(160), __helper: true,
         messages: [
           { role: 'system', content: 'You turn a character\'s appearance notes (any language) into ONE compact English visual anchor for text-to-image models: apparent age, build, face, hair (colour, length, style), eyes, skin, distinctive features, usual outfit if stated. Comma-separated phrases, at most 220 characters. Output only the anchor, nothing else.' },
           { role: 'user', content: desc }
@@ -3106,10 +3494,11 @@ async function callAIHorde(prompt, onProgress) {
 }
 
 async function generateAIHordeImage(botText) {
+  const epoch = convEpoch, profile = profileName;
   const loadingDiv = document.createElement('div');
   loadingDiv.className = 'msg image-loading';
   loadingDiv.textContent = '🎨 Génération de l\'image en cours (AI Horde)...';
-  messagesEl.appendChild(loadingDiv);
+  appendMsgEl(loadingDiv, epoch);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 
   try {
@@ -3123,14 +3512,14 @@ async function generateAIHordeImage(botText) {
         (c.wait_time ? ' — ~' + c.wait_time + ' s' : '') + '...';
     });
     loadingDiv.remove();
-    showGeneratedImage({ url: imgUrl, source: 'AI Horde' + (hordeModels && hordeModels.length ? ' (' + hordeModels[0] + ')' : ''), prompt });
+    showGeneratedImage({ url: imgUrl, source: 'AI Horde' + (hordeModels && hordeModels.length ? ' (' + hordeModels[0] + ')' : ''), prompt, epoch, profile });
   } catch (err) {
     loadingDiv.remove();
     console.error('Erreur AI Horde:', err);
     const errDiv = document.createElement('div');
     errDiv.className = 'msg image-loading';
     errDiv.textContent = '❌ AI Horde : ' + (err.message || 'génération échouée');
-    messagesEl.appendChild(errDiv);
+    appendMsgEl(errDiv, epoch);
   }
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
@@ -3204,14 +3593,15 @@ async function sendToWorker(userText, userTs) {
   // Seulement si Perchance est activé pour ce profil, sinon pas de popup inutile.
   // Mode permanent : si le générateur est connu comme inactif, on l'ouvre ici (geste de clic),
   // une seule fois ; il démarre tout seul et sert ensuite à tous les messages suivants.
-  if (genPerchance && perchancePersistentOn() && daemonAlive === false && Date.now() - daemonOpenedAt > 30000) {
+  if (perchanceUsable() && perchancePersistentOn() && daemonAlive === false && Date.now() - daemonOpenedAt > 30000) {
     openPerchanceDaemon();
   }
-  const imagePopup = (genPerchance && !perchancePersistentOn()) ? window.open('about:blank', '_blank') : null;
+  const imagePopup = (perchanceUsable() && !perchancePersistentOn()) ? window.open('about:blank', '_blank') : null;
   function closeUnusedPopup() {
     if (imagePopup && !imagePopup.closed) { try { imagePopup.close(); } catch (e) {} }
   }
 
+  const epoch = convEpoch;
   const ctrl = new AbortController();
   streamAbort = ctrl;
   let fullText = '';
@@ -3246,7 +3636,7 @@ async function sendToWorker(userText, userTs) {
       typingEl.remove();
       closeUnusedPopup();
       const errText = await response.text();
-      addMessage('Erreur ' + response.status + ' : ' + errText.slice(0, 200), 'err');
+      if (epoch === convEpoch) addMessage('Erreur ' + response.status + ' : ' + errText.slice(0, 200), 'err');
       return;
     }
 
@@ -3332,6 +3722,7 @@ async function sendToWorker(userText, userTs) {
       note.textContent = '⚠️ Flux interrompu : plus aucune donnée depuis 60 s. Le début de la réponse est conservé.';
       messagesEl.appendChild(note);
     }
+    if (epoch !== convEpoch) { closeUnusedPopup(); return; } // profil changé : rien n'est écrit dans le nouveau
     if (!finalText) {
       contentEl.innerHTML = streamError ? '' : '(réponse vide)';
       if (streamError) addMessage('Erreur du fournisseur : ' + streamError.slice(0, 200), 'err');
@@ -3364,7 +3755,7 @@ async function sendToWorker(userText, userTs) {
     if (err && err.name === 'AbortError') {
       if (!botDiv) addMessage('■ Génération arrêtée.', 'err');
     } else {
-      addMessage('Erreur réseau : ' + err.message, 'err');
+      if (epoch === convEpoch) addMessage('Erreur réseau : ' + err.message, 'err');
     }
   } finally {
     if (watchdog) clearInterval(watchdog);
