@@ -222,6 +222,10 @@
     <div>
       <label>Modèle</label>
       <input type="text" id="model" placeholder="ex: llama-3.1-8b-instant">
+      <div style="display:flex; gap:6px; margin-top:6px;">
+        <select id="modelPick" style="flex:1; font-size:11px; padding:5px 6px;"><option value="">— choisir dans la liste —</option></select>
+        <button type="button" id="modelRefresh" title="Recharger la liste des modèles depuis le Worker" style="width:auto; margin-top:0; padding:5px 10px; font-size:11px;">↻</button>
+      </div>
     </div>
   </div>
   <div>
@@ -1670,6 +1674,52 @@ function peClose() { document.getElementById('personaEditor').classList.add('hid
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !document.getElementById('personaEditor').classList.contains('hidden')) peClose();
   });
+})();
+
+// ========== CHOIX DU MODÈLE ==========
+// Liste déroulante : quelques modèles connus par fournisseur + le catalogue réel du Worker (↻).
+// Le champ « Modèle » reste libre : on peut aussi taper un identifiant à la main.
+const MODEL_PRESETS = {
+  openrouter: ['google/gemma-4-31b-it', 'google/gemma-4-31b-it:free'],
+  google: ['gemma-4-31b-it', 'gemma-4-26b-a4b-it', 'gemini-2.5-flash', 'gemini-flash-latest'],
+  groq: ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
+  pollinations: ['community/Saauf/grok-4.20-fast', 'x-ai/grok-4.6', 'openai']
+};
+function loadModelCatalog() { try { return JSON.parse(localStorage.getItem('modelCatalog') || '{}') || {}; } catch (e) { return {}; } }
+function populateModelPick() {
+  const sel = document.getElementById('modelPick');
+  if (!sel) return;
+  const prov = document.getElementById('provider').value;
+  const seen = new Set();
+  const items = [...(MODEL_PRESETS[prov] || []), ...((loadModelCatalog().providers || {})[prov] || [])]
+    .filter(m => typeof m === 'string' && m && !seen.has(m) && seen.add(m));
+  sel.innerHTML = '';
+  sel.add(new Option('— choisir dans la liste (' + items.length + ') —', ''));
+  items.slice(0, 400).forEach(m => sel.add(new Option(m, m)));
+}
+async function refreshModelCatalog() {
+  const info = document.getElementById('modelRefresh');
+  const pw = (document.getElementById('password').value || password || '').trim();
+  if (!pw) { showMediaToast('Entre d\'abord le mot de passe du Worker.'); return; }
+  info.disabled = true;
+  try {
+    // /models est à la racine du Worker (pas sous /proxy/)
+    const res = await fetch(new URL(WORKER_BASE).origin + '/models?refresh=1', { headers: { 'X-App-Secret': pw } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
+    localStorage.setItem('modelCatalog', JSON.stringify({ ts: Date.now(), providers: d.providers || {} }));
+    populateModelPick();
+    showMediaToast('Liste des modèles mise à jour.');
+  } catch (e) {
+    showMediaToast('Liste des modèles indisponible : ' + e.message);
+  } finally { info.disabled = false; }
+}
+(function () {
+  const sel = document.getElementById('modelPick');
+  sel.addEventListener('change', () => { if (sel.value) document.getElementById('model').value = sel.value; });
+  document.getElementById('provider').addEventListener('change', populateModelPick);
+  document.getElementById('modelRefresh').addEventListener('click', refreshModelCatalog);
+  populateModelPick();
 })();
 
 // ========== SUGGESTIONS DE RÉPONSE ==========
@@ -3538,7 +3588,13 @@ function setGenerating(on) {
 // Les modèles « raisonneurs » émettent leur réflexion entre <think>…</think> : on la masque,
 // y compris tant que la balise de fin n'est pas arrivée.
 function stripThink(t) {
-  return String(t).replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<think>[\s\S]*$/i, '');
+  return String(t)
+    .replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<think>[\s\S]*$/i, '')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '').replace(/<thinking>[\s\S]*$/i, '')
+    .replace(/<thought>[\s\S]*?<\/thought>/gi, '').replace(/<thought>[\s\S]*$/i, '')
+    // Gemma 4 : la réflexion est dans un « canal » <|channel>thought … <channel|>, la réponse vient après
+    .replace(/<\|channel>thought[\s\S]*?<channel\|>/g, '').replace(/<\|channel>thought[\s\S]*$/, '')
+    .replace(/<\|channel>[\s\S]*?<channel\|>/g, '').replace(/<\|?\/?channel\|?>/g, '');
 }
 
 // Voix en continu : chaque réplique entre guillemets est lue dès qu'elle est terminée, sans
@@ -3636,7 +3692,7 @@ async function sendToWorker(userText, userTs) {
       typingEl.remove();
       closeUnusedPopup();
       const errText = await response.text();
-      if (epoch === convEpoch) addMessage('Erreur ' + response.status + ' : ' + errText.slice(0, 200), 'err');
+      if (epoch === convEpoch) addMessage('Erreur ' + response.status + ' : ' + errText.slice(0, 700), 'err');
       return;
     }
 
