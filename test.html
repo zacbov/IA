@@ -174,6 +174,15 @@
   .pe-out textarea { width: 100%; background: #0c110e; border: 1px solid #2a3d33; color: #e8e8e4; border-radius: 8px; padding: 8px; font-size: 12px; font-family: monospace; min-height: 90px; }
   .pe-out .pe-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 12px; align-items: center; }
   .pe-note { font-size: 10px; color: #778; }
+  .g-cell { position: relative; cursor: zoom-in; }
+  .g-cell .g-check { position: absolute; top: 6px; left: 6px; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; color: #fff; font-size: 15px; font-weight: 700; }
+  #gallery.selecting .g-cell { cursor: pointer; }
+  #gallery.selecting .g-cell .g-check { display: flex; }
+  .g-cell.selected .g-check { background: #e0a34a; border-color: #e0a34a; color: #1a1208; }
+  .g-cell.selected img { outline: 3px solid #e0a34a; outline-offset: -3px; opacity: .78; }
+  #gSelBar { display: none; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #gallery.selecting #gSelBar { display: flex; }
+  #gHead button.danger { background: #6a2020; border-color: #a33; }
 </style>
 </head>
 <body>
@@ -224,8 +233,11 @@
       <input type="text" id="model" placeholder="ex: llama-3.1-8b-instant">
       <div style="display:flex; gap:6px; margin-top:6px;">
         <select id="modelPick" style="flex:1; font-size:11px; padding:5px 6px;"><option value="">— choisir dans la liste —</option></select>
+        <button type="button" id="modelStar" title="Mettre ce modèle en favori (★) ou l'enlever" style="width:auto; margin-top:0; padding:5px 10px; font-size:13px;">☆</button>
+        <button type="button" id="modelNoteBtn" title="Ajouter une note à ce modèle" style="width:auto; margin-top:0; padding:5px 10px; font-size:11px;">📝</button>
         <button type="button" id="modelRefresh" title="Recharger la liste des modèles depuis le Worker" style="width:auto; margin-top:0; padding:5px 10px; font-size:11px;">↻</button>
       </div>
+      <div id="modelNote" style="font-size:10px; color:#9ab; margin-top:3px; min-height:12px;"></div>
     </div>
   </div>
   <div>
@@ -377,6 +389,14 @@
           <span id="charRefInfo" style="font-size:10px; color:#888;">Nécessite le mode permanent Perchance (hébergement de l'image).</span>
         </div>
       </div>
+      <div style="margin-top:10px; padding:10px; border:1px solid #2a3d33; border-radius:8px;">
+        <div style="font-size:12px; color:#ccc; margin-bottom:6px;">🧠 Modèle pour résumer la scène (prompts d'image)</div>
+        <div style="display:flex; gap:6px;">
+          <select id="helperProvider" style="flex:1; font-size:11px; padding:5px 6px;"></select>
+          <input type="text" id="helperModel" placeholder="ex : gemini-flash-lite-latest" style="flex:2; font-size:11px; padding:5px 8px;">
+        </div>
+        <div style="font-size:10px; color:#778; margin-top:4px;">Vide = même modèle que le chat. Un modèle rapide mais approximatif résume mal l'action : choisis ici un modèle plus soigneux, uniquement pour ce résumé (les suggestions restent générées par le modèle du chat).</div>
+      </div>
       <label style="display:flex; gap:8px; align-items:center; font-size:12px; margin-top:10px;">
         <input type="checkbox" id="genTranslate" style="width:auto;"> 🌐 Traduire en anglais la description physique et la scène (si elles sont en français)
       </label>
@@ -485,6 +505,12 @@
   <div id="gHead">
     <span class="gt">🖼️ Galerie <span id="gCount" style="font-weight:400; color:#888;"></span></span>
     <label><input type="checkbox" id="gAll"> Tous les profils</label>
+    <button id="gSelect" type="button">☑ Sélectionner</button>
+    <span id="gSelBar">
+      <button id="gSelAll" type="button">Tout</button>
+      <button id="gSelNone" type="button">Aucun</button>
+      <button id="gDelSel" type="button" class="danger">🗑 Supprimer (0)</button>
+    </span>
     <button id="gClear" type="button">🗑 Tout supprimer</button>
     <button id="gClose" type="button">✕ Fermer</button>
   </div>
@@ -1492,9 +1518,10 @@ const PE_SECTIONS = [
     { id: 'cheeks', label: 'Joues', opts: peO(['high prominent cheekbones', 'Pommettes hautes'], ['plump rosy cheeks', 'Joues rebondies'], ['hollow cheeks', 'Joues creuses']) },
     { id: 'eyes', label: 'Yeux', opts: peO(['almond-shaped eyes', 'Amande'], ['hooded eyes', 'Paupières tombantes'], ['round wide-awake eyes', 'Ronds'], ['deep-set piercing eyes', 'Enfoncés'], ['doe-like soft eyes', 'Regard de biche'], ['monolid eyes', 'Monolid'], ['big blue eyes', 'Grands yeux bleus']) },
     { id: 'brows', label: 'Sourcils', opts: peO(['arched eyebrows', 'Arqués'], ['straight horizontal eyebrows', 'Droits'], ['bushy thick eyebrows', 'Broussailleux'], ['thin pencil-thin eyebrows', 'Fins'], ['feathery fluffy eyebrows', 'Aériens']) },
-    { id: 'lashes', label: 'Cils', opts: peO(['long curled eyelashes', 'Longs recourbés'], ['thick dense dark eyelashes', 'Épais sombres'], ['sparse delicate eyelashes', 'Clairsemés'], ['voluminous sweeping eyelashes', 'Volumineux']) },
+    { id: 'eye-makeup', label: 'Maquillage des yeux', opts: peO(['winged eyeliner', 'Eyeliner winged'], ['cat eyes makeup', 'Cat eyes'], ['smudged smoky eye makeup', 'Smoky estompé']) },
+    { id: 'lashes', label: 'Cils', opts: peO(['long curled eyelashes', 'Longs recourbés'], ['thick dense dark eyelashes', 'Épais sombres'], ['sparse delicate eyelashes', 'Clairsemés'], ['voluminous sweeping eyelashes', 'Volumineux'], ['thick mascara-coated lashes with individual spikes', 'Épais au mascara, mèches en pics'], ['dramatic fluffy volumized lashes', 'Volumineux et duveteux'], ['long false lash extensions, dense and curled', 'Faux cils longs, denses et recourbés'], ['wispy spiky lashes', 'Effilés en pointes'], ['heavy clumped mascara lashes', 'Lourds de mascara, en paquets'], ['doll-like lashes with volume on upper and lower lids', 'De poupée, haut et bas']) },
     { id: 'nose', label: 'Nez', opts: peO(['button nose', 'Bouton'], ['aquiline hawk nose', 'Aquilin'], ['straight prominent Greek nose', 'Grec'], ['bulbous wide nose', 'Bulbeux'], ['small snub nose', 'Petit'], ['small nose', 'Small nose']) },
-    { id: 'lips', label: 'Lèvres', opts: peO(['full plush lips', 'Pulpées'], ['thin delicate lips', 'Fines'], ["exaggerated Cupid's-bow lips", 'Arc de Cupidon'], ['pouty protruding lips', 'Boudeuses'], ['wide generous lips', 'Larges']) },
+    { id: 'lips', label: 'Lèvres', opts: peO(['full plush lips', 'Pulpées'], ['thin delicate lips', 'Fines'], ["exaggerated Cupid's-bow lips", 'Arc de Cupidon'], ['pouty protruding lips', 'Boudeuses'], ['wide generous lips', 'Larges'], ['upturned upper lip', 'Lèvre supérieure retroussée'], ['M-shaped upper lip', 'Lèvre en forme de M'], ['pronounced philtrum', 'Philtrum prononcé']) },
     { id: 'jaw', label: 'Mâchoire', opts: peO(['sharp chiseled angular jawline', 'Ciselée'], ['soft rounded delicate jawline', 'Douce'], ['pointed prominent chin', 'Menton pointu'], ['cleft chin', 'Fourchu'], ['soft double chin', 'Double menton'], ['strong broad square jawline', 'Carrée']) },
     { id: 'expression', label: 'Expression (scène)', opts: peO(['orgasm face', 'Orgasm face'], ['ahegao face', 'Ahegao'], ['ahegao face, orgasm expression, deep pleasure', 'Ahegao + deep pleasure'], ['pleasure face', 'Pleasure face'], ['moaning expression', 'Moaning'], ['ecstatic face', 'Ecstatic'], ['eyes rolled back', 'Eyes rolled back'], ['tongue out', 'Tongue out'], ['biting lip', 'Biting lip'], ['seductive look', 'Seductive'], ['flushed cheeks', 'Flushed'], ['silly face', 'Silly face']) },
     { id: 'glasses', label: 'Lunettes', opts: peO(['wearing glasses', 'Lunettes'], ['black-rimmed glasses', 'Monture noire'], ['round glasses', 'Rondes'], ['thin metal glasses', 'Fines métal']) },
@@ -1502,7 +1529,7 @@ const PE_SECTIONS = [
     { id: 'face-art', label: 'Peinture / tatouages tribaux', ethnicOnly: true, opts: peO(['traditional face painting, thick line painting', 'Peinture faciale traditionnelle'], ['intricate Native American tribal tattoos', 'Tatouages tribaux Native American'], ['intricate tribal tattoos on arms, shoulders and lower belly', 'Tatouages bras/épaules/ventre']) }
   ] },
   { title: '5. Cheveux, tenue & scène', fields: [
-    { id: 'hair-texture', label: 'Texture / coupe', opts: peO(['straight sleek hair', 'Raides'], ['wavy textured hair', 'Ondulés'], ['curly voluminous hair', 'Bouclés'], ['long thick wavy hair with bangs', 'Longs ondulés + frange'], ['long flowing thick hair', 'Très longs'], ['ponytail', 'Queue de cheval'], ['high ponytail', 'Queue de cheval haute'], ['bangs', 'Frange'], ['side bangs', 'Frange latérale'], ['messy bun', 'Chignon décoiffé'], ['wet hair', 'Mouillés'], ['short textured pixie cut', 'Pixie']) },
+    { id: 'hair-texture', label: 'Texture / coupe', opts: peO(['straight sleek hair', 'Raides'], ['wavy textured hair', 'Ondulés'], ['curly voluminous hair', 'Bouclés'], ['long thick wavy hair with bangs', 'Longs ondulés + frange'], ['long flowing thick hair', 'Très longs'], ['ponytail', 'Queue de cheval'], ['high ponytail', 'Queue de cheval haute'], ['bangs', 'Frange'], ['side bangs', 'Frange latérale'], ['messy bun', 'Chignon décoiffé'], ['wet hair', 'Mouillés'], ['short textured pixie cut', 'Pixie'], ['long hair tied back with bangs', 'Frange + longs cheveux attachés'], ['braids', 'Tresses'], ['double ponytails', 'Double queue de cheval']) },
     { id: 'hair-color', label: 'Couleur', opts: peO(['jet-black', 'Noir jais'], ['deep dark brown', 'Brun'], ['honey blonde', 'Blond miel'], ['striking platinum blonde', 'Platine'], ['vibrant auburn red', 'Roux auburn'], ['long vibrant black hair', 'Noir vibrant'], ['silver gray', 'Gris'], ['pastel pink hue', 'Rose pastel']) },
     { id: 'outfit', label: 'Tenue (scène)', opts: peO(['completely nude', 'Complètement nue'], ['wearing white lingerie', 'Lingerie blanche'], ['wearing lingerie', 'Lingerie'], ['wearing sheer lingerie', 'Lingerie transparente'], ['wearing long victorian black dress', 'Robe victorienne noire'], ['wearing only panties', 'Seulement culotte'], ['wearing open robe', 'Peignoir ouvert'], ['wearing stockings and garter', 'Bas + porte-jarretelles'], ['wearing micro bikini', 'Micro bikini'], ['wearing ripped clothes', 'Vêtements déchirés'], ['wearing black neck choker', 'Tour de cou noir']) },
     { id: 'jewelry', label: 'Bijoux (turquoise / Navajo)', ethnicOnly: true, opts: peO(['gleaming traditional Navajo silver and turquoise squash blossom necklace and matching earrings', 'Collier Navajo argent & turquoise'], ['traditional Navajo silver and turquoise jewelry', 'Bijoux Navajo']) },
@@ -1527,7 +1554,7 @@ function peCompose(v, addSuffix) {
   const subject = art(mods.length ? mods.join(', ') + ' ' + core : core);
   const pick = (keys) => keys.map(k => v[k]).filter(Boolean);
   const hair = [v['hair-color'], v['hair-texture']].filter(Boolean).join(' ');
-  const faceKeys = ['face-shape', 'cheeks', 'eyes', 'brows', 'lashes', 'nose', 'lips', 'jaw', 'glasses', 'facial-piercing', 'face-art'];
+  const faceKeys = ['face-shape', 'cheeks', 'eyes', 'eye-makeup', 'brows', 'lashes', 'nose', 'lips', 'jaw', 'glasses', 'facial-piercing', 'face-art'];
   // description fixe : l'ordre sert aussi de priorité pour l'ancre (visage d'abord)
   // description : sujet simple puis traits en expressions séparées (plus lisible pour les moteurs)
   const plainSubject = art(core);
@@ -1539,7 +1566,7 @@ function peCompose(v, addSuffix) {
   const bodyAll = pick(['waist-shape', 'hips-shape', 'shoulders-neck', 'breasts', 'areolas', 'nipples', 'pussy', 'pussy-state']);
   if (bodyAll.length) parts.push(bodyAll.join(', '));
   if (hair) parts.push(hair);
-  const faceAll = [v['face-shape'], v.cheeks, v.eyes, v.brows, v.lashes, v.nose, v.lips, v.jaw, v.expression, v.glasses, v['facial-piercing'], v['face-art']].filter(Boolean);
+  const faceAll = [v['face-shape'], v.cheeks, v.eyes, v['eye-makeup'], v.brows, v.lashes, v.nose, v.lips, v.jaw, v.expression, v.glasses, v['facial-piercing'], v['face-art']].filter(Boolean);
   if (faceAll.length) parts.push(faceAll.join(', '));
   [v['skin-blemish'], v['skin-marks'], v.outfit, v.jewelry].filter(Boolean).forEach(x => parts.push(x));
   // « in missionary » mais pas « in on all fours » : on ne préfixe que les noms de positions
@@ -1683,19 +1710,68 @@ const MODEL_PRESETS = {
   openrouter: ['google/gemma-4-31b-it', 'google/gemma-4-31b-it:free'],
   google: ['gemma-4-31b-it', 'gemma-4-26b-a4b-it', 'gemini-2.5-flash', 'gemini-flash-latest'],
   groq: ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
-  pollinations: ['community/Saauf/grok-4.20-fast', 'x-ai/grok-4.6', 'openai']
+  pollinations: ['community/Saauf/grok-4.20-fast', 'x-ai/grok-4.6', 'openai'],
+  mistral: ['ministral-14b-2512', 'ministral-14b-latest', 'mistral-small-latest']
 };
+// Résultats de tes essais (★ = fonctionne, à garder sous la main). Modifiables : ★ et 📝 écrasent ces valeurs.
+// st : 'ok' | 'warn' (répond mais douteux) | 'bad' (ne fonctionne pas)
+const MODEL_SEED = (() => {
+  const m = {};
+  const add = (p, st, note, ids, star) => ids.forEach(id => { m[id] = { p, st, note, star: star ? 1 : 0 }; });
+  add('mistral', 'ok', 'parfait', ['ministral-14b-2512', 'ministral-14b-latest'], true);
+  add('google', 'ok', 'ok mais lent', ['gemini-flash-lite-latest', 'gemini-3.1-flash-lite-preview', 'gemini-3.1-flash-lite'], true);
+  add('google', 'warn', 'lent', ['gemma-4-26b-a4b-it']);
+  add('groq', 'warn', 'ultra rapide mais confus, réponses délirantes', ['allam-2-7b']);
+  add('openrouter', 'warn', 'rapide mais confus, tronqué', ['openrouter/free']);
+  add('google', 'bad', 'erreur 500', ['gemma-4-31b-it']);
+  add('openrouter', 'bad', 'erreur 500', ['google/gemma-4-31b-it', 'google/gemma-4-31b-it:free']);
+  add('google', 'bad', 'indisponible', ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro']);
+  add('google', 'bad', 'erreur 503', ['gemini-flash-latest', 'gemini-3-flash-preview']);
+  add('google', 'bad', 'pas de réponse', ['gemini-3.5-flash', 'gemini-3.6-flash', 'gemini-3.8-flash']);
+  add('openrouter', 'bad', 'pas de réponse', ['nvidia/nemotron-3.5-lightning:free']);
+  add('google', 'bad', '429 quota', ['gemini-omni-flash-preview', 'gemini-omni-1.1-flash', 'gemini-pro-latest', 'gemini-3.1-pro-preview']);
+  add('openrouter', 'bad', '429 quota', ['google/gemma-4-26b-a4b-it:free']);
+  add('google', 'bad', 'accès restreint', ['gemini-3.7-flash']);
+  add('openrouter', 'bad', 'accès restreint', ['nvidia/nemotron-3-ultra-550b-a55b:free']);
+  add('openrouter', 'bad', 'erreur 404', ['nvidia/nemotron-3-super-120b-a12b:free']);
+  add('openrouter', 'bad', 'erreur 502', ['nvidia/nemotron-3.5-super-vl:free']);
+  return m;
+})();
+function userModelNotes() { try { return JSON.parse(localStorage.getItem('modelNotes') || '{}') || {}; } catch (e) { return {}; } }
+function modelInfo(id) { return { ...(MODEL_SEED[id] || {}), ...(userModelNotes()[id] || {}) }; }
+function saveModelInfo(id, patch) {
+  const all = userModelNotes();
+  all[id] = { ...(all[id] || {}), ...patch };
+  localStorage.setItem('modelNotes', JSON.stringify(all));
+}
 function loadModelCatalog() { try { return JSON.parse(localStorage.getItem('modelCatalog') || '{}') || {}; } catch (e) { return {}; } }
+const modelMark = (i) => i.star ? '★' : i.st === 'bad' ? '✖' : i.st === 'warn' ? '⚠' : '';
 function populateModelPick() {
   const sel = document.getElementById('modelPick');
   if (!sel) return;
   const prov = document.getElementById('provider').value;
   const seen = new Set();
-  const items = [...(MODEL_PRESETS[prov] || []), ...((loadModelCatalog().providers || {})[prov] || [])]
+  const seeded = Object.keys({ ...MODEL_SEED, ...userModelNotes() }).filter(id => modelInfo(id).p === prov);
+  const ids = [...(MODEL_PRESETS[prov] || []), ...seeded, ...((loadModelCatalog().providers || {})[prov] || [])]
     .filter(m => typeof m === 'string' && m && !seen.has(m) && seen.add(m));
+  // ordre : favoris, neutres, douteux, non fonctionnels
+  const rank = (i) => i.star ? 0 : i.st === 'bad' ? 3 : i.st === 'warn' ? 2 : 1;
+  ids.sort((a, b) => rank(modelInfo(a)) - rank(modelInfo(b)) || a.localeCompare(b));
   sel.innerHTML = '';
-  sel.add(new Option('— choisir dans la liste (' + items.length + ') —', ''));
-  items.slice(0, 400).forEach(m => sel.add(new Option(m, m)));
+  sel.add(new Option('— choisir dans la liste (' + ids.length + ') —', ''));
+  ids.slice(0, 500).forEach(id => {
+    const i = modelInfo(id), mk = modelMark(i);
+    sel.add(new Option((mk ? mk + ' ' : '') + id + (i.note ? ' — ' + i.note : ''), id));
+  });
+  refreshModelBadges();
+}
+// ★/☆ et note du modèle actuellement saisi
+function refreshModelBadges() {
+  const id = (document.getElementById('model').value || '').trim();
+  const i = id ? modelInfo(id) : {};
+  document.getElementById('modelStar').textContent = i.star ? '★' : '☆';
+  const mk = modelMark(i);
+  document.getElementById('modelNote').textContent = id && (i.note || mk) ? (mk ? mk + ' ' : '') + (i.note || '') : '';
 }
 async function refreshModelCatalog() {
   const info = document.getElementById('modelRefresh');
@@ -1716,7 +1792,25 @@ async function refreshModelCatalog() {
 }
 (function () {
   const sel = document.getElementById('modelPick');
-  sel.addEventListener('change', () => { if (sel.value) document.getElementById('model').value = sel.value; });
+  sel.addEventListener('change', () => { if (sel.value) { document.getElementById('model').value = sel.value; refreshModelBadges(); } });
+  document.getElementById('model').addEventListener('input', refreshModelBadges);
+  document.getElementById('modelStar').addEventListener('click', () => {
+    const id = (document.getElementById('model').value || '').trim();
+    if (!id) { showMediaToast('Choisis ou tape d\'abord un modèle.'); return; }
+    const i = modelInfo(id);
+    saveModelInfo(id, { p: i.p || document.getElementById('provider').value, star: i.star ? 0 : 1, st: i.star ? i.st : (i.st === 'bad' ? 'ok' : (i.st || 'ok')) });
+    populateModelPick();
+  });
+  document.getElementById('modelNoteBtn').addEventListener('click', () => {
+    const id = (document.getElementById('model').value || '').trim();
+    if (!id) { showMediaToast('Choisis ou tape d\'abord un modèle.'); return; }
+    const i = modelInfo(id);
+    const t = window.prompt('Note pour « ' + id + ' » (vide = effacer).\nCommence par ✖ pour « ne fonctionne pas », ⚠ pour « douteux » :', i.note || '');
+    if (t === null) return;
+    const st = /^\s*✖/.test(t) ? 'bad' : /^\s*⚠/.test(t) ? 'warn' : (i.st === 'bad' || i.st === 'warn' ? 'ok' : (i.st || 'ok'));
+    saveModelInfo(id, { p: i.p || document.getElementById('provider').value, note: t.replace(/^\s*[✖⚠]\s*/, '').trim(), st });
+    populateModelPick();
+  });
   document.getElementById('provider').addEventListener('change', populateModelPick);
   document.getElementById('modelRefresh').addEventListener('click', refreshModelCatalog);
   populateModelPick();
@@ -2276,6 +2370,20 @@ document.addEventListener('keydown', (e) => {
 
 // ----- Galerie (grille de miniatures) -----
 let galleryUrls = [];
+let gallerySelMode = false;
+const gallerySel = new Set();
+function updateSelCount() {
+  const n = gallerySel.size;
+  document.getElementById('gDelSel').textContent = '🗑 Supprimer (' + n + ')';
+  document.getElementById('gDelSel').disabled = n === 0;
+}
+function setSelMode(on) {
+  gallerySelMode = on; gallerySel.clear();
+  document.getElementById('gallery').classList.toggle('selecting', on);
+  document.getElementById('gSelect').textContent = on ? '✕ Quitter la sélection' : '☑ Sélectionner';
+  updateSelCount();
+  if (!document.getElementById('gallery').classList.contains('hidden')) renderGallery();
+}
 async function renderGallery() {
   galleryUrls.forEach(u => URL.revokeObjectURL(u));
   galleryUrls = [];
@@ -2294,11 +2402,23 @@ async function renderGallery() {
     grid.innerHTML = '<div id="gEmpty" style="grid-column:1/-1;">Aucune image pour le moment. Elles sont enregistrées ici automatiquement à chaque génération.</div>';
     return items;
   }
+  // une sélection ne garde que des images qui existent encore
+  [...gallerySel].forEach(id => { if (!items.some(x => x.id === id)) gallerySel.delete(id); });
+  updateSelCount();
   items.forEach((it, i) => {
+    const cell = document.createElement('div');
+    cell.className = 'g-cell' + (gallerySel.has(it.id) ? ' selected' : '');
     const img = document.createElement('img');
     img.src = it.src; img.loading = 'lazy'; img.alt = it.caption;
-    img.onclick = () => openLightbox(items, i, true);
-    grid.appendChild(img);
+    const chk = document.createElement('span'); chk.className = 'g-check'; chk.textContent = '✓';
+    cell.append(img, chk);
+    cell.onclick = () => {
+      if (!gallerySelMode) return openLightbox(items, i, true);
+      if (gallerySel.has(it.id)) gallerySel.delete(it.id); else gallerySel.add(it.id);
+      cell.classList.toggle('selected', gallerySel.has(it.id));
+      updateSelCount();
+    };
+    grid.appendChild(cell);
   });
   return items;
 }
@@ -2308,6 +2428,9 @@ async function openGallery() {
 }
 function closeGallery() {
   closeLightbox();
+  gallerySelMode = false; gallerySel.clear();
+  document.getElementById('gallery').classList.remove('selecting');
+  document.getElementById('gSelect').textContent = '☑ Sélectionner';
   document.getElementById('gallery').classList.add('hidden');
   galleryUrls.forEach(u => URL.revokeObjectURL(u));
   galleryUrls = [];
@@ -2315,6 +2438,21 @@ function closeGallery() {
 }
 document.getElementById('galleryBtn').onclick = openGallery;
 document.getElementById('gClose').onclick = closeGallery;
+document.getElementById('gSelect').onclick = () => setSelMode(!gallerySelMode);
+document.getElementById('gSelAll').onclick = async () => {
+  const rows = await galleryList(document.getElementById('gAll').checked);
+  rows.forEach(r => gallerySel.add(r.id));
+  await renderGallery();
+};
+document.getElementById('gSelNone').onclick = () => { gallerySel.clear(); renderGallery(); };
+document.getElementById('gDelSel').onclick = async () => {
+  const n = gallerySel.size;
+  if (!n || !confirm('Supprimer ces ' + n + ' image(s) de la galerie ?')) return;
+  for (const id of [...gallerySel]) { try { await galleryDelete(id); } catch (e) { console.warn('Suppression :', e); } }
+  gallerySel.clear();
+  await renderGallery();
+  showMediaToast('🗑 ' + n + ' image(s) supprimée(s)');
+};
 document.getElementById('gAll').onchange = () => renderGallery();
 document.getElementById('gClear').onclick = async () => {
   const all = document.getElementById('gAll').checked;
@@ -2398,7 +2536,7 @@ async function generatePerchanceViaDaemon(botText) {
   appendMsgEl(card, epoch);
   label.textContent = '🎨 Perchance : travail envoyé au générateur permanent…';
 
-  const prompt = buildPerchancePrompt(botText, 900);
+  const prompt = buildPerchancePrompt(botText, 1300);
   console.log('[Perchance permanent] prompt :', prompt);
   const token = perchanceToken();
   const id = hex24();
@@ -2536,7 +2674,7 @@ async function generateNSFWImage(botText, popup) {
     return;
   }
 
-  const prompt = buildPerchancePrompt(botText, 900);
+  const prompt = buildPerchancePrompt(botText, 1300);
   console.log('[Perchance] prompt :', prompt);
   const baseOpts = {
     resolution: '768x512',
@@ -2727,8 +2865,21 @@ const sceneCache = new Map();
 // de tokens à réfléchir : avec 150 tokens, la réponse arrive VIDE et le prompt d'image retombe sur
 // le texte brut du message. Pour les appels auxiliaires, on prévoit donc de la marge.
 const REASONING_RE = /gpt-oss|grok|deepseek-r|\br1\b|qwen3|qwq|reason|think|\bo[134]\b|gemma-4/i;
-const helperTokens = (base) => REASONING_RE.test(model || '') ? Math.min(base * 4, 2400) : base;
-const SCENE_SYSTEM_PROMPT = "You write prompts for an image generator. Read the roleplay exchange and describe only what is visually happening right now: pose and body positions, the physical action, camera angle, facial expression, clothing state and setting. Write it in English as one line of concise comma-separated visual phrases, 45 words maximum. Do not describe the character's fixed appearance (hair, eyes, body type). No dialogue, no names, no explanations, no quotation marks.";
+// Modèle et fournisseur du résumé de scène : ceux choisis dans les réglages, sinon ceux du chat
+function helperTarget() {
+  const hp = localStorage.getItem('helperProvider') || '', hm = (localStorage.getItem('helperModel') || '').trim();
+  return (hp && hm) ? { provider: hp, model: hm } : { provider, model };
+}
+const helperTokens = (base, mdl) => REASONING_RE.test(mdl || model || '') ? Math.min(base * 4, 2400) : base;
+(function () {
+  const sel = document.getElementById('helperProvider'), inp = document.getElementById('helperModel');
+  sel.innerHTML = '<option value="">Même que le chat</option>' + document.getElementById('provider').innerHTML;
+  sel.value = localStorage.getItem('helperProvider') || '';
+  inp.value = localStorage.getItem('helperModel') || '';
+  sel.addEventListener('change', () => localStorage.setItem('helperProvider', sel.value));
+  inp.addEventListener('input', () => localStorage.setItem('helperModel', inp.value.trim()));
+})();
+const SCENE_SYSTEM_PROMPT = "You write prompts for an image generator. Read the roleplay exchange and describe only what is visually happening right now. Output ONE line of comma-separated English visual phrases, 40 words maximum, in this order: (1) what the characters are physically doing, their poses and body positions, hands, gaze and held objects; (2) facial expressions; (3) clothing state; (4) camera angle; (5) the setting LAST, in 6 words at most. Be concrete. Do not describe the character's fixed appearance (hair, eyes, body type). No dialogue, no names, no explanations, no quotation marks, no dashes. Example: standing close to a man, one hand resting on a knife hilt, smirking with one eyebrow raised, long coat pulled open, low angle shot, rainy cobblestone street";
 
 function cleanSceneText(raw) {
   let s = String(raw || '');
@@ -2741,7 +2892,7 @@ function cleanSceneText(raw) {
   s = s.replace(/^(scene|description|prompt|visual|image prompt)\s*[:\-–]\s*/i, '');
   s = s.replace(/["“”«»*`#]/g, '').replace(/\s+/g, ' ').trim();
   if (/^(i['’]?m sorry|i am sorry|i can(not|['’]?t)|sorry|je ne peux|désolé)/i.test(s)) return '';
-  return s.slice(0, 300);
+  return s.replace(/[\s,;:—–-]+$/, '').slice(0, 700);
 }
 
 async function prepareScene(botText, userText) {
@@ -2754,19 +2905,20 @@ async function prepareScene(botText, userText) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20000);
     try {
-      const res = await fetch(WORKER_BASE + provider, {
+      const tgt = helperTarget();
+      const res = await fetch(WORKER_BASE + tgt.provider, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
         signal: controller.signal,
         body: JSON.stringify({
-          model,
+          model: tgt.model,
           messages: [
             { role: 'system', content: SCENE_SYSTEM_PROMPT },
             { role: 'user', content: context + 'Character message:\n' + botText.slice(0, 1500) }
           ],
           stream: false,
           temperature: 0.3,
-          max_tokens: helperTokens(150) * attempt,
+          max_tokens: helperTokens(150, tgt.model) * attempt,
           __helper: true
         })
       });
@@ -2774,7 +2926,7 @@ async function prepareScene(botText, userText) {
       const data = await res.json();
       const rawScene = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
       const scene = cleanSceneText(rawScene);
-      console.log('[Scène] essai ' + attempt + ' — brut :', rawScene, '→', scene || '(vide)', '— fin :', data && data.choices && data.choices[0] && data.choices[0].finish_reason);
+      console.log('[Scène] essai ' + attempt + ' — modèle ' + tgt.provider + '/' + tgt.model + ' — brut :', rawScene, '→', scene || '(vide)', '— fin :', data && data.choices && data.choices[0] && data.choices[0].finish_reason);
       if (scene) {
         sceneCache.set(botText, scene);
         if (sceneCache.size > 30) sceneCache.delete(sceneCache.keys().next().value);
@@ -2878,7 +3030,7 @@ function buildImagePrompt(botText, maxLen) {
 // ========== PROMPTS ADAPTÉS À CHAQUE MOTEUR ==========
 // Tes constantes de style (valeurs d'origine, simplement remontées ici pour que tous les moteurs
 // puissent s'en servir) :
-const PERCHANCE_TAGS = 'detailed anatomy, cinematic lighting';
+const PERCHANCE_TAGS = 'futanari, huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting';
 const PERCHANCE_PREFIX = 'A casual real-life photograph, ';
 const PERCHANCE_SUFFIX = ". (((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. It's a casual photo. Overall it's an actual real-life photograph";
 
@@ -2887,9 +3039,18 @@ const PERCHANCE_SUFFIX = ". (((actual, actual photo))) 2020s Western-style porn 
 function toPhrases(str) {
   return String(str || '')
     .replace(/\.\s*(?=[,;])/g, '')
-    .split(/[,;]|\.\s+(?=[A-Z(])/)
+    .split(/[,;—–]|\s-\s|\.\s+(?=[A-Z(])/)
     .map(x => x.replace(/^[\s.]+|[\s.]+$/g, ''))
     .filter(Boolean);
+}
+// Les expressions de décor (pavés, lanterne, ciel…) passent après celles qui décrivent l'action et
+// les poses : quand la place manque, c'est le décor qui saute en premier, jamais l'action.
+const SETTING_RE = /\b(cobblestones?|street|alley|courtyard|village|town|city|tavern|inn|room|bedroom|kitchen|forest|woods|field|beach|sky|clouds?|rain|fog|mist|snow|night|dusk|dawn|sunset|lantern|torch|candles?|moonlight|sunlight|lights?|lighting|shadows?|wall|floor|ceiling|window|door|building|rooftops?|background|setting|atmosphere|ambience|weather|medieval|gritty|dusty|overcast|damp|glistening|slick)\b/i;
+const BODY_RE = /\b(hands?|arms?|legs?|knees?|face|eyes?|gaze|smirk\w*|smil\w*|grip\w*|hold\w*|lean\w*|stand\w*|kneel\w*|sit\w*|lying|body|hips?|chest|breasts?|mouth|lips?|pose|posture|crossed|bent|boots?|coat|shirt|dress)\b/i;
+function prioritizePhrases(list) {
+  const act = [], set = [];
+  list.forEach(p => (SETTING_RE.test(p) && !BODY_RE.test(p) ? set : act).push(p));
+  return [...act, ...set];
 }
 function dedupePhrases(list) {
   const seen = new Set();
@@ -2919,7 +3080,7 @@ function promptParts(botText) {
   return {
     shot,
     subject: dedupePhrases(toPhrases(charAnchor || physDescForImage() || '')),
-    actionList: dedupePhrases([...toPhrases(action), ...toPhrases([sh.outfit, sh.location].filter(Boolean).join(', '))])
+    actionList: dedupePhrases([...prioritizePhrases(dedupePhrases(toPhrases(action))), ...toPhrases([sh.outfit, sh.location].filter(Boolean).join(', '))])
   };
 }
 
@@ -2980,22 +3141,25 @@ function compactSuffix(sfx) {
 function buildPerchancePrompt(botText, maxLen, compact) {
   if (rawPromptOverride) return rawPromptOverride;
   const shot = shotPhrase();
-  const action = dedupePhrases(toPhrases(shot ? stripFraming(extractAction(botText)) : extractAction(botText))).join(', ').slice(0, 300);
+  // action d'abord, décor ensuite ; aucune expression n'est coupée en son milieu
+  const actionAll = prioritizePhrases(dedupePhrases(toPhrases(shot ? stripFraming(extractAction(botText)) : extractAction(botText))));
   const tags = PERCHANCE_TAGS;
   const prefix = PERCHANCE_PREFIX;
   const suffixFull = PERCHANCE_SUFFIX;
   const suffix = compact ? compactSuffix(suffixFull) : suffixFull;
-  // La scène du moment est prioritaire : si le budget manque, c'est la description du
-  // personnage qu'on raccourcit, jamais la scène ni les tags de style.
-  const budget = Math.max((maxLen || 900) - prefix.length - suffix.length - tags.length - 2 - (shot ? shot.length + 2 : 0), 0);
-  // Avec une ancre visuelle, c'est elle qu'on garde entière (elle fait le visage) et la scène
-  // qui cède en premier ; sans ancre, comportement d'origine.
-  let descPart, actionPart = action;
+  const budget = Math.max((maxLen || 1300) - prefix.length - suffix.length - tags.length - 2 - (shot ? shot.length + 2 : 0), 0);
+  // Avec une ancre visuelle, c'est elle qu'on garde entière (elle fait le visage) ; sinon la
+  // description reçoit au moins 30 % de la place (avant : l'action pouvait tout prendre, et la
+  // description se réduisait à ses deux premiers mots).
+  let descPart, actionPart;
   if (charAnchor) {
     descPart = charAnchor.slice(0, 260);
-    actionPart = fitText(action, Math.max(budget - descPart.length - 2, 80));
+    actionPart = fitPhrases(actionAll, Math.max(budget - descPart.length - 2, 120)).join(', ');
   } else {
-    descPart = fitText(physDescForImage(), Math.max(budget - action.length - 2, 0));
+    const d0 = physDescForImage() || '';
+    const descBudget = Math.min(d0.length, Math.floor(budget * 0.3));
+    actionPart = fitPhrases(actionAll, Math.max(budget - descBudget - 2, 120)).join(', ');
+    descPart = fitText(d0, Math.max(budget - actionPart.length - 2, 0));
   }
   const variable = [shot, descPart, actionPart].filter(Boolean).join(', ');
   return prefix + (variable ? variable + ', ' : '') + tags + suffix;
