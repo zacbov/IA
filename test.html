@@ -1569,7 +1569,7 @@ function peCompose(v, addSuffix) {
   const plainSubject = art(core);
   const persona = [plainSubject, ...mods, hair, ...pick(faceKeys), ...pick(['skin-blemish', 'skin-marks']), ...pick(['waist-shape', 'hips-shape', 'shoulders-neck']), ...pick(['breasts', 'areolas', 'nipples', 'pussy']), ...pick(['jewelry'])].filter(Boolean);
   const desc = persona.join(', ');
-  const anchor = fitPhrases(dedupePhrases(toPhrases(desc)), 250).join(', ');
+  const anchor = fitPhrases(dedupePhrases(toPhrases(desc)), 500).join(', ');
   // prompt complet : même assemblage que ton générateur
   const parts = [subject];
   const bodyAll = pick(['waist-shape', 'hips-shape', 'shoulders-neck', 'breasts', 'areolas', 'nipples', 'pussy', 'pussy-state']);
@@ -3272,7 +3272,7 @@ function buildPerchancePrompt(botText, maxLen, compact) {
   // description se réduisait à ses deux premiers mots).
   let descPart, actionPart;
   if (charAnchor) {
-    descPart = charAnchor.slice(0, 260);
+    descPart = charAnchor.slice(0, 500);
     actionPart = fitPhrases(actionAll, Math.max(budget - descPart.length - 2, 120)).join(', ');
   } else {
     const d0 = physDescForImage() || '';
