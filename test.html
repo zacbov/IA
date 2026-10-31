@@ -270,9 +270,18 @@
           <input type="checkbox" id="perchancePersistent" style="width:auto;"> Mode permanent : 2 images, sans popup à chaque message
         </label>
         <button type="button" id="perchanceOpenDaemon" style="font-size:11px; padding:5px 10px; width:auto; margin-top:4px;">🪟 Ouvrir le générateur permanent</button>
-        <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:6px; cursor:pointer;">
-          <input type="checkbox" id="perchanceMobile" style="width:auto;"> Perchance aussi sur téléphone (la fenêtre doit rester au premier plan)
-        </label>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+          <label style="font-size:11px; color:#aaa;">Format</label>
+          <select id="imgFormat" style="font-size:11px; padding:5px 6px;">
+            <option value="landscape">Paysage 768×512</option>
+            <option value="portrait">Portrait 512×768</option>
+            <option value="square">Carré 512×512</option>
+            <option value="auto">Auto (portrait selon le cadrage)</option>
+          </select>
+          <label style="font-size:11px; color:#aaa;">Images / message</label>
+          <select id="perchanceN" style="font-size:11px; padding:5px 6px;"><option value="">Auto</option><option value="1">1</option><option value="2">2</option></select>
+        </div>
+        <div style="font-size:10px; color:#778; margin-top:3px;">Le format s'applique à Perchance, Pollination et au Space. Sur téléphone, un bouton « Générer » ouvre l'onglet Perchance (reste dessus jusqu'à la fin : il rend la main tout seul quand l'image est livrée).</div>
       </div>
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; text-transform:none; letter-spacing:normal; cursor:pointer;">
         <input type="checkbox" id="genHFSpace" style="width:auto;"> Space Hugging Face
@@ -2462,7 +2471,16 @@ document.getElementById('gClear').onclick = async () => {
 };
 
 // ========== PERCHANCE PERMANENT : un onglet générateur reste ouvert et traite une file de travaux ==========
-const PERCHANCE_VARIANTS = 2; // images par message
+// Format des images (Perchance, Pollination, Space) : paysage, portrait, carré ou auto selon le cadrage
+function imageSize() {
+  let f = localStorage.getItem('imgFormat') || 'landscape';
+  if (f === 'auto') f = ['closeup', 'portrait', 'medium', 'cowboy', 'full', 'behind'].includes(localStorage.getItem('shotPreset') || '') ? 'portrait' : 'landscape';
+  return f === 'portrait' ? { w: 512, h: 768 } : f === 'square' ? { w: 512, h: 512 } : { w: 768, h: 512 };
+}
+function perchanceCount() {
+  const n = parseInt(localStorage.getItem('perchanceN') || '', 10);
+  return (n === 1 || n === 2) ? n : (isMobile() ? 1 : 2);
+}
 const hex24 = () => Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2, '0')).join('');
 function perchanceToken() {
   let t = localStorage.getItem('perchanceToken') || '';
@@ -2477,11 +2495,10 @@ function isMobile() {
       || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
   } catch (e) { return false; }
 }
-function perchanceUsable() {
-  return genPerchance && (!isMobile() || localStorage.getItem('perchanceMobile') === '1');
-}
+function perchanceUsable() { return genPerchance; }
 function perchancePersistentOn() {
-  return localStorage.getItem('perchancePersistent') === '1' && perchanceGenName() !== 'perchance-ai-api';
+  // jamais de fenêtre permanente sur téléphone : le navigateur la mettrait en pause
+  return !isMobile() && localStorage.getItem('perchancePersistent') === '1' && perchanceGenName() !== 'perchance-ai-api';
 }
 let daemonAlive = null;      // dernier état connu du générateur permanent (null = inconnu)
 let daemonOpenedAt = 0;
@@ -2516,9 +2533,11 @@ setTimeout(refreshDaemonState, 3000);
   cb.checked = localStorage.getItem('perchancePersistent') === '1';
   cb.addEventListener('change', () => localStorage.setItem('perchancePersistent', cb.checked ? '1' : '0'));
   document.getElementById('perchanceOpenDaemon').addEventListener('click', () => openPerchanceDaemon(true));
-  const mob = document.getElementById('perchanceMobile');
-  mob.checked = localStorage.getItem('perchanceMobile') === '1';
-  mob.addEventListener('change', () => localStorage.setItem('perchanceMobile', mob.checked ? '1' : '0'));
+  ['imgFormat', 'perchanceN'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = localStorage.getItem(id) || (id === 'imgFormat' ? 'landscape' : '');
+    el.addEventListener('change', () => localStorage.setItem(id, el.value));
+  });
 })();
 
 async function generatePerchanceViaDaemon(botText) {
@@ -2540,7 +2559,7 @@ async function generatePerchanceViaDaemon(botText) {
   console.log('[Perchance permanent] prompt :', prompt);
   const token = perchanceToken();
   const id = hex24();
-  const N = PERCHANCE_VARIANTS;
+  const N = perchanceCount();
   const ids = Array.from({ length: N }, (_, i) => id + String.fromCharCode(97 + i)); // …a, …b
   const headers = { 'Content-Type': 'application/json', 'X-App-Secret': password };
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -2550,7 +2569,7 @@ async function generatePerchanceViaDaemon(botText) {
       method: 'POST', headers,
       body: JSON.stringify({
         token, id, prompt, count: N, seed: charSeedValue() ?? Math.floor(Math.random() * 1e9),
-        resolution: '768x512', guidanceScale: 7, replace: true, // le dernier message prime
+        resolution: imageSize().w + 'x' + imageSize().h, guidanceScale: 7, replace: true, // le dernier message prime
         negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark'
       })
     });
@@ -2618,6 +2637,66 @@ async function generatePerchanceViaDaemon(botText) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+// Téléphone : un navigateur mobile suspend l'onglet qui n'est pas au premier plan. Le chat ne peut donc
+// ni ouvrir l'onglet Perchance « en arrière-plan », ni le piloter. On prépare le prompt, puis un BOUTON
+// (geste de l'utilisateur) ouvre l'onglet Perchance au premier plan : la génération y tourne à pleine
+// vitesse. L'onglet ne se ferme qu'une fois l'image LIVRÉE au chat (réponse du Worker) et rend alors
+// la main tout seul ; le chat reprend son attente et affiche l'image.
+async function generatePerchanceMobile(botText) {
+  const epoch = convEpoch, profile = profileName;
+  const prompt = buildPerchancePrompt(botText, 1300);
+  console.log('[Perchance mobile] prompt :', prompt);
+  const id = hex24(), token = perchanceToken();
+  const sz = imageSize();
+  const params = new URLSearchParams({
+    prompt, format: 'html', id, resolution: sz.w + 'x' + sz.h, guidanceScale: '7',
+    negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark',
+    relay: WORKER_BASE, token, autoclose: '1', return: location.origin + location.pathname,
+    ...(charSeedValue() !== null ? { seed: String(charSeedValue()) } : {})
+  });
+  const url = 'https://perchance.org/' + perchanceGenName() + '?' + params.toString();
+  const card = document.createElement('div');
+  card.className = 'msg image-loading';
+  const label = document.createElement('span');
+  label.textContent = '🎨 Image prête : appuie sur le bouton pour la générer avec Perchance.';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = '▶ Générer avec Perchance';
+  btn.style.cssText = 'display:block; margin-top:8px; padding:10px 16px; border-radius:10px; border:none; background:#e0a34a; color:#1a1208; font-weight:700; font-size:14px; cursor:pointer;';
+  card.append(label, btn);
+  appendMsgEl(card, epoch);
+
+  let started = false;
+  const waitForImage = async () => {
+    const headers = { 'X-App-Secret': password };
+    const deadline = Date.now() + 600000; // l'attente reprend d'elle-même au retour sur le chat
+    while (Date.now() < deadline && epoch === convEpoch) {
+      const t = Date.now();
+      try {
+        const r = await fetch(WORKER_BASE + 'relay-get?id=' + id + '&token=' + token + '&wait=20', { headers });
+        if (r.ok) {
+          const d = await r.json();
+          if (d && d.url) {
+            card.remove();
+            showGeneratedImage({ url: d.url, source: 'Perchance', prompt, epoch, profile });
+            return;
+          }
+        }
+      } catch (e) {}
+      if (Date.now() - t < 1500) await new Promise(r => setTimeout(r, 2000));
+    }
+    if (epoch === convEpoch) label.textContent = '⏳ Pas d\'image reçue. Appuie de nouveau sur le bouton pour relancer.';
+    started = false; btn.disabled = false;
+  };
+  btn.onclick = () => {
+    const w = window.open(url, '_blank'); // ouvert au premier plan, directement par ce clic
+    if (!w) { label.textContent = '⚠️ Onglet bloqué par le navigateur : autorise les fenêtres pop-up pour ce site, puis réessaie.'; return; }
+    label.textContent = '⏳ Génération dans l\'onglet Perchance — reste dessus : il te ramène ici quand l\'image est prête.';
+    btn.textContent = '↻ Rouvrir Perchance'; 
+    if (!started) { started = true; waitForImage(); }
+  };
+}
+
 // ----- Cadrage des images -----
 const SHOT_PHRASES = {
   closeup:  'extreme close-up shot, face filling the frame',
@@ -2661,6 +2740,11 @@ function perchanceGenName() {
 }
 
 async function generateNSFWImage(botText, popup) {
+  if (isMobile()) {
+    if (perchanceGenName() !== 'perchance-ai-api') return generatePerchanceMobile(botText);
+    showMediaToast('📱 Sur téléphone, Perchance a besoin de ton propre générateur (réglages d\'images).');
+    return;
+  }
   const epoch = convEpoch, profile = profileName;
   if (perchancePersistentOn()) return generatePerchanceViaDaemon(botText);
   const loadingDiv = document.createElement('div');
@@ -2677,7 +2761,7 @@ async function generateNSFWImage(botText, popup) {
   const prompt = buildPerchancePrompt(botText, 1300);
   console.log('[Perchance] prompt :', prompt);
   const baseOpts = {
-    resolution: '768x512',
+    resolution: imageSize().w + 'x' + imageSize().h,
     guidanceScale: 7,
     negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark',
     ...(charSeedValue() !== null ? { seed: String(charSeedValue()) } : {})
@@ -2879,7 +2963,7 @@ const helperTokens = (base, mdl) => REASONING_RE.test(mdl || model || '') ? Math
   sel.addEventListener('change', () => localStorage.setItem('helperProvider', sel.value));
   inp.addEventListener('input', () => localStorage.setItem('helperModel', inp.value.trim()));
 })();
-const SCENE_SYSTEM_PROMPT = "You write prompts for an image generator. Read the roleplay exchange and describe only what is visually happening right now. Output ONE line of comma-separated English visual phrases, 40 words maximum, in this order: (1) what the characters are physically doing, their poses and body positions, hands, gaze and held objects; (2) facial expressions; (3) clothing state; (4) camera angle; (5) the setting LAST, in 6 words at most. Be concrete. Do not describe the character's fixed appearance (hair, eyes, body type). No dialogue, no names, no explanations, no quotation marks, no dashes. Example: standing close to a man, one hand resting on a knife hilt, smirking with one eyebrow raised, long coat pulled open, low angle shot, rainy cobblestone street";
+const SCENE_SYSTEM_PROMPT = "You write prompts for an image generator. The roleplay is between a man (the user, who narrates his own actions) and a woman (the character played by the AI). Read both messages and describe only what is visually happening right now, showing BOTH people together: his position and what he does (his hands, where he stands or sits relative to her) from his message, and hers from her message. Call them 'a man' and 'a woman'. Output ONE line of comma-separated English visual phrases, 55 words maximum, in this order: (1) the physical interaction between them, both poses, hands, gaze and held objects; (2) facial expressions; (3) clothing state; (4) camera angle; (5) the setting LAST, in 6 words at most. Be concrete. Do not describe fixed appearance (hair, eyes, body type). No dialogue, no names, no explanations, no quotation marks, no dashes. Example: a man leaning over a woman, one hand resting on the wall beside her head, she looking up at him with a smirk, long coat pulled open, low angle shot, rainy cobblestone street";
 
 function cleanSceneText(raw) {
   let s = String(raw || '');
@@ -2895,10 +2979,20 @@ function cleanSceneText(raw) {
   return s.replace(/[\s,;:—–-]+$/, '').slice(0, 700);
 }
 
-async function prepareScene(botText, userText) {
+// Une seule exécution par message : le résumé démarre dès la fin de la réponse, en parallèle de
+// l'analyse (suggestions + fiche), et le lancement des moteurs réutilise cette même exécution.
+const scenePending = new Map();
+function prepareScene(botText, userText) {
+  if (sceneCache.has(botText)) return Promise.resolve();
+  if (scenePending.has(botText)) return scenePending.get(botText);
+  const pr = prepareSceneRun(botText, userText).finally(() => scenePending.delete(botText));
+  scenePending.set(botText, pr);
+  return pr;
+}
+async function prepareSceneRun(botText, userText) {
   if (sceneCache.has(botText)) return;
   const context = (userText && userText !== '__init__')
-    ? 'Previous message from the user: ' + userText.slice(0, 300) + '\n\n'
+    ? 'Message from the man (the user):\n' + userText.slice(0, 1200) + '\n\n'
     : '';
   // Deux essais : si la réponse est vide (budget épuisé par le raisonnement), on double la marge.
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -2914,11 +3008,11 @@ async function prepareScene(botText, userText) {
           model: tgt.model,
           messages: [
             { role: 'system', content: SCENE_SYSTEM_PROMPT },
-            { role: 'user', content: context + 'Character message:\n' + botText.slice(0, 1500) }
+            { role: 'user', content: context + 'Message from the woman (the character):\n' + botText.slice(0, 1500) }
           ],
           stream: false,
           temperature: 0.3,
-          max_tokens: helperTokens(150, tgt.model) * attempt,
+          max_tokens: helperTokens(200, tgt.model) * attempt,
           __helper: true
         })
       });
@@ -3030,8 +3124,8 @@ function buildImagePrompt(botText, maxLen) {
 // ========== PROMPTS ADAPTÉS À CHAQUE MOTEUR ==========
 // Tes constantes de style (valeurs d'origine, simplement remontées ici pour que tous les moteurs
 // puissent s'en servir) :
-const PERCHANCE_TAGS = 'detailed anatomy, cinematic lighting';
-const PERCHANCE_PREFIX = 'A casual real-life photography, ';
+const PERCHANCE_TAGS = 'futanari, huge breasts, thick veiny cock, wet, detailed anatomy, cinematic lighting';
+const PERCHANCE_PREFIX = 'A casual real-life photograph, ';
 const PERCHANCE_SUFFIX = ". (((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. It's a casual photo. Overall it's an actual real-life photograph";
 
 // Découpe un texte en expressions courtes, retire la ponctuation parasite (« exertion., futanari »)
@@ -3175,9 +3269,6 @@ function safeTrigger(fn) {
 // tous les générateurs cochés. Appelée sans await : elle ne retarde pas le bouton Envoyer.
 async function launchImageGenerators(text, userText, popup, closePopup, rawPrompt) {
   if (rawPrompt) rawPromptOverride = rawPrompt;
-  if (genPerchance && !perchanceUsable() && !(genHFSpace || genPollination || genAIHorde)) {
-    showMediaToast('📱 Perchance est désactivé sur téléphone. Active Pollination ou Horde, ou coche « Perchance aussi sur téléphone » dans les réglages.');
-  }
   if (!(perchanceUsable() || genHFSpace || genPollination || genAIHorde)) {
     rawPromptOverride = '';
     closePopup();
@@ -3296,7 +3387,7 @@ async function generateHFSpaceImage(botText) {
     // de negative prompt et préfère une description naturelle plutôt qu'un pavé de texte.
     const prompt = buildProsePrompt(botText, 600); // Z-Image Turbo : langage naturel
 
-    const finalData = await callHFSpace([prompt, 768, 512, 10, 0, true, 1]);
+    const finalData = await callHFSpace([prompt, imageSize().w, imageSize().h, 10, 0, true, 1]);
     console.log('[Space HF] prompt :', prompt, '— réponse :', finalData);
     const imageUrl = extractHFImageUrl(finalData);
 
@@ -3354,8 +3445,8 @@ async function generatePollinationImage(botText) {
   if (refImage) console.log('[Pollination] image de référence :', refImage);
   console.log('[Pollination] modèle :', model, '— prompt :', prompt);
   const opts = {
-    width: 768,
-    height: 512,
+    width: imageSize().w,
+    height: imageSize().h,
     guidance_scale: 7,
     negative_prompt: 'blurry, low quality, deformed, bad anatomy, text, watermark'
   };
@@ -3816,7 +3907,8 @@ async function sendToWorker(userText, userTs) {
   if (perchanceUsable() && perchancePersistentOn() && daemonAlive === false && Date.now() - daemonOpenedAt > 30000) {
     openPerchanceDaemon();
   }
-  const imagePopup = (perchanceUsable() && !perchancePersistentOn()) ? window.open('about:blank', '_blank') : null;
+  // (pas d'onglet vide ouvert d'avance sur téléphone : il resterait au premier plan et mettrait le chat en pause)
+  const imagePopup = (perchanceUsable() && !perchancePersistentOn() && !isMobile()) ? window.open('about:blank', '_blank') : null;
   function closeUnusedPopup() {
     if (imagePopup && !imagePopup.closed) { try { imagePopup.close(); } catch (e) {} }
   }
@@ -3960,9 +4052,10 @@ async function sendToWorker(userText, userTs) {
     speaker.end(finalText);
     const analysis = analyzeReply(botDiv); // suggestions + fiche de scène, sans bloquer l'interface
     if (finalText.length > 20) {
+      if (genPerchance || genHFSpace || genPollination || genAIHorde) prepareScene(finalText, userText); // en parallèle de l'analyse
       (async () => {
-        // les images attendent la fiche de scène (7 s au plus) pour en profiter
-        if (sceneOn()) await Promise.race([analysis, new Promise(r => setTimeout(r, 7000))]);
+        // les images attendent la fiche de scène (4 s au plus) pour en profiter
+        if (sceneOn()) await Promise.race([analysis, new Promise(r => setTimeout(r, 4000))]);
         launchImageGenerators(finalText, userText, imagePopup, closeUnusedPopup);
       })();
     } else {
