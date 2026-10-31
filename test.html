@@ -2963,30 +2963,33 @@ const helperTokens = (base, mdl) => REASONING_RE.test(mdl || model || '') ? Math
   sel.addEventListener('change', () => localStorage.setItem('helperProvider', sel.value));
   inp.addEventListener('input', () => localStorage.setItem('helperModel', inp.value.trim()));
 })();
-const SCENE_SYSTEM_PROMPT = `You write prompts for an image generator. The roleplay is between a man (the user, who narrates his own actions) and a woman (the character played by the AI).
+const SCENE_SYSTEM_PROMPT = `You write the ACTION line of an image prompt for a photorealistic generator.
 
-Read BOTH messages. Describe only what is visually happening RIGHT NOW, with BOTH people in the frame. Call them "a man" and "a woman".
+Roleplay: a man (user message) and a woman (character message). Show BOTH in frame. Call them "a man" and "a woman".
 
-Output ONE line of comma-separated English visual phrases, 55 words maximum, in this exact order:
-(1) physical interaction: both full-body poses, who is inside or touching whom, hands, hips, legs, gaze, held objects — poses must be anatomically consistent (do not combine incompatible positions);
-(2) facial expressions of both;
-(3) clothing state;
-(4) camera angle;
-(5) setting LAST, in 6 words at most.
+Output ONE line only: comma-separated English visual phrases, max 50 words, in this order:
+(1) exact position — who is on top / on the bottom / behind / in front, body orientation (lying on back, on all fours, kneeling, sitting), and the sexual act in plain visual words;
+(2) hands of both people and what they touch;
+(3) both facial expressions / gaze;
+(4) clothing: write "fully nude" for any sex, oral, genital touch, or masturbation unless a message names a garment still worn;
+(5) setting in 5 words max.
 
-Clothing rules (strict):
-- If they are having sex, oral sex, or any penetration/touch of genitals: both are fully nude unless a message clearly says a specific garment is still on (then name only that garment, e.g. "skirt hiked up", "shirt pushed up").
-- Never invent clothes. Never write "disheveled clothing", "casual clothes", "underwear" unless the messages say so.
-- Partial undress only when the messages describe it.
+Pose rules (critical — never mix positions):
+- Missionary: "she lying on her back on the bed, he on top between her spread legs thrusting into her" — do NOT write "her legs around his waist" alone (that reads as cowgirl).
+- Cowgirl: "she straddling him on top, sinking down onto him".
+- Doggy / from behind: "she on all fours on the bed, he kneeling behind her thrusting into her from behind".
+- Anal: same as doggy plus "anal penetration from behind".
+- Woman masturbating: "she sitting or lying with legs spread, her fingers rubbing her clitoris, genitals visible".
+- Man watching: "he sitting nearby watching her".
+- Cum on face: "he standing over her, ejaculating onto her face/nose, she looking up toward him".
 
-Action rules (strict):
-- Attribute each action to the correct person: his hands/hips/thrust from HIS message; her back/legs/mouth from HERS.
-- One clear sexual position only (e.g. missionary, her on top, doggy, oral). Do not mix two positions in the same line.
-- Be concrete and visual. No dialogue, no names, no explanations, no quotation marks, no dashes.
-- Do not describe fixed appearance (hair color, eye color, body type, breast size).
+Visibility rules:
+- Name the visible contact: thrusting into her, fingers on her clitoris, penis entering her, semen on her face.
+- Prefer side view or three-quarter view wording when it clarifies who is on top (e.g. "seen from the side").
+- No hair color, body type, eye color, names, dialogue, quotes, dashes.
+- One position only.`;
 
-Example (sex): a man between a woman's spread legs thrusting into her, her legs locked around his waist, his hands gripping her hips, both faces flushed and mouths open, fully nude, close-up from above, dim bedroom sheets
-Example (clothed): a man pinning a woman to a wall one hand beside her head, she gripping his jacket, both fully clothed coats on, low angle shot, rainy night street`;
+ 
 function cleanSceneText(raw) {
   let s = String(raw || '');
   // Modèle "réflexion" coupé en plein raisonnement : inutilisable.
