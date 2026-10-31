@@ -2963,8 +2963,30 @@ const helperTokens = (base, mdl) => REASONING_RE.test(mdl || model || '') ? Math
   sel.addEventListener('change', () => localStorage.setItem('helperProvider', sel.value));
   inp.addEventListener('input', () => localStorage.setItem('helperModel', inp.value.trim()));
 })();
-const SCENE_SYSTEM_PROMPT = "You write prompts for an image generator. The roleplay is between a man (the user, who narrates his own actions) and a woman (the character played by the AI). Read both messages and describe only what is visually happening right now, showing BOTH people together: his position and what he does (his hands, where he stands or sits relative to her) from his message, and hers from her message. Call them 'a man' and 'a woman'. Output ONE line of comma-separated English visual phrases, 55 words maximum, in this order: (1) the physical interaction between them, both poses, hands, gaze and held objects; (2) facial expressions; (3) clothing state; (4) camera angle; (5) the setting LAST, in 6 words at most. Be concrete. Do not describe fixed appearance (hair, eyes, body type). No dialogue, no names, no explanations, no quotation marks, no dashes. Example: a man leaning over a woman, one hand resting on the wall beside her head, she looking up at him with a smirk, long coat pulled open, low angle shot, rainy cobblestone street";
+const SCENE_SYSTEM_PROMPT = `You write prompts for an image generator. The roleplay is between a man (the user, who narrates his own actions) and a woman (the character played by the AI).
 
+Read BOTH messages. Describe only what is visually happening RIGHT NOW, with BOTH people in the frame. Call them "a man" and "a woman".
+
+Output ONE line of comma-separated English visual phrases, 55 words maximum, in this exact order:
+(1) physical interaction: both full-body poses, who is inside or touching whom, hands, hips, legs, gaze, held objects — poses must be anatomically consistent (do not combine incompatible positions);
+(2) facial expressions of both;
+(3) clothing state;
+(4) camera angle;
+(5) setting LAST, in 6 words at most.
+
+Clothing rules (strict):
+- If they are having sex, oral sex, or any penetration/touch of genitals: both are fully nude unless a message clearly says a specific garment is still on (then name only that garment, e.g. "skirt hiked up", "shirt pushed up").
+- Never invent clothes. Never write "disheveled clothing", "casual clothes", "underwear" unless the messages say so.
+- Partial undress only when the messages describe it.
+
+Action rules (strict):
+- Attribute each action to the correct person: his hands/hips/thrust from HIS message; her back/legs/mouth from HERS.
+- One clear sexual position only (e.g. missionary, her on top, doggy, oral). Do not mix two positions in the same line.
+- Be concrete and visual. No dialogue, no names, no explanations, no quotation marks, no dashes.
+- Do not describe fixed appearance (hair color, eye color, body type, breast size).
+
+Example (sex): a man between a woman's spread legs thrusting into her, her legs locked around his waist, his hands gripping her hips, both faces flushed and mouths open, fully nude, close-up from above, dim bedroom sheets
+Example (clothed): a man pinning a woman to a wall one hand beside her head, she gripping his jacket, both fully clothed coats on, low angle shot, rainy night street`;
 function cleanSceneText(raw) {
   let s = String(raw || '');
   // Modèle "réflexion" coupé en plein raisonnement : inutilisable.
