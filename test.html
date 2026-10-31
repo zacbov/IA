@@ -2963,31 +2963,32 @@ const helperTokens = (base, mdl) => REASONING_RE.test(mdl || model || '') ? Math
   sel.addEventListener('change', () => localStorage.setItem('helperProvider', sel.value));
   inp.addEventListener('input', () => localStorage.setItem('helperModel', inp.value.trim()));
 })();
-const SCENE_SYSTEM_PROMPT = `You write the ACTION line of an image prompt for a photorealistic generator.
+const SCENE_SYSTEM_PROMPT = `You write the ACTION line only for a photorealistic explicit image prompt.
 
-Roleplay: a man (user message) and a woman (character message). Show BOTH in frame. Call them "a man" and "a woman".
+Man = user message. Woman = character message. Both in frame when the action involves both. Call them "a man" and "a woman".
 
-Output ONE line only: comma-separated English visual phrases, max 50 words, in this order:
-(1) exact position — who is on top / on the bottom / behind / in front, body orientation (lying on back, on all fours, kneeling, sitting), and the sexual act in plain visual words;
-(2) hands of both people and what they touch;
-(3) both facial expressions / gaze;
-(4) clothing: write "fully nude" for any sex, oral, genital touch, or masturbation unless a message names a garment still worn;
+ONE line, comma-separated English phrases, max 55 words, order:
+(1) exact position and act with plain sexual anatomy words (penis, pussy, clitoris, anus, breasts, ass) — who is on top, on their back, on all fours, kneeling, standing;
+(2) hands and what they grip or rub;
+(3) faces / gaze (looking at camera only if the messages imply it);
+(4) fully nude for any sex, oral, anal, or genital touch;
 (5) setting in 5 words max.
 
-Pose rules (critical — never mix positions):
-- Missionary: "she lying on her back on the bed, he on top between her spread legs thrusting into her" — do NOT write "her legs around his waist" alone (that reads as cowgirl).
-- Cowgirl: "she straddling him on top, sinking down onto him".
-- Doggy / from behind: "she on all fours on the bed, he kneeling behind her thrusting into her from behind".
-- Anal: same as doggy plus "anal penetration from behind".
-- Woman masturbating: "she sitting or lying with legs spread, her fingers rubbing her clitoris, genitals visible".
-- Man watching: "he sitting nearby watching her".
-- Cum on face: "he standing over her, ejaculating onto her face/nose, she looking up toward him".
+Position recipes (use these structures, do not invent hybrids):
+- Missionary: she lying on her back, he on top between her spread legs, penis thrusting into her pussy
+- Mating press: she on her back, knees pulled to her chest, he kneeling between her legs, penis thrusting deep into her pussy
+- Cowgirl: she straddling him, lowering her pussy onto his penis
+- Doggy: she on all fours, he kneeling behind her, penis thrusting into her pussy from behind
+- Anal doggy: she on all fours, he behind her, penis in her anus
+- Woman masturbating: she legs spread, her fingers rubbing her clitoris, pussy and labia visible
+- Oral: she kneeling or on her back, his penis in her mouth
+- Cum on face: he standing over her, ejaculating semen onto her face and nose, she looking up, his hand on his penis
 
-Visibility rules:
-- Name the visible contact: thrusting into her, fingers on her clitoris, penis entering her, semen on her face.
-- Prefer side view or three-quarter view wording when it clarifies who is on top (e.g. "seen from the side").
-- No hair color, body type, eye color, names, dialogue, quotes, dashes.
-- One position only.`;
+Rules:
+- Always name penis/pussy/clitoris/anus when involved — never only "thrusting into her" or "touching herself".
+- Never "her legs around his waist" alone for missionary.
+- No hair color, ethnicity, body type, breast size (character lock already has that).
+- No dialogue, names, quotes, dashes. One position only.`;
 
  
 function cleanSceneText(raw) {
