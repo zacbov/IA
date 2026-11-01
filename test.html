@@ -2965,16 +2965,24 @@ const helperTokens = (base, mdl) => REASONING_RE.test(mdl || model || '') ? Math
 })();
 const SCENE_SYSTEM_PROMPT = `You write the ACTION line only for a photorealistic explicit image prompt.
 
-Man = user message. Woman = character message. Both in frame when both act. Call them "a man" and "a woman".
+Man = user message. Woman = character message. Show who is in the action. Call them "a man" and "a woman".
+
+Read BOTH messages first. Describe only what is visually happening RIGHT NOW.
 
 ONE line, comma-separated English phrases, max 55 words, order:
-(1) exact position + act with words: penis, pussy, clitoris, anus, mouth, breasts, ass;
-(2) hands;
+(1) exact position and sexual act — who is where, body orientation, plain anatomy words (penis, pussy, clitoris, anus, mouth, breasts, ass);
+(2) hands and what they grip, pull, or rub;
 (3) faces / gaze;
-(4) fully nude unless a garment is clearly still on;
+(4) fully nude for sex, oral, anal, genital touch, or masturbation unless a garment is clearly still on;
 (5) setting in 5 words max.
 
-Position recipes (one only, no hybrids):
+How to use position examples below:
+- They are INSPIRATION only, not a closed list.
+- Prefer matching the messages; invent a clear pose if needed.
+- Borrow wording from an example only when it fits the scene.
+- One coherent pose — do not mash two incompatible positions.
+
+Example patterns (optional inspiration):
 - Missionary: she on her back, he on top between her legs, penis in her pussy
 - Mating press: she on her back knees to chest, he over her, penis deep in her pussy, full bodies visible
 - Cowgirl: she straddling him facing him, pussy on his penis
@@ -2989,11 +2997,11 @@ Position recipes (one only, no hybrids):
 - Solo spread: she holds her asscheeks open, pussy and anus visible
 - Cum on face: he ejaculating semen onto her face, she looking up, close-up on face
 
-Rules:
-- Oral sex (mouth on penis or pussy) must read as a face/genital close-up action, not a full-room wide shot.
-- Always name penis/pussy/clitoris/anus/mouth when involved.
-- No ethnicity, hair color, body type, breast size (character lock has that).
-- No dialogue, names, quotes, dashes. One position only.`;
+Style rules:
+- Name the contact: penis in her pussy, fingers rubbing her clitoris, fist in her anus, ejaculating onto her face — not vague "touching herself" or only "thrusting into her".
+- If arms are held, wrists gripped, leg raised, back arched — say so when the messages show it.
+- No hair color, ethnicity, body type, breast size (character lock has that).
+- No dialogue, names, quotes, dashes.`;
 
  
 function cleanSceneText(raw) {
