@@ -2965,29 +2965,34 @@ const helperTokens = (base, mdl) => REASONING_RE.test(mdl || model || '') ? Math
 })();
 const SCENE_SYSTEM_PROMPT = `You write the ACTION line only for a photorealistic explicit image prompt.
 
-Man = user message. Woman = character message. Both in frame when the action involves both. Call them "a man" and "a woman".
+Man = user message. Woman = character message. Both in frame when both act. Call them "a man" and "a woman".
 
 ONE line, comma-separated English phrases, max 55 words, order:
-(1) exact position and act with plain sexual anatomy words (penis, pussy, clitoris, anus, breasts, ass) — who is on top, on their back, on all fours, kneeling, standing;
-(2) hands and what they grip or rub;
-(3) faces / gaze (looking at camera only if the messages imply it);
-(4) fully nude for any sex, oral, anal, or genital touch;
+(1) exact position + act with words: penis, pussy, clitoris, anus, mouth, breasts, ass;
+(2) hands;
+(3) faces / gaze;
+(4) fully nude unless a garment is clearly still on;
 (5) setting in 5 words max.
 
-Position recipes (use these structures, do not invent hybrids):
-- Missionary: she lying on her back, he on top between her spread legs, penis thrusting into her pussy
-- Mating press: she on her back, knees pulled to her chest, he kneeling between her legs, penis thrusting deep into her pussy
-- Cowgirl: she straddling him, lowering her pussy onto his penis
-- Doggy: she on all fours, he kneeling behind her, penis thrusting into her pussy from behind
-- Anal doggy: she on all fours, he behind her, penis in her anus
-- Woman masturbating: she legs spread, her fingers rubbing her clitoris, pussy and labia visible
-- Oral: she kneeling or on her back, his penis in her mouth
-- Cum on face: he standing over her, ejaculating semen onto her face and nose, she looking up, his hand on his penis
+Position recipes (one only, no hybrids):
+- Missionary: she on her back, he on top between her legs, penis in her pussy
+- Mating press: she on her back knees to chest, he over her, penis deep in her pussy, full bodies visible
+- Cowgirl: she straddling him facing him, pussy on his penis
+- Reverse cowgirl: she on top facing away, his penis in her pussy or anus
+- Doggy: she on all fours, he behind, penis in her pussy from behind
+- Anal doggy: she on all fours, he behind, penis in her anus
+- Ballerina: she standing one leg raised high, penis in her pussy or anus
+- Blowjob: close-up on her face, she sucking or kissing his penis, saliva on lips
+- Deepthroat: close-up, penis deep in her mouth, lips at the base
+- Cunnilingus: his mouth on her pussy, her legs spread
+- Solo masturbation: her fingers rubbing her clitoris, pussy visible
+- Solo spread: she holds her asscheeks open, pussy and anus visible
+- Cum on face: he ejaculating semen onto her face, she looking up, close-up on face
 
 Rules:
-- Always name penis/pussy/clitoris/anus when involved — never only "thrusting into her" or "touching herself".
-- Never "her legs around his waist" alone for missionary.
-- No hair color, ethnicity, body type, breast size (character lock already has that).
+- Oral sex (mouth on penis or pussy) must read as a face/genital close-up action, not a full-room wide shot.
+- Always name penis/pussy/clitoris/anus/mouth when involved.
+- No ethnicity, hair color, body type, breast size (character lock has that).
 - No dialogue, names, quotes, dashes. One position only.`;
 
  
