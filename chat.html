@@ -281,7 +281,10 @@
           <label style="font-size:11px; color:#aaa;">Images / message</label>
           <select id="perchanceN" style="font-size:11px; padding:5px 6px;"><option value="">Auto</option><option value="1">1</option><option value="2">2</option></select>
         </div>
-        <div style="font-size:10px; color:#778; margin-top:3px;">Le format s'applique à Perchance, Pollination et au Space. Sur téléphone, un bouton « Générer » ouvre l'onglet Perchance (reste dessus jusqu'à la fin : il rend la main tout seul quand l'image est livrée).</div>
+        <div style="font-size:10px; color:#778; margin-top:3px;">Le format s'applique à Perchance, Pollination et au Space. Sur téléphone, le bouton « Générer » ouvre (ou ramène) l'onglet Perchance au premier plan : il produit les images, puis te ramène ici tout seul (sauf si tu gardes l'onglet ouvert : reviens alors par le sélecteur d'onglets).</div>
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; margin-top:6px; cursor:pointer;">
+          <input type="checkbox" id="perchanceKeepTab" style="width:auto;"> Téléphone : garder l'onglet Perchance ouvert après la génération (réutilisé au message suivant)
+        </label>
       </div>
       <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; text-transform:none; letter-spacing:normal; cursor:pointer;">
         <input type="checkbox" id="genHFSpace" style="width:auto;"> Space Hugging Face
@@ -1503,8 +1506,8 @@ const peO = (...pairs) => pairs.map(p => Array.isArray(p) ? p : [p, p]);
 const PE_SECTIONS = [
   { title: '1. Identité', fields: [
     { id: 'prefix', label: 'Accroche', none: false, opts: peO(['A casual real-life photograph. A casual photo of', 'Photo réelle décontractée'], ['A realistic portrait of', 'Portrait réaliste'], ['A raw candid photo of', 'Photo brute sur le vif']) },
-    { id: 'gender', label: 'Sujet', none: false, opts: peO(['a woman', 'Une femme'], ['a person', 'Une personne']) },
-    { id: 'age', label: 'Âge (adulte)', opts: peO(['young adult', 'Jeune adulte (19-25)'], ['mid-20s', 'Mi-vingtaine'], ['late 20s', 'Fin de vingtaine'], ['mature', 'Mature (30s)'], ['MILF', 'MILF']) },
+    { id: 'gender', label: 'Sujet', none: false, opts: peO(['a woman', 'Une femme'], ['two woman', 'Deux femmes'], ['a futanari woman', 'Futa']) },
+    { id: 'age', label: 'Âge (adulte)', opts: peO(['young adult', 'Jeune adulte (19-25)'], ['mid-20s', 'Mi-vingtaine'], ['late 20s', 'Fin de vingtaine'], ['mature', 'Mature (30s)'], ['childish', 'childish']) },
     { id: 'ethnicity', label: 'Ethnie / Origine', opts: peO(['Peruvian', 'Péruvienne / Quechua'], ['Native American', 'Native Américaine / Navajo'], ['French', 'Française'], ['Mediterranean', 'Méditerranéenne'], ['East Asian', 'Est-Asiatique'], ['South Asian', 'Sud-Asiatique'], ['Hispanic', 'Hispanique'], ['Nordic', 'Nordique'], ['Spanish', 'Espagnole']) },
     { id: 'style-subculture', label: 'Style / Sous-culture', opts: peO(['punk aesthetic', 'Punk'], ['goth aesthetic', 'Gothique'], ['chicano lifestyle style', 'Chicano'], ['streetwear fashion', 'Streetwear'], ['vintage bohemian', 'Bohème / Vintage']) }
   ] },
@@ -1526,7 +1529,7 @@ const PE_SECTIONS = [
     { id: 'face-shape', label: 'Forme du visage', opts: peO(['oval face', 'Ovale'], ['round face', 'Rond'], ['square face', 'Carré'], ['heart-shaped face', 'Cœur'], ['diamond-shaped face', 'Losange'], ['chiseled face', 'Ciselé'], ['chubby face', 'Joufflu'], ['soft soft-contoured round face', 'Rond doux']) },
     { id: 'cheeks', label: 'Joues', opts: peO(['high prominent cheekbones', 'Pommettes hautes'], ['plump rosy cheeks', 'Joues rebondies'], ['hollow cheeks', 'Joues creuses']) },
     { id: 'eyes', label: 'Yeux', opts: peO(['almond-shaped eyes', 'Amande'], ['hooded eyes', 'Paupières tombantes'], ['round wide-awake eyes', 'Ronds'], ['deep-set piercing eyes', 'Enfoncés'], ['doe-like soft eyes', 'Regard de biche'], ['monolid eyes', 'Monolid'], ['big blue eyes', 'Grands yeux bleus']) },
-    { id: 'brows', label: 'Sourcils', opts: peO(['arched eyebrows', 'Arqués'], ['straight horizontal eyebrows', 'Droits'], ['bushy thick eyebrows', 'Broussailleux'], ['thin pencil-thin eyebrows', 'Fins'], ['feathery fluffy eyebrows', 'Aériens']) },
+    { id: 'brows', label: 'Sourcils', opts: peO(['arched eyebrows', 'Arqués'], ['straight horizontal eyebrows', 'Droits'], ['eyebrow slit', 'Rasoir'], ['bushy thick eyebrows', 'Broussailleux'], ['thin pencil-thin eyebrows', 'Fins'], ['feathery fluffy eyebrows', 'Aériens']) },
     { id: 'eye-makeup', label: 'Maquillage des yeux', opts: peO(['winged eyeliner', 'Eyeliner winged'], ['cat eyes makeup', 'Cat eyes'], ['smudged smoky eye makeup', 'Smoky estompé']) },
     { id: 'lashes', label: 'Cils', opts: peO(['long curled eyelashes', 'Longs recourbés'], ['thick dense dark eyelashes', 'Épais sombres'], ['sparse delicate eyelashes', 'Clairsemés'], ['voluminous sweeping eyelashes', 'Volumineux'], ['thick mascara-coated lashes with individual spikes', 'Épais au mascara, mèches en pics'], ['dramatic fluffy volumized lashes', 'Volumineux et duveteux'], ['long false lash extensions, dense and curled', 'Faux cils longs, denses et recourbés'], ['wispy spiky lashes', 'Effilés en pointes'], ['heavy clumped mascara lashes', 'Lourds de mascara, en paquets'], ['doll-like lashes with volume on upper and lower lids', 'De poupée, haut et bas']) },
     { id: 'nose', label: 'Nez', opts: peO(['button nose', 'Bouton'], ['aquiline hawk nose', 'Aquilin'], ['straight prominent Greek nose', 'Grec'], ['bulbous wide nose', 'Bulbeux'], ['small snub nose', 'Petit'], ['small nose', 'Small nose']) },
@@ -1539,8 +1542,8 @@ const PE_SECTIONS = [
   ] },
   { title: '5. Cheveux, tenue & scène', fields: [
     { id: 'hair-texture', label: 'Texture / coupe', opts: peO(['straight sleek hair', 'Raides'], ['wavy textured hair', 'Ondulés'], ['curly voluminous hair', 'Bouclés'], ['long thick wavy hair with bangs', 'Longs ondulés + frange'], ['long flowing thick hair', 'Très longs'], ['ponytail', 'Queue de cheval'], ['high ponytail', 'Queue de cheval haute'], ['bangs', 'Frange'], ['side bangs', 'Frange latérale'], ['messy bun', 'Chignon décoiffé'], ['wet hair', 'Mouillés'], ['short textured pixie cut', 'Pixie'], ['long hair tied back with bangs', 'Frange + longs cheveux attachés'], ['braids', 'Tresses'], ['double ponytails', 'Double queue de cheval']) },
-    { id: 'hair-color', label: 'Couleur', opts: peO(['jet-black', 'Noir jais'], ['deep dark brown', 'Brun'], ['honey blonde', 'Blond miel'], ['striking platinum blonde', 'Platine'], ['vibrant auburn red', 'Roux auburn'], ['long vibrant black hair', 'Noir vibrant'], ['silver gray', 'Gris'], ['pastel pink hue', 'Rose pastel']) },
-    { id: 'outfit', label: 'Tenue (scène)', opts: peO(['completely nude', 'Complètement nue'], ['wearing white lingerie', 'Lingerie blanche'], ['wearing lingerie', 'Lingerie'], ['wearing sheer lingerie', 'Lingerie transparente'], ['wearing long victorian black dress', 'Robe victorienne noire'], ['wearing only panties', 'Seulement culotte'], ['wearing open robe', 'Peignoir ouvert'], ['wearing stockings and garter', 'Bas + porte-jarretelles'], ['wearing micro bikini', 'Micro bikini'], ['wearing ripped clothes', 'Vêtements déchirés'], ['wearing black neck choker', 'Tour de cou noir']) },
+    { id: 'hair-color', label: 'Couleur', opts: peO(['jet-black', 'Noir jais'], ['deep dark brown', 'Brun'], ['fake blonde', 'Fausse blonde'], ['brunette with 2 strands blond', 'meches blondes'], ['honey blonde', 'Blond miel'], ['striking platinum blonde', 'Platine'], ['vibrant auburn red', 'Roux auburn'], ['long vibrant black hair', 'Noir vibrant'], ['silver gray', 'Gris'], ['pastel pink hue', 'Rose pastel']) },
+    { id: 'outfit', label: 'Tenue (scène)', opts: peO(['completely nude', 'Complètement nue'], ['garter belte', 'Jaretelle'], ['wearing lingerie', 'Lingerie'], ['wearing sheer lingerie', 'Lingerie transparente'], ['wearing long victorian black dress', 'Robe victorienne noire'], ['wearing only panties', 'Seulement culotte'], ['wearing open robe', 'Peignoir ouvert'], ['wearing stockings and garter', 'Bas + porte-jarretelles'], ['wearing micro bikini', 'Micro bikini'], ['wearing ripped clothes', 'Vêtements déchirés'], ['wearing black neck choker', 'Tour de cou noir']) },
     { id: 'jewelry', label: 'Bijoux (turquoise / Navajo)', ethnicOnly: true, opts: peO(['gleaming traditional Navajo silver and turquoise squash blossom necklace and matching earrings', 'Collier Navajo argent & turquoise'], ['traditional Navajo silver and turquoise jewelry', 'Bijoux Navajo']) },
     { id: 'position', label: 'Position (scène)', opts: peO(['missionary', 'Missionnaire'], ['doggy style', 'Levrette'], ['cowgirl', 'Cowgirl'], ['reverse cowgirl', 'Reverse cowgirl'], ['standing doggy', 'Levrette debout'], ['legs spread', 'Jambes écartées'], ['on all fours', 'À quatre pattes'], ['lying on back', 'Allongée sur le dos'], ['kneeling', 'À genoux'], ['ballerina sex position, one leg completely up and spread', 'Position ballerine'], ['squatting over a man', 'Accroupie'], ['on her back, legs spread wide and held up next to her head', 'Jambes relevées'], ['legs tied up with wrists up', 'Jambes et poignets attachés']) },
     { id: 'location', label: 'Lieu (scène)', opts: peO(['she lays on a traditional victorian bed', 'Lit victorien'], ['inside a dimly lit wooden hogan in the deep forest', 'Hogan en bois'], ['on a traditional woven rug', 'Tapis tissé']) }
@@ -1550,7 +1553,9 @@ const PE_SECTIONS = [
     { id: 'skin-marks', label: 'Signes & charme', opts: peO(['a small dark hyper-realistic beauty mark near the upper lip', 'Grain de beauté'], ['deep natural dimples on the cheeks when smiling', 'Fossettes'], ["subtle crow's feet wrinkles and fine lines around the eyes", 'Rides patte d\'oie'], ['pronounced tired dark circles under the eyes', 'Cernes']) }
   ] }
 ];
-const PE_ACTIONS = peO(['sucking huge penis', 'Sucer un énorme pénis'], ['deepthroat', 'Deepthroat'], ['rubbing her clitoris', 'Frotter le clitoris'], ['fingering pussy', 'Doigter'], ['licking nipples', 'Lécher les tétons'], ['titjob', 'Titjob'], ['the penis is in her anus', 'Pénétration anale'], ['cum dripping', 'Sperme qui coule'], ['holding her asscheeks stretched open', 'Écarter les fesses'], ['looking at camera', 'Regarder la caméra']);
+const PE_ACTIONS = peO(['sucking huge penis', 'Sucer un énorme pénis'], ['deepthroat', 'Deepthroat'], ['rubbing her clitoris', 'Frotter le clitoris'], ['fingering pussy', 'Doigter'], ['licking nipples', 'Lécher les tétons'], ['titjob', 'Titjob'], ['the penis is in her anus', 'Pénétration anale'], ['hollowed cheeks sucking penis', 'Succion joues creuses'],
+ ['mushroom glans wider than shaft', 'Gland champignon'],
+ ['a man gripping her wrists behind her back', 'Poignets dans le dos'], ['cum dripping', 'Sperme qui coule'], ['holding her asscheeks stretched open', 'Écarter les fesses'], ['looking at camera', 'Regarder la caméra']);
 const PE_FIELDS = PE_SECTIONS.flatMap(sec => sec.fields);
 
 // Composition pure (testable) : valeurs choisies → description fixe, ancre, prompt complet
@@ -2479,7 +2484,7 @@ function imageSize() {
 }
 function perchanceCount() {
   const n = parseInt(localStorage.getItem('perchanceN') || '', 10);
-  return (n === 1 || n === 2) ? n : (isMobile() ? 1 : 2);
+  return (n === 1 || n === 2) ? n : 2;
 }
 const hex24 = () => Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2, '0')).join('');
 function perchanceToken() {
@@ -2519,6 +2524,27 @@ function openPerchanceDaemon(force) {
   else { try { win.focus(); } catch (e) {} showMediaToast('🪟 Le générateur est déjà ouvert : ramène sa fenêtre au premier plan.'); }
   return win;
 }
+// Téléphone : un navigateur mobile suspend l'onglet qui n'est pas au premier plan. Le générateur
+// doit donc être AU PREMIER PLAN pendant qu'il travaille. Ici, un clic (geste de l'utilisateur) ouvre
+// ou ramène l'onglet Perchance — toujours le MÊME onglet (nom 'perchanceGen'), jamais un de plus.
+// Les images (2 par message) sont générées en parallèle ; en fin de livraison l'onglet se ferme
+// tout seul (retour direct au chat) ou reste ouvert pour le message suivant, selon le réglage.
+function openPerchanceTabMobile(force) {
+  const keep = localStorage.getItem('perchanceKeepTab') === '1';
+  const u = 'https://perchance.org/' + perchanceGenName() + '?' + new URLSearchParams({
+    mode: 'daemon', token: perchanceToken(), relay: WORKER_BASE, autostart: '1', autoclose: keep ? '0' : '1'
+  }).toString();
+  let win = null;
+  try { win = window.open('', 'perchanceGen'); } catch (e) {}
+  if (!win) return null;
+  // un onglet déjà sur Perchance est de l'autre origine : lire son adresse échoue → on le ramène
+  // simplement au premier plan, sans le recharger (ce qui interromprait son travail)
+  let blank = true;
+  try { blank = (win.location.href === 'about:blank'); } catch (e) { blank = false; }
+  if (blank || force) { try { win.location.href = u; } catch (e) {} }
+  else { try { win.focus(); } catch (e) {} }
+  return win;
+}
 async function refreshDaemonState() {
   if (!perchancePersistentOn() || !password) return;
   try {
@@ -2533,6 +2559,9 @@ setTimeout(refreshDaemonState, 3000);
   cb.checked = localStorage.getItem('perchancePersistent') === '1';
   cb.addEventListener('change', () => localStorage.setItem('perchancePersistent', cb.checked ? '1' : '0'));
   document.getElementById('perchanceOpenDaemon').addEventListener('click', () => openPerchanceDaemon(true));
+  const kt = document.getElementById('perchanceKeepTab');
+  kt.checked = localStorage.getItem('perchanceKeepTab') === '1';
+  kt.addEventListener('change', () => localStorage.setItem('perchanceKeepTab', kt.checked ? '1' : '0'));
   ['imgFormat', 'perchanceN'].forEach(id => {
     const el = document.getElementById(id);
     el.value = localStorage.getItem(id) || (id === 'imgFormat' ? 'landscape' : '');
@@ -2546,14 +2575,27 @@ async function generatePerchanceViaDaemon(botText) {
   card.className = 'msg image-loading';
   const label = document.createElement('span');
   card.appendChild(label);
+  const mobile = isMobile();
+  let tabOpened = false;
   const openBtn = document.createElement('button');
   openBtn.type = 'button';
-  openBtn.textContent = '🪟 Ouvrir le générateur';
-  openBtn.style.cssText = 'display:none; margin-left:8px; padding:4px 10px; border-radius:8px; border:1px solid #2a3d33; background:#1a2a22; color:#e8e8e4; cursor:pointer; font-size:12px;';
-  openBtn.onclick = () => openPerchanceDaemon(true);
+  openBtn.textContent = mobile ? '▶ Générer avec Perchance' : '🪟 Ouvrir le générateur';
+  openBtn.style.cssText = mobile
+    ? 'display:block; margin-top:8px; padding:10px 16px; border-radius:10px; border:none; background:#e0a34a; color:#1a1208; font-weight:700; font-size:14px; cursor:pointer;'
+    : 'display:none; margin-left:8px; padding:4px 10px; border-radius:8px; border:1px solid #2a3d33; background:#1a2a22; color:#e8e8e4; cursor:pointer; font-size:12px;';
+  openBtn.onclick = mobile
+    ? () => {
+        const w = openPerchanceTabMobile(tabOpened); // 2e appui : on relance l'onglet à zéro
+        if (!w) { label.textContent = '⚠️ Onglet bloqué par le navigateur : autorise les pop-up pour ce site, puis réessaie.'; return; }
+        tabOpened = true;
+        openBtn.textContent = '↻ Relancer l\'onglet';
+        openBtn.style.cssText = 'display:block; margin-top:8px; padding:6px 12px; border-radius:8px; border:1px solid #2a3d33; background:#1a2a22; color:#e8e8e4; cursor:pointer; font-size:12px;';
+        refreshLabel();
+      }
+    : () => openPerchanceDaemon(true);
   card.appendChild(openBtn);
   appendMsgEl(card, epoch);
-  label.textContent = '🎨 Perchance : travail envoyé au générateur permanent…';
+  label.textContent = mobile ? '🎨 Image prête : appuie sur le bouton pour la générer avec Perchance.' : '🎨 Perchance : travail envoyé au générateur permanent…';
 
   const prompt = buildPerchancePrompt(botText, 1300);
   console.log('[Perchance permanent] prompt :', prompt);
@@ -2584,6 +2626,12 @@ async function generatePerchanceViaDaemon(botText) {
   let alive = null, done = false;
   const refreshLabel = () => {
     if (got.size >= N) return;
+    if (mobile) { // téléphone : le bouton reste visible, le texte indique où en est la génération
+      label.textContent = !tabOpened && got.size === 0
+        ? '🎨 Image prête : appuie sur le bouton pour la générer avec Perchance.'
+        : '⏳ Génération (' + got.size + '/' + N + ') dans l\'onglet Perchance — reste dessus : il te ramène ici quand les images sont livrées.';
+      return;
+    }
     if (alive === false && got.size === 0) {
       label.textContent = '⚠️ Générateur permanent inactif — ouvre-le (laisse-le ouvert) :';
       openBtn.style.display = '';
@@ -2637,66 +2685,6 @@ async function generatePerchanceViaDaemon(botText) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-// Téléphone : un navigateur mobile suspend l'onglet qui n'est pas au premier plan. Le chat ne peut donc
-// ni ouvrir l'onglet Perchance « en arrière-plan », ni le piloter. On prépare le prompt, puis un BOUTON
-// (geste de l'utilisateur) ouvre l'onglet Perchance au premier plan : la génération y tourne à pleine
-// vitesse. L'onglet ne se ferme qu'une fois l'image LIVRÉE au chat (réponse du Worker) et rend alors
-// la main tout seul ; le chat reprend son attente et affiche l'image.
-async function generatePerchanceMobile(botText) {
-  const epoch = convEpoch, profile = profileName;
-  const prompt = buildPerchancePrompt(botText, 1300);
-  console.log('[Perchance mobile] prompt :', prompt);
-  const id = hex24(), token = perchanceToken();
-  const sz = imageSize();
-  const params = new URLSearchParams({
-    prompt, format: 'html', id, resolution: sz.w + 'x' + sz.h, guidanceScale: '7',
-    negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark',
-    relay: WORKER_BASE, token, autoclose: '1', return: location.origin + location.pathname,
-    ...(charSeedValue() !== null ? { seed: String(charSeedValue()) } : {})
-  });
-  const url = 'https://perchance.org/' + perchanceGenName() + '?' + params.toString();
-  const card = document.createElement('div');
-  card.className = 'msg image-loading';
-  const label = document.createElement('span');
-  label.textContent = '🎨 Image prête : appuie sur le bouton pour la générer avec Perchance.';
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.textContent = '▶ Générer avec Perchance';
-  btn.style.cssText = 'display:block; margin-top:8px; padding:10px 16px; border-radius:10px; border:none; background:#e0a34a; color:#1a1208; font-weight:700; font-size:14px; cursor:pointer;';
-  card.append(label, btn);
-  appendMsgEl(card, epoch);
-
-  let started = false;
-  const waitForImage = async () => {
-    const headers = { 'X-App-Secret': password };
-    const deadline = Date.now() + 600000; // l'attente reprend d'elle-même au retour sur le chat
-    while (Date.now() < deadline && epoch === convEpoch) {
-      const t = Date.now();
-      try {
-        const r = await fetch(WORKER_BASE + 'relay-get?id=' + id + '&token=' + token + '&wait=20', { headers });
-        if (r.ok) {
-          const d = await r.json();
-          if (d && d.url) {
-            card.remove();
-            showGeneratedImage({ url: d.url, source: 'Perchance', prompt, epoch, profile });
-            return;
-          }
-        }
-      } catch (e) {}
-      if (Date.now() - t < 1500) await new Promise(r => setTimeout(r, 2000));
-    }
-    if (epoch === convEpoch) label.textContent = '⏳ Pas d\'image reçue. Appuie de nouveau sur le bouton pour relancer.';
-    started = false; btn.disabled = false;
-  };
-  btn.onclick = () => {
-    const w = window.open(url, '_blank'); // ouvert au premier plan, directement par ce clic
-    if (!w) { label.textContent = '⚠️ Onglet bloqué par le navigateur : autorise les fenêtres pop-up pour ce site, puis réessaie.'; return; }
-    label.textContent = '⏳ Génération dans l\'onglet Perchance — reste dessus : il te ramène ici quand l\'image est prête.';
-    btn.textContent = '↻ Rouvrir Perchance'; 
-    if (!started) { started = true; waitForImage(); }
-  };
-}
-
 // ----- Cadrage des images -----
 const SHOT_PHRASES = {
   closeup:  'extreme close-up shot, face filling the frame',
@@ -2741,7 +2729,7 @@ function perchanceGenName() {
 
 async function generateNSFWImage(botText, popup) {
   if (isMobile()) {
-    if (perchanceGenName() !== 'perchance-ai-api') return generatePerchanceMobile(botText);
+    if (perchanceGenName() !== 'perchance-ai-api') return generatePerchanceViaDaemon(botText);
     showMediaToast('📱 Sur téléphone, Perchance a besoin de ton propre générateur (réglages d\'images).');
     return;
   }
@@ -3000,10 +2988,10 @@ Example patterns (optional inspiration):
 Style rules:
 - Name the contact: penis in her pussy, fingers rubbing her clitoris, fist in her anus, ejaculating onto her face — not vague "touching herself" or only "thrusting into her".
 - If arms are held, wrists gripped, leg raised, back arched — say so when the messages show it.
+- Oral acts should read as face/genital close-ups in the action wording.
 - No hair color, ethnicity, body type, breast size (character lock has that).
 - No dialogue, names, quotes, dashes.`;
 
- 
 function cleanSceneText(raw) {
   let s = String(raw || '');
   // Modèle "réflexion" coupé en plein raisonnement : inutilisable.
@@ -3295,7 +3283,7 @@ function buildPerchancePrompt(botText, maxLen, compact) {
     descPart = fitText(d0, Math.max(budget - actionPart.length - 2, 0));
   }
   const variable = [shot, descPart, actionPart].filter(Boolean).join(', ');
-  return prefix + (variable ? variable + ', ' : '') + tags + suffix;
+  return (prefix + (variable ? variable + ', ' : '') + tags + suffix).replace(/ {2,}/g, ' ');
 }
 
 // Isole chaque appel de générateur : une erreur synchrone dans l'un ne peut plus jamais
