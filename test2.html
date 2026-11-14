@@ -1251,8 +1251,6 @@ async function speakQuotedText(botText) {
 
 /* ========== MODULE AUDIO MULTI-BOUCLES + GÉMISSEMENTS ========== */
 
-/* ========== MODULE AUDIO MULTI-BOUCLES + GÉMISSEMENTS ========== */
-
 const LOOP_SOUNDS = [
   {
     id: "HeabyResp",
@@ -1324,6 +1322,29 @@ const MOAN_CONFIG = {
   minInterval: 2, maxInterval: 10
 };
 
+/* ----- Bouton Gag : chaîne aléatoire + respire de temps en temps ----- */
+const GAG_CONFIG = {
+  id: "gag",
+  label: "Gag",
+  pool: [
+    ...Array.from({ length: 22 }, (_, i) =>
+      "https://raw.githubusercontent.com/zacbov/IA/main/vfx/gag" + (i + 1) + ".mp3"
+    ),
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/fastgag.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/fastgag2.mp3"
+  ],
+  interruptions: [
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/resprire-joui.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/respire-continue.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/respire-baisemagorge.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/respireshock.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/respireshock2.mp3",
+    "https://raw.githubusercontent.com/zacbov/IA/main/vfx/respireshock3.mp3"
+  ],
+  minInterval: 5,
+  maxInterval: 16
+};
+
 const activeLoops = {};
 const activeMoans = {};
 let masterVolume = 1.0;
@@ -1333,11 +1354,15 @@ function applyMasterVolumeLive() {
     if (loop.audio) loop.audio.volume = (loop.baseVolume ?? 0.7) * masterVolume;
   });
   Object.values(activeMoans).forEach(st => {
-    if (st.baseAudio) st.baseAudio.volume = (st.ducking ? 0.25 : 0.65) * masterVolume;
+    if (!st.baseAudio) return;
+    // gag : volume de base 0.7, moan : 0.65
+    const normal = st.kind === "gag" ? 0.7 : 0.65;
+    const ducked = st.kind === "gag" ? 0.2 : 0.25;
+    st.baseAudio.volume = (st.ducking ? ducked : normal) * masterVolume;
   });
 }
 
-document.getElementById('masterVolume')?.addEventListener('input', (e) => {
+document.getElementById("masterVolume")?.addEventListener("input", (e) => {
   masterVolume = Number(e.target.value) / 100;
   applyMasterVolumeLive();
 });
@@ -1350,6 +1375,9 @@ function stopMoanStyle(id, btn) {
   const st = activeMoans[id];
   if (!st) return;
   clearTimeout(st.timer);
+  if (st.onEnded) {
+    try { st.baseAudio.removeEventListener("ended", st.onEnded); } catch (e) {}
+  }
   st.baseAudio.pause();
   st.baseAudio.currentTime = 0;
   delete activeMoans[id];
@@ -1398,8 +1426,72 @@ function startMoanStyle(cfg, btn) {
     }, randomBetween(minI, maxI) * 1000);
   };
 
-  activeMoans[id] = { baseAudio, timer: null, ducking: false };
+  activeMoans[id] = { baseAudio, timer: null, ducking: false, kind: "moan" };
   scheduleNext();
+  btn.style.background = "#e0a34a";
+  btn.style.color = "#1a1208";
+  btn.style.borderColor = "#e0a34a";
+}
+
+/* ----- Gag : enchaîne des clips aléatoires, respire de temps en temps ----- */
+function startGagStyle(btn) {
+  const id = GAG_CONFIG.id;
+  if (activeMoans[id]) { stopMoanStyle(id, btn); return; }
+  if (!requireMedia()) return;
+
+  const pool = GAG_CONFIG.pool.filter(Boolean);
+  const interruptions = GAG_CONFIG.interruptions.filter(Boolean);
+  if (!pool.length) { alert("Aucun fichier gag"); return; }
+
+  let lastSrc = "";
+  const pick = (list) => {
+    if (list.length === 1) return list[0];
+    let s;
+    do { s = list[Math.floor(Math.random() * list.length)]; }
+    while (s === lastSrc && list.length > 1);
+    lastSrc = s;
+    return s;
+  };
+
+  const baseAudio = new Audio();
+  baseAudio.volume = 0.7 * masterVolume;
+
+  const playNextGag = () => {
+    if (!activeMoans[id]) return;
+    baseAudio.src = pick(pool);
+    baseAudio.play().catch(console.error);
+  };
+
+  const onEnded = () => {
+    if (!activeMoans[id] || activeMoans[id].ducking) return;
+    playNextGag();
+  };
+  baseAudio.addEventListener("ended", onEnded);
+
+  const scheduleInterrupt = () => {
+    const st = activeMoans[id];
+    if (!st || !interruptions.length) return;
+    st.timer = setTimeout(() => {
+      if (!mediaUnlocked || !activeMoans[id]) return;
+      const interrupt = new Audio(pick(interruptions));
+      interrupt.volume = 0.9 * masterVolume;
+      st.ducking = true;
+      baseAudio.volume = 0.2 * masterVolume;
+      interrupt.play().catch(console.error);
+      interrupt.addEventListener("ended", () => {
+        if (!activeMoans[id]) return;
+        st.ducking = false;
+        baseAudio.volume = 0.7 * masterVolume;
+        if (baseAudio.paused || baseAudio.ended) playNextGag();
+        scheduleInterrupt();
+      });
+    }, randomBetween(GAG_CONFIG.minInterval, GAG_CONFIG.maxInterval) * 1000);
+  };
+
+  activeMoans[id] = { baseAudio, timer: null, ducking: false, onEnded, kind: "gag" };
+  playNextGag();
+  scheduleInterrupt();
+
   btn.style.background = "#e0a34a";
   btn.style.color = "#1a1208";
   btn.style.borderColor = "#e0a34a";
@@ -1469,11 +1561,21 @@ function createMoanButton() {
   return btn;
 }
 
+function createGagButton() {
+  const btn = document.createElement("button");
+  btn.textContent = GAG_CONFIG.label;
+  btn.dataset.id = GAG_CONFIG.id;
+  btn.style.cssText = `background:#1a2a22;border:1px solid #2a3d33;color:#e8e8e4;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;`;
+  btn.addEventListener("click", () => startGagStyle(btn));
+  return btn;
+}
+
 function initAudioLooper() {
   const container = document.getElementById("loopButtons");
   if (!container) return;
   LOOP_SOUNDS.forEach(sound => container.appendChild(createLoopButton(sound)));
   container.appendChild(createMoanButton());
+  container.appendChild(createGagButton());   // ← bouton Gag ici
 
   document.getElementById("stopAllLoops")?.addEventListener("click", () => {
     Object.values(activeLoops).forEach(loop => {
@@ -2975,7 +3077,7 @@ How to use position examples below:
 
 Example patterns (optional inspiration):
 - Missionary: she on her back, he on top between her legs, penis in her pussy
-- Mating press: she on her back knees to chest, he over her, penis deep in her pussy, full bodies visible
+- Mating press: A man inserts his long penis all the way into her ass, mating press position. He is fucking her with his long penis, slowly thrusting his hips against her ass. He thrusts his penis in and out of her ass—slow, deep penetration with a long penis. 
 - Cowgirl: she straddling him facing him, pussy on his penis
 - Reverse cowgirl: she on top facing away, his penis in her pussy or anus
 - Doggy: she on all fours, he behind, penis in her pussy from behind
