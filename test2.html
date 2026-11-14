@@ -636,11 +636,7 @@ function lockMedia() {
       if (l.audio) { l.audio.pause(); l.audio.currentTime = 0; }
       delete activeLoops[id];
     });
-    if (moanState) {
-      clearTimeout(moanState.timer);
-      moanState.baseAudio.pause();
-      moanState = null;
-    }
+    Object.keys(activeMoans).forEach(id => stopMoanStyle(id));
     document.querySelectorAll('#loopButtons button').forEach(b => {
       b.style.background = '#1a2a22'; b.style.color = '#e8e8e4'; b.style.borderColor = '#2a3d33';
     });
@@ -1255,6 +1251,8 @@ async function speakQuotedText(botText) {
 
 /* ========== MODULE AUDIO MULTI-BOUCLES + GÉMISSEMENTS ========== */
 
+/* ========== MODULE AUDIO MULTI-BOUCLES + GÉMISSEMENTS ========== */
+
 const LOOP_SOUNDS = [
   {
     id: "HeabyResp",
@@ -1265,27 +1263,21 @@ const LOOP_SOUNDS = [
     id: "clac",
     label: "Claquement",
     src: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/flesh_against_flesh__1.mp3",
-    startMin: 0.10,
-    startMax: 0.25,
-    endMin: 0.65,
-    endMax: 1.05
+    startMin: 0.10, startMax: 0.25, endMin: 0.65, endMax: 1.05
   },
   {
     id: "moan",
     label: "Gémissements",
     src: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/fast-halete.mp3",
-    // même logique que Gémissements +
     interruptions: [
       "https://raw.githubusercontent.com/zacbov/IA/main/vfx/pleure2-encore.mp3",
       "https://raw.githubusercontent.com/zacbov/IA/main/vfx/pleure-encule.mp3",
       "https://raw.githubusercontent.com/zacbov/IA/main/vfx/pleure-chatte.mp3",
       "https://raw.githubusercontent.com/zacbov/IA/main/vfx/pleure-jouir.mp3",
       "https://raw.githubusercontent.com/zacbov/IA/main/vfx/pleurs.mp3",
-      "https://raw.githubusercontent.com/zacbov/IA/main/vfx/orgasm.mp3",
-      
+      "https://raw.githubusercontent.com/zacbov/IA/main/vfx/orgasm.mp3"
     ],
-    minInterval: 4,
-    maxInterval: 14
+    minInterval: 4, maxInterval: 14
   },
   {
     id: "moan2",
@@ -1297,15 +1289,15 @@ const LOOP_SOUNDS = [
       "https://raw.githubusercontent.com/zacbov/IA/main/vfx/pleure-chatte.mp3",
       "https://raw.githubusercontent.com/zacbov/IA/main/vfx/pleure-jouir.mp3",
       "https://raw.githubusercontent.com/zacbov/IA/main/vfx/pleurs.mp3",
-      "https://raw.githubusercontent.com/zacbov/IA/main/vfx/orgasm.mp3",
-      
+      "https://raw.githubusercontent.com/zacbov/IA/main/vfx/orgasm.mp3"
     ],
-    minInterval: 3,
-    maxInterval: 12
+    minInterval: 3, maxInterval: 12
   }
 ];
 
 const MOAN_CONFIG = {
+  id: "moanPlus",
+  label: "Gémissements +",
   base: "https://raw.githubusercontent.com/zacbov/IA/main/vfx/moan-long.mp3",
   interruptions: [
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/pleurs.mp3",
@@ -1329,21 +1321,20 @@ const MOAN_CONFIG = {
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/coninue.mp3",
     "https://raw.githubusercontent.com/zacbov/IA/main/vfx/jouir.mp3"
   ],
-  minInterval: 2,
-  maxInterval: 10
+  minInterval: 2, maxInterval: 10
 };
 
 const activeLoops = {};
-let moanState = null;
-let masterVolume = 1.0; // 0 à 1, piloté par le curseur #masterVolume
+const activeMoans = {};
+let masterVolume = 1.0;
 
 function applyMasterVolumeLive() {
   Object.values(activeLoops).forEach(loop => {
     if (loop.audio) loop.audio.volume = (loop.baseVolume ?? 0.7) * masterVolume;
   });
-  if (moanState && moanState.baseAudio) {
-    moanState.baseAudio.volume = (moanState.ducking ? 0.25 : 0.65) * masterVolume;
-  }
+  Object.values(activeMoans).forEach(st => {
+    if (st.baseAudio) st.baseAudio.volume = (st.ducking ? 0.25 : 0.65) * masterVolume;
+  });
 }
 
 document.getElementById('masterVolume')?.addEventListener('input', (e) => {
@@ -1355,14 +1346,75 @@ function randomBetween(min, max) {
   return min + Math.random() * (max - min);
 }
 
+function stopMoanStyle(id, btn) {
+  const st = activeMoans[id];
+  if (!st) return;
+  clearTimeout(st.timer);
+  st.baseAudio.pause();
+  st.baseAudio.currentTime = 0;
+  delete activeMoans[id];
+  if (btn) {
+    btn.style.background = "#1a2a22";
+    btn.style.color = "#e8e8e4";
+    btn.style.borderColor = "#2a3d33";
+  }
+}
+
+function startMoanStyle(cfg, btn) {
+  const id = cfg.id;
+  if (activeMoans[id]) { stopMoanStyle(id, btn); return; }
+  if (!requireMedia()) return;
+  const baseSrc = cfg.base || cfg.src;
+  if (!baseSrc) { alert("Aucun fichier audio de base"); return; }
+
+  const interruptions = (cfg.interruptions || []).filter(Boolean);
+  const minI = cfg.minInterval ?? 3;
+  const maxI = cfg.maxInterval ?? 12;
+
+  const baseAudio = new Audio(baseSrc);
+  baseAudio.loop = true;
+  baseAudio.volume = 0.65 * masterVolume;
+  baseAudio.play().catch(console.error);
+
+  const scheduleNext = () => {
+    const st = activeMoans[id];
+    if (!st) return;
+    st.timer = setTimeout(() => {
+      if (!mediaUnlocked || !activeMoans[id] || !interruptions.length) {
+        if (activeMoans[id]) scheduleNext();
+        return;
+      }
+      const interrupt = new Audio(interruptions[Math.floor(Math.random() * interruptions.length)]);
+      interrupt.volume = 0.85 * masterVolume;
+      st.ducking = true;
+      baseAudio.volume = 0.25 * masterVolume;
+      interrupt.play().catch(console.error);
+      interrupt.addEventListener("ended", () => {
+        if (!activeMoans[id]) return;
+        st.ducking = false;
+        baseAudio.volume = 0.65 * masterVolume;
+        scheduleNext();
+      });
+    }, randomBetween(minI, maxI) * 1000);
+  };
+
+  activeMoans[id] = { baseAudio, timer: null, ducking: false };
+  scheduleNext();
+  btn.style.background = "#e0a34a";
+  btn.style.color = "#1a1208";
+  btn.style.borderColor = "#e0a34a";
+}
+
 function createLoopButton(sound) {
   const btn = document.createElement("button");
   btn.textContent = sound.label;
   btn.dataset.id = sound.id;
-  btn.style.cssText = `
-    background:#1a2a22; border:1px solid #2a3d33; color:#e8e8e4;
-    border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;
-  `;
+  btn.style.cssText = `background:#1a2a22;border:1px solid #2a3d33;color:#e8e8e4;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;`;
+
+  if (sound.interruptions && sound.interruptions.length) {
+    btn.addEventListener("click", () => startMoanStyle(sound, btn));
+    return btn;
+  }
 
   btn.addEventListener("click", () => {
     if (activeLoops[sound.id]) {
@@ -1376,13 +1428,8 @@ function createLoopButton(sound) {
       btn.style.borderColor = "#2a3d33";
       return;
     }
-
     if (!requireMedia()) return;
-
-    if (!sound.src) {
-      alert("Aucun fichier audio défini");
-      return;
-    }
+    if (!sound.src) { alert("Aucun fichier audio défini"); return; }
 
     const audio = new Audio(sound.src);
     const baseVolume = sound.baseVolume ?? 0.7;
@@ -1390,9 +1437,7 @@ function createLoopButton(sound) {
     const hasRange = sound.startMin !== undefined && sound.endMin !== undefined;
 
     if (hasRange) {
-      let currentStart = randomBetween(sound.startMin, sound.startMax);
-      let currentEnd = randomBetween(sound.endMin, sound.endMax);
-
+      let currentStart, currentEnd;
       const playNext = () => {
         currentStart = randomBetween(sound.startMin, sound.startMax);
         currentEnd = randomBetween(sound.endMin, sound.endMax);
@@ -1400,11 +1445,7 @@ function createLoopButton(sound) {
         audio.currentTime = currentStart;
         audio.play().catch(console.error);
       };
-
-      const timer = setInterval(() => {
-        if (audio.currentTime >= currentEnd) playNext();
-      }, 25);
-
+      const timer = setInterval(() => { if (audio.currentTime >= currentEnd) playNext(); }, 25);
       audio.addEventListener("ended", playNext);
       playNext();
       activeLoops[sound.id] = { audio, timer, baseVolume };
@@ -1413,80 +1454,25 @@ function createLoopButton(sound) {
       audio.play().catch(console.error);
       activeLoops[sound.id] = { audio, timer: null, baseVolume };
     }
-
     btn.style.background = "#e0a34a";
     btn.style.color = "#1a1208";
     btn.style.borderColor = "#e0a34a";
   });
-
   return btn;
 }
 
 function createMoanButton() {
   const btn = document.createElement("button");
-  btn.textContent = "Gémissements +";
-  btn.style.cssText = `
-    background:#1a2a22; border:1px solid #2a3d33; color:#e8e8e4;
-    border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;
-  `;
-
-  btn.addEventListener("click", () => {
-    if (moanState) {
-      clearTimeout(moanState.timer);
-      moanState.baseAudio.pause();
-      moanState.baseAudio.currentTime = 0;
-      moanState = null;
-      btn.style.background = "#1a2a22";
-      btn.style.color = "#e8e8e4";
-      btn.style.borderColor = "#2a3d33";
-      return;
-    }
-
-    if (!requireMedia()) return;
-
-    const baseAudio = new Audio(MOAN_CONFIG.base);
-    baseAudio.loop = true;
-    baseAudio.volume = 0.65 * masterVolume;
-    baseAudio.play().catch(console.error);
-
-    const scheduleNext = () => {
-      const delay = randomBetween(MOAN_CONFIG.minInterval, MOAN_CONFIG.maxInterval) * 1000;
-      moanState.timer = setTimeout(() => {
-        if (!mediaUnlocked || !moanState) return;
-        const randomSrc = MOAN_CONFIG.interruptions[
-          Math.floor(Math.random() * MOAN_CONFIG.interruptions.length)
-        ];
-        const interrupt = new Audio(randomSrc);
-        interrupt.volume = 0.85 * masterVolume;
-        moanState.ducking = true;
-        baseAudio.volume = 0.25 * masterVolume;
-        interrupt.play().catch(console.error);
-        interrupt.addEventListener("ended", () => {
-          moanState.ducking = false;
-          baseAudio.volume = 0.65 * masterVolume;
-          scheduleNext();
-        });
-      }, delay);
-    };
-
-    moanState = { baseAudio, timer: null, ducking: false };
-    scheduleNext();
-
-    btn.style.background = "#e0a34a";
-    btn.style.color = "#1a1208";
-    btn.style.borderColor = "#e0a34a";
-  });
-
+  btn.textContent = MOAN_CONFIG.label || "Gémissements +";
+  btn.style.cssText = `background:#1a2a22;border:1px solid #2a3d33;color:#e8e8e4;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;`;
+  btn.addEventListener("click", () => startMoanStyle(MOAN_CONFIG, btn));
   return btn;
 }
 
 function initAudioLooper() {
   const container = document.getElementById("loopButtons");
   if (!container) return;
-
-  LOOP_SOUNDS.forEach(sound => {
-    container.appendChild(createLoopButton(sound));
-  });
+  LOOP_SOUNDS.forEach(sound => container.appendChild(createLoopButton(sound)));
   container.appendChild(createMoanButton());
 
   document.getElementById("stopAllLoops")?.addEventListener("click", () => {
@@ -1495,13 +1481,7 @@ function initAudioLooper() {
       loop.audio.pause();
     });
     Object.keys(activeLoops).forEach(k => delete activeLoops[k]);
-
-    if (moanState) {
-      clearTimeout(moanState.timer);
-      moanState.baseAudio.pause();
-      moanState = null;
-    }
-
+    Object.keys(activeMoans).forEach(id => stopMoanStyle(id));
     document.querySelectorAll("#loopButtons button").forEach(btn => {
       btn.style.background = "#1a2a22";
       btn.style.color = "#e8e8e4";
@@ -3223,36 +3203,44 @@ const capFirst = (t) => t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
 
 // Éléments communs : cadrage choisi, sujet (ancre ou description), scène
 function promptParts(botText) {
-  const shot = shotPhrase();
-  let action = extractAction(botText);
-  if (shot) action = stripFraming(action);
-  // La fiche de scène complète ce que la réponse ne répète pas (tenue, lieu)
+  let action = hardenSceneLine(extractAction(botText));
+  action = stripFraming(action);
+  const sex = isSexAction(action) || isSexAction(botText);
+  const userShot = shotPhrase();
+  const shot = shotForAction(action, userShot);
   const sh = sceneOn() ? getSceneSheet() : {};
+  const extra = sex ? [sh.location].filter(Boolean).join(', ') : [sh.outfit, sh.location].filter(Boolean).join(', ');
   return {
     shot,
     subject: dedupePhrases(toPhrases(charAnchor || physDescForImage() || '')),
-    actionList: dedupePhrases([...prioritizePhrases(dedupePhrases(toPhrases(action))), ...toPhrases([sh.outfit, sh.location].filter(Boolean).join(', '))])
+    actionList: dedupePhrases([...prioritizePhrases(dedupePhrases(toPhrases(action))), ...toPhrases(extra)]),
+    sex
   };
 }
 
-// Moteurs « langage naturel » (Flux, Z-Image Turbo, kontext, gptimage…) : phrases courtes,
-// sans poids ni étiquettes de qualité empilées, pas de prompt négatif.
-function buildProsePrompt(botText, maxLen) {
-  if (rawPromptOverride) return rawPromptOverride.slice(0, 1500);
-  const { shot, subject, actionList } = promptParts(botText);
-  // « (((actual, actual photo))) » → « actual photo » : doublons retirés, poids SD supprimés
-  const style = compactSuffix(PERCHANCE_SUFFIX).replace(/\b(\w+),\s*\1\b/gi, '$1').replace(/[()]/g, '').replace(/^[\s.]+/, '');
-  const sentences = [
-    'A candid real-life photograph.',
-    shot ? capFirst(shot) + '.' : '',
-    subject.length ? capFirst(subject.join(', ')) + '.' : '',
-    actionList.length ? capFirst(fitPhrases(actionList, 360).join(', ')) + '.' : '',
-    style ? capFirst(style) + '.' : ''
-  ].filter(Boolean);
-  let out = sentences.join(' ');
-  // trop long : on enlève d'abord la fin du style, jamais la scène
-  if (out.length > (maxLen || 800)) out = sentences.slice(0, -1).join(' ');
-  return out.slice(0, maxLen || 800);
+function buildPerchancePrompt(botText, maxLen, compact) {
+  if (rawPromptOverride) return rawPromptOverride;
+  let actionRaw = hardenSceneLine(extractAction(botText));
+  actionRaw = stripFraming(actionRaw);
+  const userShot = shotPhrase();
+  const shot = shotForAction(actionRaw, userShot);
+  const actionAll = prioritizePhrases(dedupePhrases(toPhrases(actionRaw)));
+  const tags = PERCHANCE_TAGS;
+  const prefix = PERCHANCE_PREFIX;
+  const suffix = compact ? compactSuffix(PERCHANCE_SUFFIX) : PERCHANCE_SUFFIX;
+  const budget = Math.max((maxLen || 1300) - prefix.length - suffix.length - tags.length - 2 - (shot ? shot.length + 2 : 0), 0);
+  let descPart, actionPart;
+  if (charAnchor) {
+    descPart = charAnchor.slice(0, 500);
+    actionPart = fitPhrases(actionAll, Math.max(budget - descPart.length - 2, 120)).join(', ');
+  } else {
+    const d0 = physDescForImage() || '';
+    const descBudget = Math.min(d0.length, Math.floor(budget * 0.3));
+    actionPart = fitPhrases(actionAll, Math.max(budget - descBudget - 2, 120)).join(', ');
+    descPart = fitText(d0, Math.max(budget - actionPart.length - 2, 0));
+  }
+  const variable = [shot, descPart, actionPart].filter(Boolean).join(', ');
+  return (prefix + (variable ? variable + ', ' : '') + tags + suffix).replace(/ {2,}/g, ' ');
 }
 
 // Modèles Stable Diffusion (Horde, Pollination turbo) : étiquettes séparées par des virgules,
