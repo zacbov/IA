@@ -1541,14 +1541,14 @@ function startGagStyle(btn) {
     st.timer = setTimeout(() => {
       if (!mediaUnlocked || !activeMoans[id]) return;
       const interrupt = new Audio(pick(interruptions));
-      interrupt.volume = 0.9 * masterVolume;
+      interrupt.volume = 0.3 * masterVolume;
       st.ducking = true;
-      baseAudio.volume = 0.2 * masterVolume;
+      baseAudio.volume = 1.0 * masterVolume;
       interrupt.play().catch(console.error);
       interrupt.addEventListener("ended", () => {
         if (!activeMoans[id]) return;
         st.ducking = false;
-        baseAudio.volume = 0.7 * masterVolume;
+        baseAudio.volume = 1.0 * masterVolume;
         if (baseAudio.paused || baseAudio.ended) playNextGag();
         scheduleInterrupt();
       });
