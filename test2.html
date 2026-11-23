@@ -1793,37 +1793,82 @@ const PE_ACTIONS = peO(['sucking huge penis', 'Sucer un énorme pénis'], ['deep
  ['mushroom glans wider than shaft', 'Gland champignon'],
  ['a man gripping her wrists behind her back', 'Poignets dans le dos'], ['cum dripping', 'Sperme qui coule'], ['holding her asscheeks stretched open', 'Écarter les fesses'], ['looking at camera', 'Regarder la caméra']);
 const PE_FIELDS = PE_SECTIONS.flatMap(sec => sec.fields);
+// Assemble la tenue à partir des champs modulaires
+function peBuildOutfit(v) {
+  const mode = v['outfit-mode'] || '';
+  // Modes « spéciaux » prioritaires
+  if (mode === 'completely nude') return 'completely nude';
+  if (mode === 'wearing only panties') return 'wearing only panties';
+  if (mode === 'wearing lingerie') return 'wearing lingerie';
+  if (mode === 'wearing sheer lingerie') return 'wearing sheer lingerie';
+  if (mode === 'wearing micro bikini') return 'wearing micro bikini';
+  if (mode === 'wearing open robe') return 'wearing open robe';
+  if (mode === 'wearing ripped clothes') return 'wearing ripped clothes';
 
+  const color = v['outfit-color'] || '';
+  const material = v['outfit-material'] || '';
+  const prefix = [color, material].filter(Boolean).join(' ');
+
+  const parts = [];
+
+  if (v['outfit-dress']) {
+    parts.push((prefix + ' ' + v['outfit-dress']).trim());
+  } else {
+    if (v['outfit-top']) parts.push((prefix + ' ' + v['outfit-top']).trim());
+    if (v['outfit-outer']) parts.push(v['outfit-outer']);
+    if (v['outfit-bottom']) parts.push((prefix + ' ' + v['outfit-bottom']).trim());
+  }
+
+  if (v['outfit-legs']) parts.push(v['outfit-legs']);
+  if (v['outfit-shoes']) parts.push(v['outfit-shoes']);
+  if (v['outfit-acc']) parts.push(v['outfit-acc']);
+
+  if (!parts.length) return mode || '';
+  return 'wearing ' + parts.join(', ');
+}
 // Composition pure (testable) : valeurs choisies → description fixe, ancre, prompt complet
 function peCompose(v, addSuffix) {
   const art = (t) => (/^[aeiou]/i.test(t) ? 'an ' : 'a ') + t;
   const base = String(v.gender || 'a woman').replace(/^an? /, '');
-  // Sans âge choisi, le personnage est explicitement « adult »
   const core = [v.age || 'adult', v.ethnicity, base].filter(Boolean).join(' ');
   const mods = [v['body-shape'], v['height-proportion'], v['style-subculture']].filter(Boolean);
   const subject = art(mods.length ? mods.join(', ') + ' ' + core : core);
   const pick = (keys) => keys.map(k => v[k]).filter(Boolean);
   const hair = [v['hair-color'], v['hair-texture']].filter(Boolean).join(' ');
   const faceKeys = ['face-shape', 'cheeks', 'eyes', 'eye-makeup', 'brows', 'lashes', 'nose', 'lips', 'jaw', 'glasses', 'facial-piercing', 'face-art'];
-  // description fixe : l'ordre sert aussi de priorité pour l'ancre (visage d'abord)
-  // description : sujet simple puis traits en expressions séparées (plus lisible pour les moteurs)
+
   const plainSubject = art(core);
-  const persona = [plainSubject, ...mods, hair, ...pick(faceKeys), ...pick(['skin-blemish', 'skin-marks']), ...pick(['waist-shape', 'hips-shape', 'shoulders-neck']), ...pick(['breasts', 'areolas', 'nipples', 'pussy']), ...pick(['jewelry'])].filter(Boolean);
+  const persona = [
+    plainSubject, ...mods, hair,
+    ...pick(faceKeys),
+    ...pick(['skin-blemish', 'skin-marks']),
+    ...pick(['waist-shape', 'hips-shape', 'shoulders-neck']),
+    ...pick(['breasts', 'areolas', 'nipples', 'pussy']),
+    ...pick(['jewelry'])
+  ].filter(Boolean);
+
   const desc = persona.join(', ');
   const anchor = fitPhrases(dedupePhrases(toPhrases(desc)), 500).join(', ');
-  // prompt complet : même assemblage que ton générateur
+
+  // Tenue assemblée
+  const outfit = peBuildOutfit(v);
+
+  // Prompt complet
   const parts = [subject];
   const bodyAll = pick(['waist-shape', 'hips-shape', 'shoulders-neck', 'breasts', 'areolas', 'nipples', 'pussy', 'pussy-state']);
   if (bodyAll.length) parts.push(bodyAll.join(', '));
   if (hair) parts.push(hair);
+
   const faceAll = [v['face-shape'], v.cheeks, v.eyes, v['eye-makeup'], v.brows, v.lashes, v.nose, v.lips, v.jaw, v.expression, v.glasses, v['facial-piercing'], v['face-art']].filter(Boolean);
   if (faceAll.length) parts.push(faceAll.join(', '));
-  [v['skin-blemish'], v['skin-marks'], v.outfit, v.jewelry].filter(Boolean).forEach(x => parts.push(x));
-  // « in missionary » mais pas « in on all fours » : on ne préfixe que les noms de positions
+
+  [v['skin-blemish'], v['skin-marks'], outfit, v.jewelry].filter(Boolean).forEach(x => parts.push(x));
+
   if (v.position) parts.push(/^(on |in |she |legs |lying|kneeling|squatting|ballerina)/i.test(v.position) ? v.position : 'in ' + v.position);
   const acts = (v.actions || []);
   if (acts.length) parts.push(acts.join(' and '));
   if (v.location) parts.push(v.location);
+
   let full = (v.prefix || '') + ' ' + parts.join(', ') + '. Authentic features, raw skin texture, sharp focus, photorealistic.';
   full = full.replace(/\s+/g, ' ').replace(/ ,/g, ',').replace(/, ,/g, ',').trim();
   if (addSuffix) full += ' ' + PE_SUFFIX;
