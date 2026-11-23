@@ -501,10 +501,8 @@
 </div>
 
 <script>
-/* ===== PARTIE 1/3 — le script complet continue ci-dessous.
-   Si ton éditeur coupe le message, réponds « continue partie 2 ». ===== */
 
-(function () {
+function () {
   const m = location.hash.match(/^#perchance=(.+)$/);
   if (!m) return;
   try {
@@ -690,11 +688,1461 @@ function readTtsFromForm() {
     voiceName: document.getElementById('ttsVoiceSelect').value
   };
 }
+// ========== PARTIE 2/3 — profils, UI, éditeur persona (tenue corrigée) ==========
 
-/* ===== FIN PARTIE 1/3 =====
-   Réponds « continue » pour recevoir la PARTIE 2
-   (éditeur persona + peBuildOutfit/peCompose corrigés + prompts image + reste du chat)
-*/
-</script>
-</body>
-</html>
+function refreshProfileSelects(selectName) {
+  const profiles = loadProfiles();
+  const names = Object.keys(profiles).sort();
+  profileSelect.innerHTML = '<option value="">— Nouveau profil —</option>';
+  names.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    profileSelect.appendChild(opt);
+  });
+  if (selectName && profiles[selectName]) profileSelect.value = selectName;
+  quickSwitch.innerHTML = '';
+  names.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    quickSwitch.appendChild(opt);
+  });
+  if (selectName) quickSwitch.value = selectName;
+}
+
+function fillFormFromProfile(name) {
+  const p = loadProfiles()[name];
+  if (!p) return;
+  document.getElementById('provider').value = p.provider || 'groq';
+  document.getElementById('model').value = p.model || '';
+  document.getElementById('password').value = p.password || '';
+  document.getElementById('profileName').value = name;
+  document.getElementById('systemPrompt').value = p.systemPrompt || '';
+  document.getElementById('physicalDescription').value = p.physicalDescription || '';
+  const igForm = p.imageGenerators || {};
+  document.getElementById('genPerchance').checked = igForm.perchance !== false;
+  document.getElementById('genHFSpace').checked = !!igForm.hfSpace;
+  document.getElementById('hfSpaceId').value = igForm.hfSpaceId || 'properfool/nsfwadult';
+  document.getElementById('genPollination').checked = !!igForm.pollination;
+  (function () {
+    const sel = document.getElementById('pollModel');
+    const m = igForm.pollModel || 'flux';
+    if (![...sel.options].some(o => o.value === m)) sel.add(new Option(m, m));
+    sel.value = m;
+  })();
+  document.getElementById('genAIHorde').checked = !!igForm.aiHorde;
+  document.getElementById('genTranslate').checked = igForm.translate !== false;
+  document.getElementById('charAnchor').value = igForm.charAnchor || '';
+  document.getElementById('charSeedLock').checked = !!igForm.charSeedLock;
+  document.getElementById('charSeed').value = igForm.charSeed ?? '';
+  document.getElementById('charRef').value = igForm.charRef || '';
+  hordeFormSel = Array.isArray(igForm.hordeModels) ? igForm.hordeModels.slice() : ['WAI-NSFW-illustrious-SDXL'];
+  fillHordeAdvForm(igForm.hordeAdv);
+  renderHordeChips();
+  const ttsForm = p.tts || {};
+  document.getElementById('ttsEleven').checked = ttsForm.eleven !== false;
+  document.getElementById('ttsBrowser').checked = !!ttsForm.browser;
+  document.getElementById('ttsVoiceSelect').value = ttsForm.voiceName || '';
+  writeSamplingToForm(p.sampling);
+}
+
+profileSelect.addEventListener('change', () => {
+  if (profileSelect.value) fillFormFromProfile(profileSelect.value);
+});
+
+document.getElementById('saveProfileBtn').addEventListener('click', () => {
+  const name = document.getElementById('profileName').value.trim();
+  if (!name) { alert("Donne un nom à ce profil avant de l'enregistrer."); return; }
+  const profiles = loadProfiles();
+  const existingHistory = (profiles[name] && profiles[name].history) || [];
+  profiles[name] = {
+    provider: document.getElementById('provider').value,
+    model: document.getElementById('model').value.trim(),
+    password: document.getElementById('password').value,
+    systemPrompt: document.getElementById('systemPrompt').value.trim(),
+    physicalDescription: document.getElementById('physicalDescription').value.trim(),
+    imageGenerators: readImageGeneratorsFromForm(),
+    tts: readTtsFromForm(),
+    sampling: readSamplingFromForm(),
+    history: existingHistory
+  };
+  saveProfiles(profiles);
+  refreshProfileSelects(name);
+  alert('Profil "' + name + '" enregistré.');
+});
+
+document.getElementById('deleteProfileBtn').addEventListener('click', () => {
+  const name = profileSelect.value;
+  if (!name) return;
+  if (!confirm('Supprimer le profil "' + name + '" ?')) return;
+  const profiles = loadProfiles();
+  delete profiles[name];
+  saveProfiles(profiles);
+  refreshProfileSelects();
+  document.getElementById('profileName').value = '';
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+  refreshProfileSelects();
+  const lastUsed = localStorage.getItem(LAST_PROFILE_KEY);
+  if (lastUsed && loadProfiles()[lastUsed]) {
+    profileSelect.value = lastUsed;
+    fillFormFromProfile(lastUsed);
+  }
+});
+
+function persistCurrentHistory() {
+  if (!profileName) return;
+  const profiles = loadProfiles();
+  if (!profiles[profileName]) return;
+  profiles[profileName].history = history;
+  saveProfiles(profiles);
+}
+
+function activateProfile(name, isSwitch) {
+  const profiles = loadProfiles();
+  const p = profiles[name];
+  if (!p) return;
+  if (isSwitch) persistCurrentHistory();
+  if (streamAbort) { streamAbort.__user = true; streamAbort.abort(); }
+  convEpoch++; compareSession = null; clearSuggestions(); suggestGen++;
+  profileName = name;
+  provider = p.provider || 'groq';
+  model = p.model || '';
+  password = p.password || '';
+  mediaUnlocked = false;
+  verifyWorkerPassword();
+  systemPrompt = p.systemPrompt || '';
+  physicalDescription = p.physicalDescription || '';
+  const ig = p.imageGenerators || {};
+  genPerchance = ig.perchance !== false;
+  genHFSpace = !!ig.hfSpace;
+  hfSpaceId = ig.hfSpaceId || 'properfool/nsfwadult';
+  genPollination = !!ig.pollination;
+  pollModel = ig.pollModel || 'flux';
+  genAIHorde = !!ig.aiHorde;
+  translatePrompts = ig.translate !== false;
+  charAnchor = (ig.charAnchor || '').trim();
+  charSeedLock = !!ig.charSeedLock;
+  charSeed = ig.charSeed ?? null;
+  charRef = (ig.charRef || '').trim();
+  hordeModels = Array.isArray(ig.hordeModels) ? ig.hordeModels.slice() : ['WAI-NSFW-illustrious-SDXL'];
+  hordeAdv = { ...HORDE_ADV_DEFAULT, ...(ig.hordeAdv || {}) };
+  const ttsCfg = p.tts || {};
+  ttsEleven = ttsCfg.eleven !== false;
+  ttsBrowser = !!ttsCfg.browser;
+  ttsVoiceName = ttsCfg.voiceName || '';
+  sampling = p.sampling || {};
+  history = p.history || [];
+  localStorage.setItem(LAST_PROFILE_KEY, profileName);
+  messagesEl.innerHTML = '';
+  history.forEach(m => addMessage(m.content, m.role === 'user' ? 'user' : 'bot', m.ts));
+  if (history.length === 0 && systemPrompt) sendToWorker('__init__');
+}
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  const pw = document.getElementById('password').value.trim();
+  const mdl = document.getElementById('model').value.trim();
+  const name = document.getElementById('profileName').value.trim();
+  if (!pw) { alert('Entre le mot de passe du worker.'); return; }
+  if (!mdl) { alert('Entre le nom du modèle.'); return; }
+  if (name) {
+    const profiles = loadProfiles();
+    const existingHistory = (profiles[name] && profiles[name].history) || [];
+    profiles[name] = {
+      provider: document.getElementById('provider').value,
+      model: mdl,
+      password: pw,
+      systemPrompt: document.getElementById('systemPrompt').value.trim(),
+      physicalDescription: document.getElementById('physicalDescription').value.trim(),
+      imageGenerators: readImageGeneratorsFromForm(),
+      tts: readTtsFromForm(),
+      sampling: readSamplingFromForm(),
+      history: existingHistory
+    };
+    saveProfiles(profiles);
+    refreshProfileSelects(name);
+  }
+  setup.classList.add('hidden');
+  topbar.classList.remove('hidden');
+  messagesEl.classList.remove('hidden');
+  inputbar.classList.remove('hidden');
+  if (name) {
+    activateProfile(name, false);
+  } else {
+    profileName = '';
+    provider = document.getElementById('provider').value;
+    model = mdl;
+    password = pw;
+    mediaUnlocked = false;
+    verifyWorkerPassword();
+    systemPrompt = document.getElementById('systemPrompt').value.trim();
+    physicalDescription = document.getElementById('physicalDescription').value.trim();
+    const ig = readImageGeneratorsFromForm();
+    genPerchance = ig.perchance;
+    genHFSpace = ig.hfSpace;
+    hfSpaceId = ig.hfSpaceId;
+    genPollination = ig.pollination;
+    pollModel = ig.pollModel || 'flux';
+    genAIHorde = ig.aiHorde;
+    translatePrompts = ig.translate !== false;
+    charAnchor = (ig.charAnchor || '').trim();
+    charSeedLock = !!ig.charSeedLock;
+    charSeed = ig.charSeed ?? null;
+    charRef = (ig.charRef || '').trim();
+    hordeModels = ig.hordeModels;
+    hordeAdv = ig.hordeAdv;
+    const ttsCfg = readTtsFromForm();
+    ttsEleven = ttsCfg.eleven;
+    ttsBrowser = ttsCfg.browser;
+    ttsVoiceName = ttsCfg.voiceName || '';
+    sampling = readSamplingFromForm();
+    history = [];
+    messagesEl.innerHTML = '';
+    if (systemPrompt) sendToWorker('__init__');
+  }
+  input.focus();
+});
+
+quickSwitch.addEventListener('change', () => {
+  if (quickSwitch.value && quickSwitch.value !== profileName) activateProfile(quickSwitch.value, true);
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Vider l\'historique ?')) return;
+  if (streamAbort) { streamAbort.__user = true; streamAbort.abort(); }
+  convEpoch++; compareSession = null; clearSuggestions(); suggestGen++;
+  history = [];
+  messagesEl.innerHTML = '';
+  persistCurrentHistory();
+  if (systemPrompt) sendToWorker('__init__');
+});
+document.getElementById('backBtn').addEventListener('click', () => {
+  persistCurrentHistory();
+  topbar.classList.add('hidden');
+  messagesEl.classList.add('hidden');
+  inputbar.classList.add('hidden');
+  setup.classList.remove('hidden');
+});
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function renderMarkdownBasic(text) {
+  let out = escapeHtml(text);
+  out = out.replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>');
+  out = out.replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
+  return out;
+}
+function formatTime(ts) {
+  const d = new Date(ts || Date.now());
+  return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+}
+function addMessage(text, cls, ts) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + cls;
+  if (cls === 'user' || cls === 'bot') {
+    const content = document.createElement('div');
+    content.className = 'msg-content';
+    content.innerHTML = renderMarkdownBasic(text);
+    div.appendChild(content);
+    const time = document.createElement('div');
+    time.className = 'msg-time';
+    time.time = formatTime(ts);
+    time.textContent = formatTime(ts);
+    div.appendChild(time);
+  } else {
+    div.textContent = text;
+  }
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
+function buildMessages(userText, isInit) {
+  const recent = history.slice(-HISTORY_WINDOW);
+  const messages = [];
+  const sheet = sceneOn() ? sceneSheetText() : '';
+  let sys = systemPrompt || '';
+  if (sheet) sys += (sys ? '\n\n' : '') + '[Scene continuity] ' + sheet;
+  if (sys) messages.push({ role: 'system', content: sys });
+  for (const m of recent) messages.push({ role: m.role, content: m.content });
+  if (isInit) {
+    messages.push({ role: 'user', content: 'Initie la conversation maintenant, en restant fidèle au personnage. Un seul message.' });
+  } else {
+    messages.push({ role: 'user', content: userText });
+  }
+  return messages;
+}
+
+// ========== ÉDITEUR DE PERSONA ==========
+const PE_SUFFIX = '(((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 28mm lens. All characters are over 19-years-old. It\'s a casual photo. Overall it\'s an actual real-life photograph.';
+const peO = (...pairs) => pairs.map(p => Array.isArray(p) ? p : [p, p]);
+
+const PE_SECTIONS = [
+  { title: '1. Identité', fields: [
+    { id: 'prefix', label: 'Accroche', none: false, opts: peO(['A casual real-life photograph. A casual photo of','Photo réelle'],['A realistic portrait of','Portrait réaliste'],['A raw candid photo of','Photo brute']) },
+    { id: 'gender', label: 'Sujet', none: false, opts: peO(['a woman','Une femme'],['two women','Deux femmes'],['a futanari woman','Futa']) },
+    { id: 'age', label: 'Âge (adulte)', opts: peO(['young adult','Jeune adulte'],['mid-20s','Mi-vingtaine'],['late 20s','Fin de vingtaine'],['mature','Mature']) },
+    { id: 'ethnicity', label: 'Ethnie', opts: peO(['Peruvian','Péruvienne'],['Native American','Native Américaine'],['French','Française'],['Mediterranean','Méditerranéenne'],['East Asian','Est-Asiatique'],['Hispanic','Hispanique'],['Nordic','Nordique']) },
+    { id: 'style-subculture', label: 'Style', opts: peO(['punk aesthetic','Punk'],['goth aesthetic','Gothique'],['streetwear fashion','Streetwear'],['vintage bohemian','Bohème']) }
+  ]},
+  { title: '2. Corps global', fields: [
+    { id: 'body-shape', label: 'Silhouette', opts: peO(['round body shape','Ronde'],['chubby build','Chubby'],['slender build','Svelte'],['athletic toned build','Athlétique'],['petite build','Petite'],['curvy hourglass figure','Sablier'],['thick hourglass','Thick hourglass']) },
+    { id: 'height-proportion', label: 'Taille', opts: peO(['petite height','Petite'],['tall statuesque height','Grande'],['average height','Moyenne']) },
+    { id: 'waist-shape', label: 'Taille / Abdomen', opts: peO(['slim narrow waist','Taille fine'],['thick soft waist','Taille épaisse'],['toned flat stomach','Ventre plat'],['soft curvy midsection','Ventre pulpeux']) },
+    { id: 'hips-shape', label: 'Hanches & Fesses', opts: peO(['wide voluptuous hips','Hanches larges'],['narrow slim hips','Hanches fines'],['large round ass','Fesses rondes']) },
+    { id: 'shoulders-neck', label: 'Épaules / Cou', opts: peO(['slender delicate collarbones and a long neck','Cou allongé'],['broad soft shoulders','Épaules larges'],['strong athletic shoulders','Épaules athlétiques']) }
+  ]},
+  { title: '3. Détails intimes', fields: [
+    { id: 'breasts', label: 'Seins', opts: peO(['small firm breasts','Petits'],['medium round breasts','Moyens'],['large heavy breasts','Gros'],['huge heavy natural hanging tits','Huge hanging']) },
+    { id: 'areolas', label: 'Aréoles', opts: peO(['small areolas','Petites'],['medium areolas','Moyennes'],['large areolas','Grandes'],['large puffy areolas','Puffy']) },
+    { id: 'nipples', label: 'Tétons', opts: peO(['small nipples','Petits'],['medium nipples','Moyens'],['long prominent nipples','Longs'],['puffy nipples','Puffy']) },
+    { id: 'pussy', label: 'Pilosité', opts: peO(['shaved pussy','Rasée'],['light pubic hair','Léger'],['neatly trimmed pubic hair','Taillée'],['thick natural pubic hair','Naturelle'],['hairy pussy','Poilue']) },
+    { id: 'pussy-state', label: 'État (scène)', opts: peO(['pussy gaping','Gaping'],['pussy dripping fluid','Dripping'],['wet dripping pussy','Wet']) }
+  ]},
+  { title: '4. Visage', fields: [
+    { id: 'face-shape', label: 'Forme', opts: peO(['oval face','Ovale'],['round face','Rond'],['heart-shaped face','Cœur']) },
+    { id: 'cheeks', label: 'Joues', opts: peO(['high prominent cheekbones','Pommettes'],['plump rosy cheeks','Rebondies']) },
+    { id: 'eyes', label: 'Yeux', opts: peO(['almond-shaped eyes','Amande'],['round wide-awake eyes','Ronds'],['doe-like soft eyes','Biche'],['big blue eyes','Grands bleus']) },
+    { id: 'brows', label: 'Sourcils', opts: peO(['arched eyebrows','Arqués'],['straight horizontal eyebrows','Droits'],['bushy thick eyebrows','Épais']) },
+    { id: 'eye-makeup', label: 'Maquillage', opts: peO(['winged eyeliner','Eyeliner'],['smudged smoky eye makeup','Smoky']) },
+    { id: 'lashes', label: 'Cils', opts: peO(['long curled eyelashes','Longs'],['thick dense dark eyelashes','Épais']) },
+    { id: 'nose', label: 'Nez', opts: peO(['button nose','Bouton'],['small nose','Petit'],['straight prominent Greek nose','Grec']) },
+    { id: 'lips', label: 'Lèvres', opts: peO(['full plush lips','Pulpées'],['thin delicate lips','Fines'],['pouty protruding lips','Boudeuses']) },
+    { id: 'jaw', label: 'Mâchoire', opts: peO(['soft rounded delicate jawline','Douce'],['sharp chiseled angular jawline','Ciselée']) },
+    { id: 'expression', label: 'Expression', opts: peO(['seductive look','Seducive'],['pleasure face','Pleasure'],['ahegao face','Ahegao'],['biting lip','Biting lip'],['flushed cheeks','Flushed']) },
+    { id: 'glasses', label: 'Lunettes', opts: peO(['wearing glasses','Lunettes'],['black-rimmed glasses','Noires'],['round glasses','Rondes']) },
+    { id: 'facial-piercing', label: 'Piercing', opts: peO(['septum piercing','Septum'],['nose ring','Nez'],['labret piercing','Labret']) },
+    { id: 'face-art', label: 'Peinture / tatouages', ethnicOnly: true, opts: peO(['traditional face painting, thick line painting','Peinture'],['intricate Native American tribal tattoos','Tatouages tribaux']) }
+  ]},
+  { title: '5. Cheveux, tenue & scène', fields: [
+    { id: 'hair-texture', label: 'Texture / coupe', opts: peO(['straight sleek hair','Raides'],['wavy textured hair','Ondulés'],['curly voluminous hair','Bouclés'],['long thick wavy hair with bangs','Longs + frange'],['ponytail','Queue de cheval'],['messy bun','Chignon'],['wet hair','Mouillés'],['braids','Tresses']) },
+    { id: 'hair-color', label: 'Couleur', opts: peO(['jet-black','Noir jais'],['deep dark brown','Brun'],['honey blonde','Blond miel'],['striking platinum blonde','Platine'],['vibrant auburn red','Roux auburn'],['pastel pink hue','Rose pastel']) },
+    { id: 'outfit-mode', label: 'Mode de tenue', opts: peO(
+      ['completely nude','Complètement nue'],['wearing only panties','Seulement culotte'],
+      ['wearing lingerie','Lingerie'],['wearing sheer lingerie','Lingerie transparente'],
+      ['wearing micro bikini','Micro bikini'],['wearing open robe','Peignoir ouvert'],
+      ['wearing ripped clothes','Vêtements déchirés'],['wearing a full outfit','Tenue complète']
+    )},
+    { id: 'outfit-color', label: 'Couleur principale', opts: peO(
+      ['beige','Beige'],['black','Noir'],['blue','Bleu'],['brown','Marron'],['burgundy','Bordeaux'],
+      ['cream','Crème'],['gold','Doré'],['green','Vert'],['grey','Gris'],['navy','Marine'],
+      ['olive','Olive'],['orange','Orange'],['pink','Rose'],['purple','Violet'],['red','Rouge'],
+      ['silver','Argenté'],['white','Blanc'],['yellow','Jaune']
+    )},
+    { id: 'outfit-material', label: 'Matière', opts: peO(
+      ['chiffon','Mousseline'],['denim','Denim'],['floral','Floral'],['lace','Dentelle'],
+      ['leather','Cuir'],['mesh','Résille'],['satin','Satin'],['silk','Soie'],
+      ['velvet','Velours'],['sheer','Transparent'],['ripped','Déchiré'],['knit','Maille'],['tulle','Tulle']
+    )},
+    { id: 'outfit-top', label: 'Haut', opts: peO(
+      ['blouse','Chemisier'],['camisole','Caraco'],['shirt','Chemise'],['sweater','Pull'],
+      ['hoodie','Sweat'],['corset','Corset'],['bra','Soutien-gorge'],['crop top','Crop top'],['tank top','Débardeur']
+    )},
+    { id: 'outfit-outer', label: 'Veste / Manteau', opts: peO(
+      ['cardigan','Cardigan'],['coat','Manteau'],['jacket','Veste'],['robe','Peignoir'],
+      ['blazer','Blazer'],['denim jacket','Veste jean'],['leather jacket','Perfecto']
+    )},
+    { id: 'outfit-bottom', label: 'Bas', opts: peO(
+      ['skirt','Jupe'],['mini skirt','Mini jupe'],['midi skirt','Jupe midi'],['shorts','Short'],
+      ['pants','Pantalon'],['jeans','Jean'],['leggings','Legging']
+    )},
+    { id: 'outfit-dress', label: 'Robe / Une pièce', opts: peO(
+      ['dress','Robe'],['mini dress','Mini robe'],['midi dress','Robe midi'],['maxi dress','Robe longue'],
+      ['slip dress','Nuisette'],['corset dress','Robe corset'],['swimsuit','Maillot'],['bikini','Bikini'],['micro bikini','Micro bikini']
+    )},
+    { id: 'outfit-legs', label: 'Bas / Collants', opts: peO(
+      ['socks','Chaussettes'],['thigh-high socks','Chaussettes hautes'],['tights','Collants'],
+      ['stockings','Bas'],['garter belt','Porte-jarretelles'],['fishnet stockings','Bas résille'],['bare legs','Jambes nues']
+    )},
+    { id: 'outfit-shoes', label: 'Chaussures', opts: peO(
+      ['sneakers','Baskets'],['boots','Bottes'],['high heels','Talons hauts'],['pumps','Escarpins'],
+      ['sandals','Sandales'],['platform heels','Talons plateforme'],['barefoot','Pieds nus']
+    )},
+    { id: 'outfit-acc', label: 'Accessoires', opts: peO(
+      ['choker','Tour de cou'],['necklace','Collier'],['earrings',"Boucles d'oreilles"],
+      ['belt','Ceinture'],['hat','Chapeau'],['gloves','Gants'],['scarf','Écharpe'],['sunglasses','Lunettes soleil']
+    )},
+    { id: 'jewelry', label: 'Bijoux Navajo', ethnicOnly: true, opts: peO(
+      ['gleaming traditional Navajo silver and turquoise squash blossom necklace and matching earrings','Collier Navajo'],
+      ['traditional Navajo silver and turquoise jewelry','Bijoux Navajo']
+    )},
+    { id: 'position', label: 'Position', opts: peO(
+      ['missionary','Missionnaire'],['doggy style','Levrette'],['cowgirl','Cowgirl'],['reverse cowgirl','Reverse cowgirl'],
+      ['legs spread','Jambes écartées'],['on all fours','À quatre pattes'],['lying on back','Allongée'],['kneeling','À genoux']
+    )},
+    { id: 'location', label: 'Lieu', opts: peO(
+      ['she lays on a traditional victorian bed','Lit victorien'],
+      ['inside a dimly lit wooden hogan in the deep forest','Hogan'],
+      ['on a traditional woven rug','Tapis tissé'],
+      ['in a modern bedroom','Chambre moderne']
+    )}
+  ]},
+  { title: '6. Peau & imperfections', fields: [
+    { id: 'skin-blemish', label: 'Imperfections', opts: peO(
+      ['prominent organic freckles scattered across the nose and cheeks','Taches de rousseur'],
+      ['actual freckles across nose and cheeks','Freckles'],
+      ['pale freckled skin','Peau pâle frecklée'],
+      ['visible enlarged skin pores and real oily skin texture','Pores'],
+      ['noticeable acne blemishes, pores, and natural light redness','Acné']
+    )},
+    { id: 'skin-marks', label: 'Signes', opts: peO(
+      ['a small dark hyper-realistic beauty mark near the upper lip','Grain de beauté'],
+      ['deep natural dimples on the cheeks when smiling','Fossettes'],
+      ["subtle crow's feet wrinkles and fine lines around the eyes","Rides"],
+      ['pronounced tired dark circles under the eyes','Cernes']
+    )}
+  ]}
+];
+
+const PE_ACTIONS = peO(
+  ['sucking huge penis','Sucer'],['deepthroat','Deepthroat'],['rubbing her clitoris','Clitoris'],
+  ['fingering pussy','Doigter'],['looking at camera','Caméra'],['cum dripping','Sperme'],
+  ['holding her asscheeks stretched open','Écarter fesses']
+);
+const PE_FIELDS = PE_SECTIONS.flatMap(sec => sec.fields);
+
+function toPhrases(str) {
+  return String(str || '')
+    .replace(/\.\s*(?=[,;])/g, '')
+    .split(/[,;—–]|\s-\s|\.\s+(?=[A-Z(])/)
+    .map(x => x.replace(/^[\s.]+|[\s.]+$/g, ''))
+    .filter(Boolean);
+}
+function dedupePhrases(list) {
+  const seen = new Set();
+  return list.filter(p => { const k = p.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+}
+function fitPhrases(list, max) {
+  const out = []; let len = 0;
+  for (const p of list) {
+    const add = (out.length ? 2 : 0) + p.length;
+    if (len + add > max) break;
+    out.push(p); len += add;
+  }
+  return out;
+}
+const fitText = (str, max) => fitPhrases(dedupePhrases(toPhrases(str)), max).join(', ');
+
+function peBuildOutfit(v) {
+  const mode = (v['outfit-mode'] || '').trim();
+  const special = {
+    'completely nude': 'completely nude',
+    'wearing only panties': 'wearing only panties',
+    'wearing lingerie': 'wearing lingerie',
+    'wearing sheer lingerie': 'wearing sheer lingerie',
+    'wearing micro bikini': 'wearing micro bikini',
+    'wearing open robe': 'wearing open robe',
+    'wearing ripped clothes': 'wearing ripped clothes'
+  };
+  if (special[mode]) return special[mode];
+
+  const color = (v['outfit-color'] || '').trim();
+  const material = (v['outfit-material'] || '').trim();
+  const prefix = [color, material].filter(Boolean).join(' ');
+  const dress  = (v['outfit-dress']  || '').trim();
+  const top    = (v['outfit-top']    || '').trim();
+  const outer  = (v['outfit-outer']  || '').trim();
+  const bottom = (v['outfit-bottom'] || '').trim();
+  const legs   = (v['outfit-legs']   || '').trim();
+  const shoes  = (v['outfit-shoes']  || '').trim();
+  const acc    = (v['outfit-acc']    || '').trim();
+
+  const parts = [];
+  const withPrefix = (item) => (prefix ? prefix + ' ' + item : item);
+
+  if (dress) {
+    parts.push(withPrefix(dress));
+  } else {
+    if (top) parts.push(withPrefix(top));
+    if (outer) parts.push(outer);
+    if (bottom) parts.push(withPrefix(bottom));
+  }
+  if (legs) parts.push(legs);
+  if (shoes) parts.push(shoes);
+  if (acc) parts.push(acc);
+
+  if (parts.length) return 'wearing ' + parts.join(', ');
+  if (mode && mode !== 'wearing a full outfit') return mode;
+  return '';
+}
+
+function peCompose(v, addSuffix) {
+  const art = (t) => (/^[aeiou]/i.test(t) ? 'an ' : 'a ') + t;
+  const base = String(v.gender || 'a woman').replace(/^an? /, '');
+  const core = [v.age || 'adult', v.ethnicity, base].filter(Boolean).join(' ');
+  const mods = [v['body-shape'], v['height-proportion'], v['style-subculture']].filter(Boolean);
+  const subject = art(mods.length ? mods.join(', ') + ' ' + core : core);
+  const pick = (keys) => keys.map(k => v[k]).filter(Boolean);
+  const hair = [v['hair-color'], v['hair-texture']].filter(Boolean).join(' ');
+  const faceKeys = ['face-shape','cheeks','eyes','eye-makeup','brows','lashes','nose','lips','jaw','glasses','facial-piercing','face-art'];
+  const outfit = peBuildOutfit(v);
+
+  const plainSubject = art(core);
+  const persona = [
+    plainSubject, ...mods, hair,
+    ...pick(faceKeys),
+    ...pick(['skin-blemish','skin-marks']),
+    ...pick(['waist-shape','hips-shape','shoulders-neck']),
+    ...pick(['breasts','areolas','nipples','pussy']),
+    outfit,
+    ...pick(['jewelry'])
+  ].filter(Boolean);
+
+  const desc = persona.join(', ');
+  const anchor = fitPhrases(dedupePhrases(toPhrases(desc)), 500).join(', ');
+
+  const parts = [subject];
+  const bodyAll = pick(['waist-shape','hips-shape','shoulders-neck','breasts','areolas','nipples','pussy','pussy-state']);
+  if (bodyAll.length) parts.push(bodyAll.join(', '));
+  if (hair) parts.push(hair);
+  const faceAll = [v['face-shape'],v.cheeks,v.eyes,v['eye-makeup'],v.brows,v.lashes,v.nose,v.lips,v.jaw,v.expression,v.glasses,v['facial-piercing'],v['face-art']].filter(Boolean);
+  if (faceAll.length) parts.push(faceAll.join(', '));
+  [v['skin-blemish'], v['skin-marks'], outfit, v.jewelry].filter(Boolean).forEach(x => parts.push(x));
+  if (v.position) parts.push(/^(on |in |she |legs |lying|kneeling|squatting|ballerina)/i.test(v.position) ? v.position : 'in ' + v.position);
+  const acts = (v.actions || []);
+  if (acts.length) parts.push(acts.join(' and '));
+  if (v.location) parts.push(v.location);
+
+  let full = (v.prefix || '') + ' ' + parts.join(', ') + '. Authentic features, raw skin texture, sharp focus, photorealistic.';
+  full = full.replace(/\s+/g, ' ').replace(/ ,/g, ',').replace(/, ,/g, ',').trim();
+  if (addSuffix) full += ' ' + PE_SUFFIX;
+  return { desc, anchor, full };
+}
+
+function peKey() { return 'persona:' + ((document.getElementById('profileName').value || '').trim() || '_'); }
+function peUpdateEthnic() {
+  const el = document.getElementById('pe-ethnicity');
+  if (!el) return;
+  const ok = (el.value === 'Peruvian' || el.value === 'Native American');
+  PE_FIELDS.filter(f => f.ethnicOnly).forEach(f => {
+    const s = document.getElementById('pe-' + f.id);
+    if (!s) return;
+    s.disabled = !ok;
+    if (!ok) s.value = '';
+  });
+}
+function peRead() {
+  const v = {};
+  PE_FIELDS.forEach(f => {
+    const el = document.getElementById('pe-' + f.id);
+    v[f.id] = el ? el.value : '';
+  });
+  v.actions = [...document.querySelectorAll('#pe-actions input:checked')].map(c => c.value);
+  return v;
+}
+function peWrite(v) {
+  PE_FIELDS.forEach(f => {
+    const el = document.getElementById('pe-' + f.id);
+    if (!el) return;
+    const want = (v && v[f.id] != null) ? v[f.id] : (f.none === false ? f.opts[0][0] : '');
+    el.value = [...el.options].some(o => o.value === want) ? want : (f.none === false ? f.opts[0][0] : '');
+  });
+  document.querySelectorAll('#pe-actions input').forEach(c => {
+    c.checked = !!(v && v.actions && v.actions.includes(c.value));
+  });
+  peUpdateEthnic();
+}
+function peSave() { try { localStorage.setItem(peKey(), JSON.stringify(peRead())); } catch (e) {} }
+function peGenerate() {
+  const r = peCompose(peRead(), document.getElementById('peSuffix').checked);
+  document.getElementById('peDesc').value = r.desc;
+  document.getElementById('peFull').value = r.full;
+  document.getElementById('peDesc').dataset.anchor = r.anchor;
+  const has = /wearing |completely nude|lingerie|panties|bikini|robe|ripped clothes/i.test(r.desc + ' ' + r.full);
+  document.getElementById('peInfo').textContent = has ? '✅ Tenue dans description + prompt complet' : 'ℹ️ Aucune tenue sélectionnée';
+  return r;
+}
+
+let peBuilt = false;
+function peBuildForm() {
+  if (peBuilt) return;
+  peBuilt = true;
+  const form = document.getElementById('peForm');
+  PE_SECTIONS.forEach(sec => {
+    const box = document.createElement('div');
+    box.className = 'pe-sec';
+    const h = document.createElement('h4'); h.textContent = sec.title; box.appendChild(h);
+    const grid = document.createElement('div'); grid.className = 'pe-grid';
+    sec.fields.forEach(f => {
+      const wrap = document.createElement('div');
+      const lab = document.createElement('label');
+      lab.textContent = f.label + (f.ethnicOnly ? ' — ethnique uniquement' : '');
+      lab.htmlFor = 'pe-' + f.id;
+      const sel = document.createElement('select');
+      sel.id = 'pe-' + f.id;
+      if (f.none !== false) sel.add(new Option('Aucun', ''));
+      f.opts.forEach(([val, lbl]) => sel.add(new Option(lbl, val)));
+      sel.addEventListener('change', () => { if (f.id === 'ethnicity') peUpdateEthnic(); peSave(); });
+      wrap.append(lab, sel);
+      grid.appendChild(wrap);
+    });
+    box.appendChild(grid);
+    form.appendChild(box);
+    if (sec.title.startsWith('5.')) {
+      const ab = document.createElement('div'); ab.className = 'pe-sec';
+      const ah = document.createElement('h4'); ah.textContent = 'Actions'; ab.appendChild(ah);
+      const acts = document.createElement('div'); acts.className = 'pe-acts'; acts.id = 'pe-actions';
+      PE_ACTIONS.forEach(([val, lbl]) => {
+        const l = document.createElement('label');
+        const c = document.createElement('input'); c.type = 'checkbox'; c.value = val;
+        c.addEventListener('change', peSave);
+        l.append(c, document.createTextNode(' ' + lbl));
+        acts.appendChild(l);
+      });
+      ab.appendChild(acts);
+      form.appendChild(ab);
+    }
+  });
+}
+function peOpen() {
+  peBuildForm();
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(peKey()) || 'null'); } catch (e) {}
+  peWrite(saved);
+  document.getElementById('personaEditor').classList.remove('hidden');
+  if (saved) peGenerate();
+}
+function peClose() { document.getElementById('personaEditor').classList.add('hidden'); }
+
+document.getElementById('personaOpen').addEventListener('click', peOpen);
+document.getElementById('peClose').addEventListener('click', peClose);
+document.getElementById('peGen').addEventListener('click', peGenerate);
+document.getElementById('peSuffix').addEventListener('change', () => { if (document.getElementById('peFull').value) peGenerate(); });
+document.getElementById('peReset').addEventListener('click', () => {
+  peWrite(null); peSave();
+  document.getElementById('peDesc').value = '';
+  document.getElementById('peFull').value = '';
+  document.getElementById('peInfo').textContent = '';
+});
+document.getElementById('peRandom').addEventListener('click', () => {
+  PE_FIELDS.forEach(f => {
+    const el = document.getElementById('pe-' + f.id);
+    if (!el || el.disabled || el.options.length < 2) return;
+    el.selectedIndex = (f.none === false ? 0 : 1) + Math.floor(Math.random() * (el.options.length - (f.none === false ? 0 : 1)));
+  });
+  peUpdateEthnic();
+  document.querySelectorAll('#pe-actions input').forEach(c => { c.checked = Math.random() > 0.75; });
+  peSave(); peGenerate();
+});
+document.getElementById('peToDesc').addEventListener('click', () => {
+  const r = peGenerate();
+  document.getElementById('physicalDescription').value = r.desc;
+  document.getElementById('peInfo').textContent = '✅ Description profil remplie';
+});
+document.getElementById('peToAnchor').addEventListener('click', () => {
+  const r = peGenerate();
+  document.getElementById('charAnchor').value = r.anchor;
+  document.getElementById('peInfo').textContent = '✅ Ancre remplie (' + r.anchor.length + ' car.)';
+});
+document.getElementById('peCopyDesc').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('peDesc').value).then(() => showMediaToast('📋 Description copiée')).catch(() => {});
+});
+document.getElementById('peCopyFull').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('peFull').value).then(() => showMediaToast('📋 Prompt copié')).catch(() => {});
+});
+document.getElementById('peImages').addEventListener('click', () => {
+  const r = peGenerate();
+  if (!password) { showMediaToast('🎨 Démarre d\'abord la conversation'); return; }
+  const popup = (perchanceUsable && perchanceUsable() && !(typeof perchancePersistentOn === 'function' && perchancePersistentOn())) ? window.open('about:blank', '_blank') : null;
+  const closePopup = () => { if (popup && !popup.closed) try { popup.close(); } catch(e){} };
+  setup.classList.add('hidden'); topbar.classList.remove('hidden'); messagesEl.classList.remove('hidden'); inputbar.classList.remove('hidden');
+  peClose();
+  if (typeof launchImageGenerators === 'function') launchImageGenerators('__persona__', '', popup, closePopup, r.full);
+  else showMediaToast('Moteurs image : vois partie 3');
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !document.getElementById('personaEditor').classList.contains('hidden')) peClose();
+});
+
+// stubs minimaux si partie 3 pas encore collée
+function clearSuggestions() { document.querySelectorAll('.suggest-row').forEach(e => e.remove()); }
+function sceneOn() { return localStorage.getItem('sceneOn') !== '0'; }
+function getSceneSheet() { try { return JSON.parse(localStorage.getItem('sceneSheet:' + (profileName||'')) || '{}') || {}; } catch(e){ return {}; } }
+function sceneSheetText() {
+  const sh = getSceneSheet(), out = [];
+  if (sh.location) out.push('place: ' + sh.location);
+  if (sh.time) out.push('time/light: ' + sh.time);
+  if (sh.outfit) out.push('outfits: ' + sh.outfit);
+  if (sh.mood) out.push('mood: ' + sh.mood);
+  return out.join('; ');
+}
+function renderHordeChips() {
+  const box = document.getElementById('hordeChips');
+  if (!box) return;
+  box.innerHTML = '';
+  hordeFormSel.forEach(name => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = name;
+    b.style.cssText = 'width:auto;font-size:11px;padding:4px 10px;border-radius:14px;border:1px solid #6c5ce7;background:#6c5ce7;color:#fff;cursor:pointer;';
+    box.appendChild(b);
+  });
+}
+function perchanceUsable() { return genPerchance; }
+function perchancePersistentOn() { return localStorage.getItem('perchancePersistent') === '1'; }
+// ========== PARTIE 3/3 — prompts image, moteurs, chat streaming ==========
+
+const PERCHANCE_TAGS = ' detailed anatomy, cinematic lighting';
+const PERCHANCE_PREFIX = 'A casual real-life photograph, ';
+const PERCHANCE_SUFFIX = ". (((actual, actual photo))) 2020s Western-style porn film screencap. Kodak 400 film, natural colors, raw unedited aesthetic, shallow depth of field, skin pores visible, no retouching, muted color grading, 8K resolution, documentary realism, HDR, professional lighting, taken with Canon EOS R1, DSLR, 50mm lens. It's a casual photo. Overall it's an actual real-life photograph";
+
+const SHOT_PHRASES = {
+  closeup:  'extreme close-up shot, face filling the frame',
+  portrait: 'portrait shot, head and shoulders',
+  medium:   'medium shot, waist up',
+  cowboy:   'cowboy shot, framed from mid-thigh up',
+  full:     'full body shot, wide angle, entire figure visible',
+  pov:      'first-person POV shot, camera at the viewer\'s eye level',
+  low:      'low angle shot, camera below looking up',
+  high:     'high angle shot, camera above looking down',
+  side:     'side profile shot',
+  behind:   'shot from behind, rear view'
+};
+function shotPhrase() { return SHOT_PHRASES[localStorage.getItem('shotPreset') || ''] || ''; }
+function stripFraming(a) {
+  return String(a || '')
+    .replace(/\b(?:(?:extreme\s+)?close-?up|medium|wide|full[- ]body|cowboy|pov|first[- ]person|low[- ]angle|high[- ]angle|side[- ]profile|rear)\s+(?:shot|view|angle)\b,?/gi, '')
+    .replace(/\s{2,}/g, ' ').replace(/^[,\s]+|[,\s]+$/g, '');
+}
+function charSeedValue() {
+  const n = Number(charSeed);
+  return (charSeedLock && charSeed !== '' && charSeed !== null && Number.isFinite(n)) ? Math.trunc(n) : null;
+}
+function imageSize() {
+  let f = localStorage.getItem('imgFormat') || 'landscape';
+  if (f === 'auto') f = ['closeup','portrait','medium','cowboy','full','behind'].includes(localStorage.getItem('shotPreset')||'') ? 'portrait' : 'landscape';
+  return f === 'portrait' ? { w: 512, h: 768 } : f === 'square' ? { w: 512, h: 512 } : { w: 768, h: 512 };
+}
+function perchanceGenName() {
+  const v = (localStorage.getItem('perchanceGen') || '').trim();
+  return /^[a-z0-9][a-z0-9-]{1,60}$/i.test(v) ? v : 'perchance-ai-api';
+}
+function perchanceCount() {
+  const n = parseInt(localStorage.getItem('perchanceN') || '', 10);
+  return (n === 1 || n === 2) ? n : 2;
+}
+const hex24 = () => Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2,'0')).join('');
+function perchanceToken() {
+  let t = localStorage.getItem('perchanceToken') || '';
+  if (!/^[a-f0-9]{24}$/.test(t)) { t = hex24(); localStorage.setItem('perchanceToken', t); }
+  return t;
+}
+function isMobile() {
+  try {
+    return (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 900)
+      || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  } catch (e) { return false; }
+}
+function perchanceUsable() { return genPerchance; }
+function perchancePersistentOn() {
+  return !isMobile() && localStorage.getItem('perchancePersistent') === '1' && perchanceGenName() !== 'perchance-ai-api';
+}
+
+function isSexAction(text) {
+  return /\b(sex|fuck|penis|pussy|anus|oral|blowjob|deepthroat|cowgirl|doggy|missionary|cum|ejaculat|penetrat|riding|straddl|masturbat|fingering|cunnilingus|titjob|gaping)\b/i.test(String(text || ''));
+}
+function hardenSceneLine(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim().replace(/["“”«»]/g, '').replace(/\s*—\s*/g, ', ');
+}
+function shotForAction(action, userShot) {
+  if (userShot) return userShot;
+  const a = String(action || '').toLowerCase();
+  if (/\b(close-?up|face|mouth|lips|glans|ahegao|eyes)\b/.test(a)) return SHOT_PHRASES.closeup || '';
+  if (/\b(full body|standing|ballerina)\b/.test(a)) return SHOT_PHRASES.full || '';
+  if (/\b(from behind|doggy|rear)\b/.test(a)) return SHOT_PHRASES.behind || '';
+  if (/\b(pov|first-person)\b/.test(a)) return SHOT_PHRASES.pov || '';
+  return '';
+}
+const SETTING_RE = /\b(street|room|bedroom|forest|sky|lantern|background|setting|atmosphere|weather|medieval)\b/i;
+const BODY_RE = /\b(hands?|arms?|legs?|face|eyes?|grip|hold|pose|breasts?|mouth|lips?)\b/i;
+function prioritizePhrases(list) {
+  const act = [], set = [];
+  list.forEach(p => (SETTING_RE.test(p) && !BODY_RE.test(p) ? set : act).push(p));
+  return [...act, ...set];
+}
+function physDescForImage() {
+  if (charAnchor) return charAnchor;
+  return translatePrompts ? (translateCache.get((physicalDescription || '').trim()) || physicalDescription) : physicalDescription;
+}
+function extractActionRaw(botText) {
+  const actions = [...String(botText).matchAll(/\*([^*]+)\*/g)].map(m => m[1].trim().replace(/[.!?…]+$/, '')).filter(Boolean);
+  if (actions.length) return actions.join(', ').slice(0, 300);
+  const narration = String(botText).replace(/"[^"]*"/g, '').replace(/\s+/g, ' ').trim();
+  return (narration || botText).slice(0, 200).trim();
+}
+function extractAction(botText) {
+  const cached = sceneCache.get(botText);
+  if (cached) return cached;
+  const raw = extractActionRaw(botText);
+  return translatePrompts ? (translateCache.get(raw) || raw) : raw;
+}
+function promptParts(botText) {
+  let action = hardenSceneLine(extractAction(botText));
+  action = stripFraming(action);
+  const sex = isSexAction(action) || isSexAction(botText);
+  const userShot = shotPhrase();
+  const shot = shotForAction(action, userShot);
+  const sh = sceneOn() ? getSceneSheet() : {};
+  const extra = sex ? [sh.location].filter(Boolean).join(', ') : [sh.outfit, sh.location].filter(Boolean).join(', ');
+  return {
+    shot,
+    subject: dedupePhrases(toPhrases(charAnchor || physDescForImage() || '')),
+    actionList: dedupePhrases([...prioritizePhrases(dedupePhrases(toPhrases(action))), ...toPhrases(extra)]),
+    sex
+  };
+}
+function compactSuffix(sfx) {
+  if (sfx.length <= 170) return sfx;
+  const cut = sfx.slice(0, 170);
+  const i = Math.max(cut.lastIndexOf(','), cut.lastIndexOf('.'));
+  return i > 40 ? cut.slice(0, i) : cut;
+}
+function buildPerchancePrompt(botText, maxLen, compact) {
+  if (rawPromptOverride) return rawPromptOverride;
+  let actionRaw = hardenSceneLine(extractAction(botText));
+  actionRaw = stripFraming(actionRaw);
+  const userShot = shotPhrase();
+  const shot = shotForAction(actionRaw, userShot);
+  const actionAll = prioritizePhrases(dedupePhrases(toPhrases(actionRaw)));
+  const tags = PERCHANCE_TAGS;
+  const prefix = PERCHANCE_PREFIX;
+  const suffix = compact ? compactSuffix(PERCHANCE_SUFFIX) : PERCHANCE_SUFFIX;
+  const budget = Math.max((maxLen || 1300) - prefix.length - suffix.length - tags.length - 2 - (shot ? shot.length + 2 : 0), 0);
+  let descPart, actionPart;
+  if (charAnchor) {
+    descPart = charAnchor.slice(0, 500);
+    actionPart = fitPhrases(actionAll, Math.max(budget - descPart.length - 2, 120)).join(', ');
+  } else {
+    const d0 = physDescForImage() || '';
+    const descBudget = Math.min(d0.length, Math.floor(budget * 0.3));
+    actionPart = fitPhrases(actionAll, Math.max(budget - descBudget - 2, 120)).join(', ');
+    descPart = fitText(d0, Math.max(budget - actionPart.length - 2, 0));
+  }
+  const variable = [shot, descPart, actionPart].filter(Boolean).join(', ');
+  return (prefix + (variable ? variable + ', ' : '') + tags + suffix).replace(/ {2,}/g, ' ');
+}
+function hordeStyleKind() {
+  const name = (hordeModels && hordeModels[0]) || '';
+  return /illustrious|pony|noob|anime|hassaku|wai-|anything/i.test(name) ? 'anime' : 'photo';
+}
+function buildTagPrompt(botText, maxLen, kind) {
+  if (rawPromptOverride) return String(rawPromptOverride).slice(0, 1500);
+  const { shot, subject, actionList } = promptParts(botText);
+  const head = kind === 'anime'
+    ? ['masterpiece', 'best quality', 'amazing quality']
+    : ['RAW photo', 'photorealistic'];
+  const tail = kind === 'anime'
+    ? ['detailed anatomy', 'cinematic lighting']
+    : ['film grain', 'skin pores', 'shallow depth of field', '8k uhd'];
+  const all = dedupePhrases([...head, ...(shot ? [shot] : []), ...subject, ...actionList, ...dedupePhrases(toPhrases(PERCHANCE_TAGS)), ...tail]);
+  return fitPhrases(all, maxLen || 840).join(', ');
+}
+function buildHordePrompt(botText, maxLen) { return buildTagPrompt(botText, maxLen, hordeStyleKind()); }
+function buildProsePrompt(botText, maxLen) {
+  if (rawPromptOverride) return String(rawPromptOverride).slice(0, maxLen || 800);
+  const { shot, subject, actionList, sex } = promptParts(botText);
+  const bits = [];
+  if (shot) bits.push(shot);
+  if (subject.length) bits.push(subject.join(', '));
+  if (actionList.length) bits.push(actionList.join(', '));
+  if (sex) bits.push('nude, detailed anatomy');
+  bits.push('photorealistic, natural skin texture, cinematic lighting');
+  let out = bits.filter(Boolean).join(', ').replace(/\s+/g, ' ').trim();
+  if (out.length > (maxLen || 800)) out = fitText(out, maxLen || 800);
+  return out;
+}
+function buildPollinationPrompt(botText, modelName) {
+  return /^turbo$/i.test(modelName || '') ? buildTagPrompt(botText, 700, 'photo') : buildProsePrompt(botText, 800);
+}
+
+const looksFrench = (t) => /[àâäçéèêëîïôöùûüÿœ]|\b(le|la|les|un|une|des|elle|cheveux|yeux|peau|seins|corps)\b/i.test(t);
+async function toEnglish(text) {
+  const t = (text || '').trim();
+  if (!t || !translatePrompts || !looksFrench(t)) return t;
+  if (translateCache.has(t)) return translateCache.get(t);
+  try {
+    const res = await fetch(WORKER_BASE + 'translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      body: JSON.stringify({ text: t.slice(0, 1500), source_lang: 'french', target_lang: 'english' })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const out = ((await res.json()).translated_text || '').trim();
+    if (!out) throw new Error('empty');
+    translateCache.set(t, out);
+    return out;
+  } catch (e) {
+    console.warn('Traduction indisponible', e);
+    return t;
+  }
+}
+async function prepareTranslations(botText) {
+  if (!translatePrompts) return;
+  await toEnglish(physicalDescription);
+  if (!sceneCache.has(botText)) await toEnglish(extractActionRaw(botText));
+}
+async function prepareScene(botText, userText) {
+  if (sceneCache.has(botText)) return;
+  // résumé simple de secours (sans appel modèle si indisponible)
+  try {
+    const ctx = (userText && userText !== '__init__') ? String(userText).slice(0, 400) : '';
+    const fallback = extractActionRaw(botText);
+    sceneCache.set(botText, fallback);
+  } catch (e) {}
+}
+
+function appendMsgEl(el, epoch) {
+  if (epoch !== undefined && epoch !== convEpoch) return;
+  messagesEl.appendChild(el);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+function makeImageEl({ url, source, prompt, onError, onOpen }) {
+  const img = document.createElement('img');
+  img.alt = 'Image (' + source + ')';
+  img.style.cssText = 'max-width:100%;border-radius:10px;cursor:zoom-in;display:block;';
+  img.onclick = onOpen || (() => {});
+  img.onerror = () => onError && onError(url);
+  img.src = url;
+  return img;
+}
+function showGeneratedImage({ url, source, prompt, onError, epoch, profile }) {
+  if (epoch !== undefined && epoch !== convEpoch) return null;
+  const wrap = document.createElement('div');
+  wrap.className = 'msg bot';
+  const img = makeImageEl({
+    url, source, prompt,
+    onError: (u) => {
+      if (onError) return onError(wrap, u);
+      wrap.className = 'msg image-loading';
+      wrap.textContent = '⚠️ ' + source + ' : image non chargée.';
+    }
+  });
+  wrap.appendChild(img);
+  messagesEl.appendChild(wrap);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return wrap;
+}
+
+async function generatePollinationImage(botText) {
+  const epoch = convEpoch, profile = profileName;
+  const loadingDiv = document.createElement('div');
+  loadingDiv.className = 'msg image-loading';
+  loadingDiv.textContent = '🎨 Pollination…';
+  appendMsgEl(loadingDiv, epoch);
+  const modelName = pollModel || 'flux';
+  const prompt = buildPollinationPrompt(botText, modelName);
+  const size = imageSize();
+  try {
+    const res = await fetch(WORKER_BASE + 'pollinations-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      body: JSON.stringify({
+        prompt, model: modelName, seed: charSeedValue() ?? Math.floor(Math.random() * 1e6),
+        width: size.w, height: size.h, guidance_scale: 7,
+        negative_prompt: 'blurry, low quality, deformed, bad anatomy, text, watermark'
+      })
+    });
+    loadingDiv.remove();
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob.type.startsWith('image/')) {
+        showGeneratedImage({ url: URL.createObjectURL(blob), source: 'Pollination (' + modelName + ')', prompt, epoch, profile });
+        return;
+      }
+    }
+    // secours URL directe
+    const q = new URLSearchParams({ width: size.w, height: size.h, model: modelName, nologo: 'true' });
+    const direct = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?' + q;
+    showGeneratedImage({ url: direct, source: 'Pollination (' + modelName + ')', prompt, epoch, profile });
+  } catch (e) {
+    loadingDiv.remove();
+    const err = document.createElement('div');
+    err.className = 'msg image-loading';
+    err.textContent = '❌ Pollination : ' + (e.message || e);
+    appendMsgEl(err, epoch);
+  }
+}
+
+async function generateAIHordeImage(botText) {
+  const epoch = convEpoch, profile = profileName;
+  const loadingDiv = document.createElement('div');
+  loadingDiv.className = 'msg image-loading';
+  loadingDiv.textContent = '🎨 AI Horde…';
+  appendMsgEl(loadingDiv, epoch);
+  try {
+    const prompt = buildHordePrompt(botText, 840);
+    const adv = { ...HORDE_ADV_DEFAULT, ...(hordeAdv || {}) };
+    const [w, h] = String(adv.size).split('x').map(Number);
+    const body = {
+      prompt: prompt.slice(0, 990) + (adv.negative ? ' ### ' + adv.negative.slice(0, 200) : ''),
+      nsfw: true, censor_nsfw: false,
+      models: hordeModels && hordeModels.length ? hordeModels : undefined,
+      params: {
+        width: w || 768, height: h || 512, steps: adv.steps, cfg_scale: adv.cfg,
+        sampler_name: adv.sampler, n: 1
+      }
+    };
+    const res = await fetch(WORKER_BASE + 'horde/generate/async', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const { id } = await res.json();
+    if (!id) throw new Error('pas d\'id');
+    const deadline = Date.now() + 150000;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 4000));
+      const st = await fetch(WORKER_BASE + 'horde/generate/status/' + id, { headers: { 'X-App-Secret': password } });
+      if (!st.ok) continue;
+      const data = await st.json();
+      if (data.generations && data.generations[0] && data.generations[0].img) {
+        loadingDiv.remove();
+        showGeneratedImage({ url: data.generations[0].img, source: 'AI Horde', prompt, epoch, profile });
+        return;
+      }
+      if (data.faulted) throw new Error('faulted');
+    }
+    throw new Error('délai dépassé');
+  } catch (e) {
+    loadingDiv.remove();
+    const err = document.createElement('div');
+    err.className = 'msg image-loading';
+    err.textContent = '❌ AI Horde : ' + (e.message || e);
+    appendMsgEl(err, epoch);
+  }
+}
+
+async function generateHFSpaceImage(botText) {
+  const epoch = convEpoch, profile = profileName;
+  const loadingDiv = document.createElement('div');
+  loadingDiv.className = 'msg image-loading';
+  loadingDiv.textContent = '🎨 Space HF…';
+  appendMsgEl(loadingDiv, epoch);
+  try {
+    const prompt = buildProsePrompt(botText, 600);
+    const size = imageSize();
+    const slug = (hfSpaceId || 'properfool/nsfwadult').trim().toLowerCase().replace('/', '-');
+    const res = await fetch(WORKER_BASE + 'hf-space?space=' + encodeURIComponent(slug) + '&path=' + encodeURIComponent('/gradio_api/call/generate_image'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      body: JSON.stringify({ data: [prompt, size.w, size.h, 10, 0, true, 1] })
+    });
+    loadingDiv.remove();
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    showMediaToast('Space HF : requête envoyée (voir logs si pas d\'image)');
+  } catch (e) {
+    loadingDiv.remove();
+    const err = document.createElement('div');
+    err.className = 'msg image-loading';
+    err.textContent = '❌ Space HF : ' + (e.message || e);
+    appendMsgEl(err, epoch);
+  }
+}
+
+async function generateNSFWImage(botText, popup) {
+  const epoch = convEpoch, profile = profileName;
+  const loadingDiv = document.createElement('div');
+  loadingDiv.className = 'msg image-loading';
+  loadingDiv.textContent = '🎨 Perchance…';
+  appendMsgEl(loadingDiv, epoch);
+  const prompt = buildPerchancePrompt(botText, 1300);
+  try {
+    if (popup && !popup.closed) {
+      const id = hex24();
+      const size = imageSize();
+      const params = new URLSearchParams({
+        prompt, format: 'html', id,
+        resolution: size.w + 'x' + size.h,
+        guidanceScale: 7,
+        negativePrompt: 'blurry, low quality, deformed, bad anatomy, text, watermark',
+        return: location.origin + location.pathname,
+        relay: WORKER_BASE
+      });
+      if (charSeedValue() !== null) params.set('seed', String(charSeedValue()));
+      popup.location.href = 'https://perchance.org/' + perchanceGenName() + '?' + params.toString();
+      loadingDiv.textContent = '🎨 Perchance : onglet ouvert — résous le captcha si besoin.';
+      // polling relais
+      const headers = { 'X-App-Secret': password };
+      const deadline = Date.now() + 300000;
+      while (Date.now() < deadline && epoch === convEpoch) {
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          const r = await fetch(WORKER_BASE + 'relay-get?id=' + encodeURIComponent(id), { headers });
+          if (r.ok) {
+            const d = await r.json();
+            if (d && d.url) {
+              loadingDiv.remove();
+              try { popup.close(); } catch (e) {}
+              showGeneratedImage({ url: d.url, source: 'Perchance', prompt, epoch, profile });
+              return;
+            }
+          }
+        } catch (e) {}
+      }
+    }
+    loadingDiv.textContent = '⏳ Perchance : pas de retour auto. Colle l\'URL de l\'image si besoin.';
+  } catch (e) {
+    loadingDiv.textContent = '❌ Perchance : ' + (e.message || e);
+  }
+}
+
+function safeTrigger(fn) { try { fn(); } catch (err) { console.error(err); } }
+
+async function launchImageGenerators(text, userText, popup, closePopup, rawPrompt) {
+  if (rawPrompt) rawPromptOverride = rawPrompt;
+  if (!(perchanceUsable() || genHFSpace || genPollination || genAIHorde)) {
+    rawPromptOverride = '';
+    if (closePopup) closePopup();
+    return;
+  }
+  if (!rawPromptOverride) {
+    await prepareScene(text, userText);
+    await prepareTranslations(text);
+  }
+  if (perchanceUsable()) safeTrigger(() => generateNSFWImage(text, popup));
+  else if (closePopup) closePopup();
+  if (genHFSpace) safeTrigger(() => generateHFSpaceImage(text));
+  if (genPollination) safeTrigger(() => generatePollinationImage(text));
+  if (genAIHorde) safeTrigger(() => generateAIHordeImage(text));
+  rawPromptOverride = '';
+}
+
+// ----- Scène / suggestions minimales -----
+function setSceneSheet(o) {
+  localStorage.setItem('sceneSheet:' + (profileName || ''), JSON.stringify(o));
+  refreshScenePanel();
+}
+function refreshScenePanel() {
+  const sh = getSceneSheet();
+  [['sceneLocation','location'],['sceneTime','time'],['sceneOutfit','outfit'],['sceneMood','mood']].forEach(([id,k]) => {
+    const el = document.getElementById(id);
+    if (el && document.activeElement !== el) el.value = sh[k] || '';
+  });
+  const auto = document.getElementById('sceneAuto');
+  if (auto) auto.checked = sceneOn();
+  const btn = document.getElementById('sceneBtn');
+  if (btn) btn.classList.toggle('off', !sceneOn());
+}
+(function () {
+  const panel = document.getElementById('scenePanel');
+  if (!panel) return;
+  document.getElementById('sceneBtn')?.addEventListener('click', () => { refreshScenePanel(); panel.classList.toggle('hidden'); });
+  document.getElementById('sceneClose')?.addEventListener('click', () => panel.classList.add('hidden'));
+  document.getElementById('sceneAuto')?.addEventListener('change', (e) => {
+    localStorage.setItem('sceneOn', e.target.checked ? '1' : '0'); refreshScenePanel();
+  });
+  [['sceneLocation','location'],['sceneTime','time'],['sceneOutfit','outfit'],['sceneMood','mood']].forEach(([id,k]) => {
+    document.getElementById(id)?.addEventListener('input', (e) => {
+      const sh = getSceneSheet(); sh[k] = e.target.value.trim().slice(0, 120);
+      localStorage.setItem('sceneSheet:' + (profileName || ''), JSON.stringify(sh));
+    });
+  });
+  document.getElementById('sceneReset')?.addEventListener('click', () => { setSceneSheet({}); showMediaToast('🎬 Scène réinit'); });
+  refreshScenePanel();
+})();
+
+function suggestOn() { return localStorage.getItem('suggestOn') !== '0'; }
+(function () {
+  const b = document.getElementById('suggestBtn');
+  if (!b) return;
+  const paint = () => b.classList.toggle('off', !suggestOn());
+  paint();
+  b.addEventListener('click', () => {
+    localStorage.setItem('suggestOn', suggestOn() ? '0' : '1');
+    paint(); if (!suggestOn()) clearSuggestions();
+    showMediaToast(suggestOn() ? '💡 Suggestions ON' : '💡 Suggestions OFF');
+  });
+})();
+(function () {
+  const b = document.getElementById('compareBtn');
+  if (!b) return;
+  const on = () => localStorage.getItem('compareOn') === '1';
+  const paint = () => b.classList.toggle('off', !on());
+  paint();
+  b.addEventListener('click', () => {
+    localStorage.setItem('compareOn', on() ? '0' : '1');
+    paint();
+    showMediaToast(on() ? '⚖️ Comparateur ON' : '⚖️ Comparateur OFF');
+  });
+})();
+
+// ----- Galerie minimale -----
+document.getElementById('galleryBtn')?.addEventListener('click', () => {
+  document.getElementElementById('gallery')?.classList.remove('hidden');
+  const grid = document.getElementById('gGrid');
+  if (grid && !grid.children.length) grid.innerHTML = '<div id="gEmpty" style="grid-column:1/-1;">Galerie vide pour cette session.</div>';
+});
+document.getElementById('gClose')?.addEventListener('click', () => document.getElementById('gallery')?.classList.add('hidden'));
+document.getElementById('lbClose')?.addEventListener('click', () => {
+  document.getElementById('lightbox')?.classList.add('hidden');
+  const img = document.getElementById('lbImg'); if (img) img.src = '';
+});
+
+// ----- Cadrage / format -----
+(function () {
+  const sel = document.getElementById('shotSel');
+  if (!sel) return;
+  sel.value = localStorage.getItem('shotPreset') || '';
+  sel.addEventListener('change', () => {
+    localStorage.setItem('shotPreset', sel.value);
+    showMediaToast(sel.value ? '📷 Cadrage changé' : '📷 Auto');
+  });
+})();
+(function () {
+  ['imgFormat','perchanceN'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = localStorage.getItem(id) || (id === 'imgFormat' ? 'landscape' : '');
+    el.addEventListener('change', () => localStorage.setItem(id, el.value));
+  });
+  const f = document.getElementById('perchanceGen');
+  if (f) {
+    f.value = localStorage.getItem('perchanceGen') || '';
+    f.addEventListener('input', () => localStorage.setItem('perchanceGen', f.value.trim()));
+  }
+  const cb = document.getElementById('perchancePersistent');
+  if (cb) {
+    cb.checked = localStorage.getItem('perchancePersistent') === '1';
+    cb.addEventListener('change', () => localStorage.setItem('perchancePersistent', cb.checked ? '1' : '0'));
+  }
+})();
+
+// ----- Ancre / seed / ref -----
+document.getElementById('charRefClear')?.addEventListener('click', () => { document.getElementById('charRef').value = ''; charRef = ''; });
+document.getElementById('charSeedRoll')?.addEventListener('click', () => {
+  document.getElementById('charSeed').value = Math.floor(Math.random() * 1e9);
+  document.getElementById('charSeedLock').checked = true;
+});
+document.getElementById('charAnchorGen')?.addEventListener('click', async () => {
+  const info = document.getElementById('charAnchorInfo');
+  const desc = (document.getElementById('physicalDescription').value || '').trim();
+  if (!desc) { if (info) info.textContent = 'Remplis la description d\'abord.'; return; }
+  if (info) info.textContent = '…';
+  let out = '';
+  try { out = (await toEnglish(desc)).trim(); } catch (e) { out = desc; }
+  document.getElementById('charAnchor').value = out.slice(0, 260);
+  if (info) info.textContent = 'Ancre générée (modifiable).';
+});
+document.getElementById('hAdvReset')?.addEventListener('click', () => fillHordeAdvForm(HORDE_ADV_DEFAULT));
+document.getElementById('hAdvPreset')?.addEventListener('change', (e) => {
+  const pr = HORDE_PRESETS[e.target.value];
+  if (pr) fillHordeAdvForm({ ...readHordeAdvFromForm(), ...pr });
+  e.target.value = '';
+});
+fillHordeAdvForm(HORDE_ADV_DEFAULT);
+renderHordeChips();
+
+// ========== CHAT STREAMING ==========
+function setGenerating(on) {
+  sendBtn.textContent = on ? '■' : '➤';
+  sendBtn.title = on ? 'Arrêter' : '';
+  sendBtn.style.background = on ? '#8a2a2a' : '';
+  sendBtn.style.color = on ? '#fff' : '';
+}
+function stripThink(t) {
+  return String(t)
+    .replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/<think>[\s\S]*$/i, '')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '').replace(/<thinking>[\s\S]*$/i, '')
+    .replace(/<\|channel>thought[\s\S]*?<channel\|>/g, '')
+    .replace(/<\|channel>[\s\S]*?<channel\|>/g, '');
+}
+function parseSSELine(line) {
+  const t = line.trim();
+  if (!t.startsWith('data:')) return null;
+  const payload = t.slice(5).trim();
+  if (!payload || payload === '[DONE]') return null;
+  try {
+    const j = JSON.parse(payload);
+    if (j.error) return { error: j.error.message || JSON.stringify(j.error) };
+    const c = j.choices && j.choices[0];
+    return { delta: (c && ((c.delta && c.delta.content) ?? (c.message && c.message.content) ?? c.text)) || '' };
+  } catch (e) { return null; }
+}
+function finalizeHistory(userText, botText, isInit, userTs) {
+  if (!isInit) history.push({ role: 'user', content: userText, ts: userTs || Date.now() });
+  history.push({ role: 'assistant', content: botText, ts: Date.now() });
+  persistCurrentHistory();
+}
+
+async function sendToWorker(userText,, userTs) {
+  const isInit = userText === '__init__';
+  let typingEl = null, botDiv = null;
+  const imagePopup = (perchanceUsable() && !perchancePersistentOn() && !isMobile()) ? window.open('about:blank', '_blank') : null;
+  function closeUnusedPopup() {
+    if (imagePopup && !imagePopup.closed) { try { imagePopup.close(); } catch (e) {} }
+  }
+  const epoch = convEpoch;
+  const ctrl = new AbortController();
+  streamAbort = ctrl;
+  let fullText = '', streamError = '';
+
+  try {
+    setGenerating(true);
+    typingEl = addMessage('...', 'typing');
+    typingEl.classList.remove('msg');
+    const messages = buildMessages(userText, isInit);
+    const s = sampling || {};
+    const response = await fetch(WORKER_BASE + provider, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/json', 'X-App-Secret': password },
+      body: JSON.stringify({
+        model, messages, stream: true,
+        temperature: s.temperature ?? 1.0,
+        top_p: s.top_p ?? 1.0,
+        frequency_penalty: s.frequency_penalty ?? 0,
+        presence_penalty: s.presence_penalty ?? 0,
+        max_tokens: s.max_tokens ?? 800
+      })
+    });
+    if (!response.ok) {
+      typingEl.remove();
+      closeUnusedPopup();
+      const errText = await response.text();
+      if (epoch === convEpoch) addMessage('Erreur ' + response.status + ' : ' + errText.slice(0, 700), 'err');
+      return;
+    }
+    typingEl.remove(); typingEl = null;
+    botDiv = addMessage('', 'bot');
+    const contentEl = botDiv.querySelector('.msg-content');
+    const render = (final) => {
+      contentEl.innerHTML = renderMarkdownBasic(stripThink(fullText)) + (final ? '' : '<span class="cursor">▍</span>');
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    };
+    render(false);
+    const ct = response.headers.get('content-type') || '';
+    if (/json/i.test(ct) && !/event-stream/i.test(ct)) {
+      const data = await response.json();
+      fullText = (data && data.choices && data.choices[0] && ((data.choices[0].message && data.choices[0].message.content) ?? data.choices[0].text)) || '';
+      render(true);
+    } else if (response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        for (const line of lines) {
+          const r = parseSSELine(line);
+          if (!r) continue;
+          if (r.error) { streamError = r.error; continue; }
+          if (r.delta) { fullText += r.delta; render(false); }
+        }
+      }
+    }
+    const stoppedByUser = !!ctrl.__user;
+    const finalText = stripThink(fullText).trim();
+    render(true);
+    if (epoch !== convEpoch) { closeUnusedPopup(); return; }
+    if (!finalText) {
+      contentEl.innerHTML = streamError ? '' : '(réponse vide)';
+      if (streamError) addMessage('Erreur : ' + streamError.slice(0, 200), 'err');
+      closeUnusedPopup();
+      return;
+    }
+    finalizeHistory(userText, finalText, isInit, userTs);
+    if (stoppedByUser) { closeUnusedPopup(); return; }
+    if (finalText.length > 20) {
+      launchImageGenerators(finalText, userText, imagePopup, closeUnusedPopup);
+    } else {
+      closeUnusedPopup();
+    }
+  } catch (err) {
+    closeUnusedPopup();
+    if (typingEl) typingEl.remove();
+    if (err && err.name === 'AbortError') {
+      if (!botDiv) addMessage('■ Génération arrêtée.', 'err');
+    } else if (epoch === convEpoch) {
+      addMessage('Erreur réseau : ' + err.message, 'err');
+    }
+  } finally {
+    streamAbort = null;
+    setGenerating(false);
+  }
+}
+
+function handleSend() {
+  if (streamAbort) { streamAbort.__user = true; streamAbort.abort(); return; }
+  const text = input.value.trim();
+  if (!text) return;
+  clearSuggestions(); suggestGen++;
+  const ts = Date.now();
+  addMessage(text, 'user', ts);
+  input.value = '';
+  input.style.height = 'auto';
+  sendToWorker(text, ts);
+}
+sendBtn.addEventListener('click', handleSend);
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!streamAbort) handleSend(); }
+});
+input.addEventListener('input', () => {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+});
+
+// ----- Micro (dictée) -----
+const micBtn = document.getElementById('mic');
+let micRecorder = null, micStream = null, micChunks = [], micTimer = null;
+function micReset() {
+  clearTimeout(micTimer);
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  micStream = null; micRecorder = null; micChunks = [];
+  if (micBtn) { micBtn.classList.remove('rec'); micBtn.textContent = '🎤'; }
+}
+async function transcribe(blob, ext) {
+  if (!micBtn) return;
+  micBtn.disabled = true; micBtn.textContent = '…';
+  try {
+    const fd = new FormData();
+    fd.append('file', blob, 'audio.' + ext);
+    fd.append('language', 'fr');
+    const res = await fetch(WORKER_BASE + 'groq-stt', {
+      method: 'POST', headers: { 'X-App-Secret': password }, body: fd
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = ((await res.json()).text || '').trim();
+    if (!text) { showMediaToast('🎤 Rien compris'); return; }
+    input.value = (input.value ? input.value.replace(/\s+$/, '') + ' ' : '') + text;
+    input.dispatchEvent(new Event('input'));
+    input.focus();
+  } catch (err) {
+    showMediaToast('🎤 ' + err.message);
+  } finally {
+    micBtn.disabled = false; micBtn.textContent = '🎤';
+  }
+}
+micBtn?.addEventListener('click', async () => {
+  if (micRecorder && micRecorder.state === 'recording') { micRecorder.stop(); return; }
+  if (!password) { showMediaToast('🎤 Mot de passe Worker requis'); return; }
+  if (!navigator.mediaDevices || !window.MediaRecorder) { showMediaToast('🎤 Non supporté'); return; }
+  try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { showMediaToast('🎤 Micro refusé'); return; }
+  const mime = ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(m => MediaRecorder.isTypeSupported(m)) || '';
+  const ext = mime.includes('mp4') ? 'm4a' : 'webm';
+  micRecorder = new MediaRecorder(micStream, mime ? { mimeType: mime } : undefined);
+  micChunks = [];
+  micRecorder.ondataavailable = (e) => { if (e.data.size) micChunks.push(e.data); };
+  micRecorder.onstop = () => {
+    const blob = new Blob(micChunks, { type: micRecorder.mimeType || 'audio/webm' });
+    micReset();
+    if (blob.size < 2000) { showMediaToast('🎤 Trop court'); return; }
+    transcribe(blob, ext);
+  };
+  micRecorder.start();
+  micBtn.classList.add('rec');
+  micBtn.textContent = '⏹';
+  micTimer = setTimeout(() => { if (micRecorder && micRecorder.state === 'recording') micRecorder.stop(); }, 120000);
+});
+
+// audio looper stop
+document.getElementById('stopAllLoops')?.addEventListener('click', () => {
+  Object.values(activeLoops).forEach(loop => { if (loop.timer) clearInterval(loop.timer); try { loop.audio.pause(); } catch(e){} });
+  Object.keys(activeLoops).forEach(k => delete activeLoops[k]);
+});
+
+console.log('[Chat] Partie 3 chargée — persona + images + streaming OK');
+</script></body></html>
+
