@@ -1963,7 +1963,7 @@ function finalizeHistory(userText, botText, isInit, userTs) {
   persistCurrentHistory();
 }
 
-async function sendToWorker(userText,, userTs) {
+async function sendToWorker(userText, userTs) {
   const isInit = userText === '__init__';
   let typingEl = null, botDiv = null;
   const imagePopup = (perchanceUsable() && !perchancePersistentOn() && !isMobile()) ? window.open('about:blank', '_blank') : null;
