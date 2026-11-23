@@ -1715,8 +1715,90 @@ const PE_SECTIONS = [
   { title: '5. Cheveux, tenue & scène', fields: [
     { id: 'hair-texture', label: 'Texture / coupe', opts: peO(['straight sleek hair', 'Raides'], ['wavy textured hair', 'Ondulés'], ['curly voluminous hair', 'Bouclés'], ['long thick wavy hair with bangs', 'Longs ondulés + frange'], ['long flowing thick hair', 'Très longs'], ['ponytail', 'Queue de cheval'], ['high ponytail', 'Queue de cheval haute'], ['bangs', 'Frange'], ['side bangs', 'Frange latérale'], ['messy bun', 'Chignon décoiffé'], ['wet hair', 'Mouillés'], ['short textured pixie cut', 'Pixie'], ['long hair tied back with bangs', 'Frange + longs cheveux attachés'], ['braids', 'Tresses'], ['double ponytails', 'Double queue de cheval']) },
     { id: 'hair-color', label: 'Couleur', opts: peO(['jet-black', 'Noir jais'], ['deep dark brown', 'Brun'], ['fake blonde', 'Fausse blonde'], ['brunette with 2 strands blond', 'meches blondes'], ['honey blonde', 'Blond miel'], ['striking platinum blonde', 'Platine'], ['vibrant auburn red', 'Roux auburn'], ['long vibrant black hair', 'Noir vibrant'], ['silver gray', 'Gris'], ['pastel pink hue', 'Rose pastel']) },
-    { id: 'outfit', label: 'Tenue (scène)', opts: peO(['completely nude', 'Complètement nue'], ['garter belte', 'Jaretelle'], ['wearing lingerie', 'Lingerie'], ['wearing sheer lingerie', 'Lingerie transparente'], ['wearing long victorian black dress', 'Robe victorienne noire'], ['wearing only panties', 'Seulement culotte'], ['wearing open robe', 'Peignoir ouvert'], ['wearing stockings and garter', 'Bas + porte-jarretelles'], ['wearing micro bikini', 'Micro bikini'], ['wearing ripped clothes', 'Vêtements déchirés'], ['wearing black neck choker', 'Tour de cou noir']) },
-    { id: 'jewelry', label: 'Bijoux (turquoise / Navajo)', ethnicOnly: true, opts: peO(['gleaming traditional Navajo silver and turquoise squash blossom necklace and matching earrings', 'Collier Navajo argent & turquoise'], ['traditional Navajo silver and turquoise jewelry', 'Bijoux Navajo']) },
+    // ========== TENUE MODULAIRE (inspiré PoseWear) ==========
+{ id: 'outfit-mode', label: 'Mode de tenue', opts: peO(
+  ['wearing a full outfit', 'Tenue complète'],
+  ['wearing only lingerie', 'Lingerie seulement'],
+  ['completely nude', 'Complètement nue'],
+  ['wearing only panties', 'Seulement culotte'],
+  ['wearing open robe', 'Peignoir ouvert'],
+  ['wearing sheer lingerie', 'Lingerie transparente'],
+  ['wearing micro bikini', 'Micro bikini'],
+  ['wearing ripped clothes', 'Vêtements déchirés']
+)},
+
+// --- Couleurs ---
+{ id: 'outfit-color', label: 'Couleur principale', opts: peO(
+  ['beige', 'Beige'], ['black', 'Noir'], ['blue', 'Bleu'], ['brown', 'Marron'],
+  ['burgundy', 'Bordeaux'], ['cream', 'Crème'], ['gold', 'Doré'], ['green', 'Vert'],
+  ['grey', 'Gris'], ['ivory', 'Ivoire'], ['khaki', 'Kaki'], ['lavender', 'Lavande'],
+  ['mint', 'Menthe'], ['navy', 'Marine'], ['olive', 'Olive'], ['orange', 'Orange'],
+  ['pink', 'Rose'], ['purple', 'Violet'], ['red', 'Rouge'], ['silver', 'Argenté'],
+  ['white', 'Blanc'], ['yellow', 'Jaune']
+)},
+
+// --- Matières / styles ---
+{ id: 'outfit-material', label: 'Matière / Style', opts: peO(
+  ['chiffon', 'Mousseline'], ['corduroy', 'Velours côtelé'], ['denim', 'Denim'],
+  ['floral', 'Floral'], ['frill', 'Volants'], ['fur', 'Fourrure'], ['knit', 'Maille'],
+  ['lace', 'Dentelle'], ['leather', 'Cuir'], ['mesh', 'Résille'], ['pleated', 'Plissé'],
+  ['polka-dot', 'Pois'], ['satin', 'Satin'], ['suede', 'Daim'], ['tulle', 'Tulle'],
+  ['velvet', 'Velours'], ['wool', 'Laine'], ['sheer', 'Transparent'], ['ripped', 'Déchiré']
+)},
+
+// --- Haut ---
+{ id: 'outfit-top', label: 'Haut', opts: peO(
+  ['blouse', 'Chemisier'], ['camisole', 'Caraco / Débardeur'], ['shirt', 'Chemise'],
+  ['sweater', 'Pull'], ['turtleneck', 'Col roulé'], ['hoodie', 'Sweat à capuche'],
+  ['vest', 'Gilet'], ['corset', 'Corset'], ['bra', 'Soutien-gorge'],
+  ['crop top', 'Crop top'], ['tank top', 'Débardeur']
+)},
+
+// --- Veste / Manteau ---
+{ id: 'outfit-outer', label: 'Veste / Manteau', opts: peO(
+  ['cardigan', 'Cardigan'], ['coat', 'Manteau'], ['jacket', 'Veste'],
+  ['robe', 'Peignoir / Robe de chambre'], ['blazer', 'Blazer'],
+  ['denim jacket', 'Veste en jean'], ['leather jacket', 'Perfecto']
+)},
+
+// --- Bas ---
+{ id: 'outfit-bottom', label: 'Bas', opts: peO(
+  ['skirt', 'Jupe'], ['mini skirt', 'Mini jupe'], ['midi skirt', 'Jupe midi'],
+  ['maxi skirt', 'Jupe longue'], ['shorts', 'Short'], ['pants', 'Pantalon'],
+  ['jeans', 'Jean'], ['wide-leg pants', 'Pantalon large'], ['leggings', 'Legging']
+)},
+
+// --- Robe / Une pièce ---
+{ id: 'outfit-dress', label: 'Robe / Une pièce', opts: peO(
+  ['dress', 'Robe'], ['mini dress', 'Mini robe'], ['midi dress', 'Robe midi'],
+  ['maxi dress', 'Robe longue'], ['slip dress', 'Robe nuisette'],
+  ['corset dress', 'Robe corset'], ['swimsuit', 'Maillot de bain'],
+  ['bikini', 'Bikini'], ['micro bikini', 'Micro bikini']
+)},
+
+// --- Bas / Collants ---
+{ id: 'outfit-legs', label: 'Bas / Collants', opts: peO(
+  ['socks', 'Chaussettes'], ['thigh-high socks', 'Chaussettes hautes'],
+  ['tights', 'Collants'], ['stockings', 'Bas'], ['garter belt', 'Porte-jarretelles'],
+  ['fishnet stockings', 'Bas résille'], ['bare legs', 'Jambes nues']
+)},
+
+// --- Chaussures ---
+{ id: 'outfit-shoes', label: 'Chaussures', opts: peO(
+  ['sneakers', 'Baskets'], ['boots', 'Bottes'], ['high heels', 'Talons hauts'],
+  ['pumps', 'Escarpins'], ['sandals', 'Sandales'], ['loafers', 'Mocassins'],
+  ['platform heels', 'Talons plateforme'], ['barefoot', 'Pieds nus']
+)},
+
+// --- Accessoires ---
+{ id: 'outfit-acc', label: 'Accessoires', opts: peO(
+  ['choker', 'Tour de cou'], ['necklace', 'Collier'], ['earrings', 'Boucles d\'oreilles'],
+  ['belt', 'Ceinture'], ['bag', 'Sac'], ['tote bag', 'Tote bag'],
+  ['hat', 'Chapeau'], ['beret', 'Béret'], ['beanie', 'Bonnet'],
+  ['gloves', 'Gants'], ['scarf', 'Écharpe'], ['sunglasses', 'Lunettes de soleil'],
+  ['ribbon', 'Ruban'], ['headband', 'Bandeau']
+)}
+   { id: 'jewelry', label: 'Bijoux (turquoise / Navajo)', ethnicOnly: true, opts: peO(['gleaming traditional Navajo silver and turquoise squash blossom necklace and matching earrings', 'Collier Navajo argent & turquoise'], ['traditional Navajo silver and turquoise jewelry', 'Bijoux Navajo']) },
     { id: 'position', label: 'Position (scène)', opts: peO(['missionary', 'Missionnaire'], ['doggy style', 'Levrette'], ['cowgirl', 'Cowgirl'], ['reverse cowgirl', 'Reverse cowgirl'], ['standing doggy', 'Levrette debout'], ['legs spread', 'Jambes écartées'], ['on all fours', 'À quatre pattes'], ['lying on back', 'Allongée sur le dos'], ['kneeling', 'À genoux'], ['ballerina sex position, one leg completely up and spread', 'Position ballerine'], ['squatting over a man', 'Accroupie'], ['on her back, legs spread wide and held up next to her head', 'Jambes relevées'], ['legs tied up with wrists up', 'Jambes et poignets attachés']) },
     { id: 'location', label: 'Lieu (scène)', opts: peO(['she lays on a traditional victorian bed', 'Lit victorien'], ['inside a dimly lit wooden hogan in the deep forest', 'Hogan en bois'], ['on a traditional woven rug', 'Tapis tissé']) }
   ] },
@@ -1724,6 +1806,7 @@ const PE_SECTIONS = [
     { id: 'skin-blemish', label: 'Imperfections', opts: peO(['prominent organic freckles scattered across the nose and cheeks', 'Taches de rousseur'], ['actual freckles across nose and cheeks', 'Freckles réalistes'], ['pale freckled skin', 'Peau pâle frecklée'], ['visible enlarged skin pores and real oily skin texture', 'Pores dilatés'], ['noticeable acne blemishes, pores, and natural light redness', 'Acné']) },
     { id: 'skin-marks', label: 'Signes & charme', opts: peO(['a small dark hyper-realistic beauty mark near the upper lip', 'Grain de beauté'], ['deep natural dimples on the cheeks when smiling', 'Fossettes'], ["subtle crow's feet wrinkles and fine lines around the eyes", 'Rides patte d\'oie'], ['pronounced tired dark circles under the eyes', 'Cernes']) }
   ] }
+ 
 ];
 const PE_ACTIONS = peO(['sucking huge penis', 'Sucer un énorme pénis'], ['deepthroat', 'Deepthroat'], ['rubbing her clitoris', 'Frotter le clitoris'], ['fingering pussy', 'Doigter'], ['licking nipples', 'Lécher les tétons'], ['titjob', 'Titjob'], ['the penis is in her anus', 'Pénétration anale'], ['hollowed cheeks sucking penis', 'Succion joues creuses'],
  ['mushroom glans wider than shaft', 'Gland champignon'],
