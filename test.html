@@ -1423,8 +1423,8 @@ function applyMasterVolumeLive() {
   Object.values(activeMoans).forEach(st => {
     if (!st.baseAudio) return;
     // gag : volume de base 0.7, moan : 0.65
-    const normal = st.kind === "gag" ? 0.7 : 0.65;
-    const ducked = st.kind === "gag" ? 0.2 : 0.25;
+    const normal = st.kind === "gag" ? 1.7 : 0.65;
+    const ducked = st.kind === "gag" ? 0.1 : 0.25;
     st.baseAudio.volume = (st.ducking ? ducked : normal) * masterVolume;
   });
 }
@@ -1541,14 +1541,14 @@ function startGagStyle(btn) {
     st.timer = setTimeout(() => {
       if (!mediaUnlocked || !activeMoans[id]) return;
       const interrupt = new Audio(pick(interruptions));
-      interrupt.volume = 0.9 * masterVolume;
+      interrupt.volume = 0.3 * masterVolume;
       st.ducking = true;
-      baseAudio.volume = 0.2 * masterVolume;
+      baseAudio.volume = 1.0 * masterVolume;
       interrupt.play().catch(console.error);
       interrupt.addEventListener("ended", () => {
         if (!activeMoans[id]) return;
         st.ducking = false;
-        baseAudio.volume = 0.7 * masterVolume;
+        baseAudio.volume = 1.0 * masterVolume;
         if (baseAudio.paused || baseAudio.ended) playNextGag();
         scheduleInterrupt();
       });
@@ -3123,18 +3123,30 @@ const helperTokens = (base, mdl) => REASONING_RE.test(mdl || model || '') ? Math
   sel.addEventListener('change', () => localStorage.setItem('helperProvider', sel.value));
   inp.addEventListener('input', () => localStorage.setItem('helperModel', inp.value.trim()));
 })();
-const SCENE_SYSTEM_PROMPT = `You write the ACTION line only for a photorealistic explicit image prompt.
+const SCENE_SYSTEM_PROMPT = `You write ONE action line for a photorealistic explicit image.
 
-Man = user message. Woman = character message. Show who is in the action. Call them "a man" and "a woman".
+WHO IS IN THE FRAME
+- Read BOTH messages. Only put people who are clearly present and interacting NOW.
+- If the woman is alone (posing, spreading, masturbating, waiting): describe ONLY her. Do NOT invent a man, penis, or second person.
+- If a man is present in the messages: call them "a man" and "a woman".
+- Never reuse acts from older turns (no leftover blowjob, deepthroat, or glans wording unless THIS turn shows oral).
 
-Read BOTH messages first. Describe only what is visually happening RIGHT NOW.
+ACCURACY OF ORIFICE
+- If the act is anal: penis in her anus (or entering her anus). Do NOT say pussy penetration.
+- If vaginal: penis in her pussy. Do NOT force anal.
+- If only display/spread: gaping or wet pussy/anus as shown — no penetration unless stated.
+- If cunnilingus: his mouth on her pussy; no sucking penis unless also in the scene.
 
-ONE line, comma-separated English phrases, order:
-(1) exact position and sexual act — who is where, body orientation, plain anatomy words (penis, pussy, clitoris, anus, mouth, breasts, ass);
-(2) hands and what they grip, pull, or rub;
-(3) faces / gaze;
-(4) oral, anal, genital touch, or masturbation unless a garment is clearly still on;
-(5) setting.
+OUTPUT
+ONE English comma-separated line, ~40–70 words, order:
+(1) who is present and exact pose/act with plain anatomy words
+(2) hands
+(3) faces/gaze
+(4) nude if sex/genital focus
+(5) setting ≤5 words
+
+No hair color, ethnicity, body type, breast size (character lock has that).
+No dialogue, names, quotes, dashes.
 
 How to use position examples below:
 - They are INSPIRATION only, not a closed list.
@@ -3143,6 +3155,13 @@ How to use position examples below:
 - One coherent pose — do not mash two incompatible positions.
 
 Example patterns (optional inspiration):
+If the character is futanari: always state "futanari" and "erect penis" (size only if the messages imply it). Oral on her = mouth on her penis, not on a man's penis, unless a man is also present.
+- Solo spread: she alone on her back, thighs spread, dripping pussy and anus visible, hands near her hips, flushed face looking at camera, bedroom
+- Solo masturbation: she alone, fingers rubbing her clitoris, legs spread, no man in frame
+- Cunnilingus: a man kneeling between her open legs, mouth on her pussy, tongue on her clitoris, her legs spread, she looking down at him
+- Cunnilingus 2 : a man kneeling between her open thighs, face pressed to her pussy, tongue on her clitoris, she reclining with legs spread, hands on his head or shoulders, wetness on his chin, bedroom
+- Anal entry: she on her back or all fours, a man behind or between her legs, penis entering her anus, pussy visible and wet beside it if relevant
+- Vaginal missionary: she on her back, a man on top, penis in her pussy
 - Missionary: she on her back, he on top between her legs, penis in her pussy
 - Mating press: A man inserts his long penis all the way into her ass, mating press position. He is fucking her with his long penis, slowly thrusting his hips against her ass. He thrusts his penis in and out of her ass—slow, deep penetration with a long penis. 
 - Cowgirl: she straddling him facing him, pussy on his penis
