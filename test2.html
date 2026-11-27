@@ -1801,7 +1801,39 @@ const PE_ACTIONS = peO(['sucking huge penis', 'Sucer un énorme pénis'], ['deep
  ['mushroom glans wider than shaft', 'Gland champignon'],
  ['a man gripping her wrists behind her back', 'Poignets dans le dos'], ['cum dripping', 'Sperme qui coule'], ['holding her asscheeks stretched open', 'Écarter les fesses'], ['looking at camera', 'Regarder la caméra']);
 const PE_FIELDS = PE_SECTIONS.flatMap(sec => sec.fields);
+// Assemble la tenue à partir des champs modulaires
+function peBuildOutfit(v) {
+  const mode = v['outfit-mode'] || '';
+  // Modes « spéciaux » prioritaires
+  if (mode === 'completely nude') return 'completely nude';
+  if (mode === 'wearing only panties') return 'wearing only panties';
+  if (mode === 'wearing lingerie') return 'wearing lingerie';
+  if (mode === 'wearing sheer lingerie') return 'wearing sheer lingerie';
+  if (mode === 'wearing micro bikini') return 'wearing micro bikini';
+  if (mode === 'wearing open robe') return 'wearing open robe';
+  if (mode === 'wearing ripped clothes') return 'wearing ripped clothes';
 
+  const color = v['outfit-color'] || '';
+  const material = v['outfit-material'] || '';
+  const prefix = [color, material].filter(Boolean).join(' ');
+
+  const parts = [];
+
+  if (v['outfit-dress']) {
+    parts.push((prefix + ' ' + v['outfit-dress']).trim());
+  } else {
+    if (v['outfit-top']) parts.push((prefix + ' ' + v['outfit-top']).trim());
+    if (v['outfit-outer']) parts.push(v['outfit-outer']);
+    if (v['outfit-bottom']) parts.push((prefix + ' ' + v['outfit-bottom']).trim());
+  }
+
+  if (v['outfit-legs']) parts.push(v['outfit-legs']);
+  if (v['outfit-shoes']) parts.push(v['outfit-shoes']);
+  if (v['outfit-acc']) parts.push(v['outfit-acc']);
+
+  if (!parts.length) return mode || '';
+  return 'wearing ' + parts.join(', ');
+}
 // Composition pure (testable) : valeurs choisies → description fixe, ancre, prompt complet
 function peCompose(v, addSuffix) {
   const art = (t) => (/^[aeiou]/i.test(t) ? 'an ' : 'a ') + t;
@@ -1818,7 +1850,10 @@ function peCompose(v, addSuffix) {
   const plainSubject = art(core);
   const persona = [plainSubject, ...mods, hair, ...pick(faceKeys), ...pick(['skin-blemish', 'skin-marks']), ...pick(['waist-shape', 'hips-shape', 'shoulders-neck']), ...pick(['breasts', 'areolas', 'nipples', 'pussy']), ...pick(['jewelry'])].filter(Boolean);
   const desc = persona.join(', ');
-  const anchor = fitPhrases(dedupePhrases(toPhrases(desc)), 500).join(', ');
+  const anchor = fitPhrases(dedupePhrases(toPhrases(desc)), 1500).join(', ');
+   // Tenue assemblée
+  const outfit = peBuildOutfit(v);
+
   // prompt complet : même assemblage que ton générateur
   const parts = [subject];
   const bodyAll = pick(['waist-shape', 'hips-shape', 'shoulders-neck', 'breasts', 'areolas', 'nipples', 'pussy', 'pussy-state']);
@@ -3491,12 +3526,12 @@ function buildPerchancePrompt(botText, maxLen, compact) {
   const budget = Math.max((maxLen || 1300) - prefix.length - suffix.length - tags.length - 2 - (shot ? shot.length + 2 : 0), 0);
   let descPart, actionPart;
   if (charAnchor) {
-    descPart = charAnchor.slice(0, 500);
-    actionPart = fitPhrases(actionAll, Math.max(budget - descPart.length - 2, 120)).join(', ');
+    descPart = charAnchor.slice(0, 1500);
+    actionPart = fitPhrases(actionAll, Math.max(budget - descPart.length - 2, 1200)).join(', ');
   } else {
     const d0 = physDescForImage() || '';
     const descBudget = Math.min(d0.length, Math.floor(budget * 0.3));
-    actionPart = fitPhrases(actionAll, Math.max(budget - descBudget - 2, 120)).join(', ');
+    actionPart = fitPhrases(actionAll, Math.max(budget - descBudget - 2, 1200)).join(', ');
     descPart = fitText(d0, Math.max(budget - actionPart.length - 2, 0));
   }
   const variable = [shot, descPart, actionPart].filter(Boolean).join(', ');
@@ -3552,12 +3587,12 @@ function buildPerchancePrompt(botText, maxLen, compact) {
   // description se réduisait à ses deux premiers mots).
   let descPart, actionPart;
   if (charAnchor) {
-    descPart = charAnchor.slice(0, 500);
-    actionPart = fitPhrases(actionAll, Math.max(budget - descPart.length - 2, 120)).join(', ');
+    descPart = charAnchor.slice(0, 1500);
+    actionPart = fitPhrases(actionAll, Math.max(budget - descPart.length - 2, 1200)).join(', ');
   } else {
     const d0 = physDescForImage() || '';
     const descBudget = Math.min(d0.length, Math.floor(budget * 0.3));
-    actionPart = fitPhrases(actionAll, Math.max(budget - descBudget - 2, 120)).join(', ');
+    actionPart = fitPhrases(actionAll, Math.max(budget - descBudget - 2, 1200)).join(', ');
     descPart = fitText(d0, Math.max(budget - actionPart.length - 2, 0));
   }
   const variable = [shot, descPart, actionPart].filter(Boolean).join(', ');
